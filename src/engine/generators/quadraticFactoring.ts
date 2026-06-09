@@ -85,6 +85,7 @@ export function distractors(k: FactoringConstruction): string[] {
 
 export const generator: Generator = {
   id: QUADRATIC_FACTORING_ID,
+  chapter: "Quadratics",
   title: "Solving quadratics by factoring",
   defaultDirections: "Solve each equation by factoring.",
   schema,
