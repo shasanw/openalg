@@ -3,7 +3,7 @@
 // 8.5 x 11 proportions at all times — it never shrinks to fit the content (short
 // sheets leave honest whitespace at the bottom, exactly as they will print).
 
-import { WorksheetView } from "@/components/WorksheetView";
+import { WorksheetView, type CurationHandlers } from "@/components/WorksheetView";
 import { Label } from "@/components/ui/label";
 import type { Worksheet } from "@/engine/worksheet";
 
@@ -18,10 +18,12 @@ export function Canvas({
   worksheet,
   showAnswers,
   onToggleAnswers,
+  curation,
 }: {
   worksheet: Worksheet | null;
   showAnswers: boolean;
   onToggleAnswers: (show: boolean) => void;
+  curation?: CurationHandlers;
 }) {
   return (
     <div className="bg-sidebar flex min-h-0 flex-col overflow-hidden rounded-xl border shadow-sm">
@@ -48,7 +50,11 @@ export function Canvas({
           <div className="flex justify-center p-8 pb-24">
             {/* US-Letter page: aspect-locked, fixed width, never scales to content. */}
             <div className="font-paper aspect-[8.5/11] w-full max-w-[760px] rounded-sm bg-white px-[64px] py-[60px] shadow-[0_1px_2px_rgba(20,20,20,0.08),0_20px_46px_-18px_rgba(20,20,20,0.20)]">
-              <WorksheetView worksheet={worksheet} showAnswers={showAnswers} />
+              <WorksheetView
+                worksheet={worksheet}
+                showAnswers={showAnswers}
+                curation={curation}
+              />
             </div>
           </div>
         ) : (
