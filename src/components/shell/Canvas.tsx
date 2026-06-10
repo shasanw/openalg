@@ -48,8 +48,13 @@ export function Canvas({
       >
         {worksheet ? (
           <div className="flex justify-center p-8 pb-24">
-            {/* US-Letter page: aspect-locked, fixed width, never scales to content. */}
-            <div className="font-paper aspect-[8.5/11] w-full max-w-[760px] rounded-sm bg-white px-[64px] py-[60px] shadow-[0_1px_2px_rgba(20,20,20,0.08),0_20px_46px_-18px_rgba(20,20,20,0.20)]">
+            {/* US-Letter page. `min-h` (not a locked aspect) keeps a full blank
+                page for short sheets while letting long ones GROW to contain
+                every problem — so nothing spills past the page into an
+                invisible-but-still-interactive zone. NOTE: this is the
+                walking-skeleton HTML preview, not the Typst output; a faithful,
+                paginated preview that matches the exported PDF is issue #7. */}
+            <div className="font-paper min-h-[980px] w-full max-w-[760px] rounded-sm bg-white px-[64px] py-[60px] shadow-[0_1px_2px_rgba(20,20,20,0.08),0_20px_46px_-18px_rgba(20,20,20,0.20)]">
               <WorksheetView
                 worksheet={worksheet}
                 showAnswers={showAnswers}
