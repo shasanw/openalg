@@ -49,6 +49,37 @@ describe("buildWorksheet", () => {
     expect(ws.title.length).toBeGreaterThan(0);
   });
 
+  it("never repeats a problem within a sheet when the space is large enough", () => {
+    // Default options give 171 distinct factoring problems; a 12-problem sheet
+    // must contain 12 distinct prompts for ANY base seed (reject-and-resample).
+    fc.assert(
+      fc.property(anySeed, (baseSeed) => {
+        const ws = buildWorksheet({
+          generatorId: QUADRATIC_FACTORING_ID,
+          baseSeed,
+          count: 12,
+        });
+        const prompts = new Set(ws.problems.map((p) => p.prompt));
+        expect(prompts.size).toBe(12);
+      }),
+    );
+  });
+
+  it("degrades gracefully when count exceeds the available problem space", () => {
+    // maxRoot=1 yields only 3 distinct problems; asking for 10 must still return
+    // 10 (topped up with repeats) and terminate rather than spin forever.
+    const ws = buildWorksheet({
+      generatorId: QUADRATIC_FACTORING_ID,
+      params: { maxRoot: 1 },
+      baseSeed: 5,
+      count: 10,
+    });
+    expect(ws.problems).toHaveLength(10);
+    const distinct = new Set(ws.problems.map((p) => p.prompt));
+    expect(distinct.size).toBeLessThanOrEqual(3);
+    expect(distinct.size).toBeGreaterThan(0);
+  });
+
   it("throws on an unknown generator", () => {
     expect(() =>
       buildWorksheet({ generatorId: "nope", baseSeed: 1, count: 1 }),

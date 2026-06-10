@@ -33,10 +33,30 @@ export function buildWorksheet(opts: BuildOptions): Worksheet {
     throw new Error(`Unknown generator: ${opts.generatorId}`);
   }
   const params = opts.params ?? {};
+
+  // Reject-and-resample so a sheet never shows the same question twice: draw
+  // seeds deterministically from the base seed and skip any problem whose prompt
+  // duplicates one already placed. The draw budget is bounded, so when the
+  // requested count approaches the generator's finite problem space we still
+  // terminate instead of spinning forever hunting for a uniqueness that can't
+  // exist.
   const problems: Problem[] = [];
-  for (let i = 0; i < opts.count; i++) {
-    problems.push(generator.generate(params, deriveSeed(opts.baseSeed, i)));
+  const seen = new Set<string>();
+  const maxDraws = opts.count * 64;
+  let draw = 0;
+  while (problems.length < opts.count && draw < maxDraws) {
+    const problem = generator.generate(params, deriveSeed(opts.baseSeed, draw));
+    draw++;
+    if (seen.has(problem.prompt)) continue;
+    seen.add(problem.prompt);
+    problems.push(problem);
   }
+  // If the option-space was too small to fill uniquely, top up with repeats so
+  // the teacher still gets the count they asked for (degrades gracefully).
+  while (problems.length < opts.count) {
+    problems.push(generator.generate(params, deriveSeed(opts.baseSeed, draw++)));
+  }
+
   return {
     version: 1,
     title: opts.title ?? generator.title,
