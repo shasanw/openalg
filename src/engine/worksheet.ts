@@ -124,25 +124,19 @@ export function removeProblem(ws: Worksheet, index: number): Worksheet {
 }
 
 /**
- * Move a problem one slot up (dir = -1) or down (dir = +1). Moves that would
- * fall off either end are a no-op, so callers can wire buttons without bounds
- * checks of their own.
+ * Move the problem at `from` to the slot at `to`, shifting the rest to fill the
+ * gap (drag-and-drop reorder semantics). Out-of-range indices, or a no-op move
+ * (from === to), return the worksheet unchanged.
  */
-export function moveProblem(
+export function reorderProblem(
   ws: Worksheet,
-  index: number,
-  dir: -1 | 1,
+  from: number,
+  to: number,
 ): Worksheet {
-  const target = index + dir;
-  if (
-    index < 0 ||
-    index >= ws.problems.length ||
-    target < 0 ||
-    target >= ws.problems.length
-  ) {
-    return ws;
-  }
+  const n = ws.problems.length;
+  if (from === to || from < 0 || from >= n || to < 0 || to >= n) return ws;
   const problems = ws.problems.slice();
-  [problems[index], problems[target]] = [problems[target], problems[index]];
+  const [moved] = problems.splice(from, 1);
+  problems.splice(to, 0, moved);
   return withProblems(ws, problems);
 }

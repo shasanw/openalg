@@ -6,7 +6,7 @@ import {
   regenerateAll,
   rerollProblem,
   removeProblem,
-  moveProblem,
+  reorderProblem,
   type Worksheet,
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
@@ -90,8 +90,8 @@ function App() {
       setWorksheet((ws) => (ws ? rerollProblem(ws, i, randomSeed()) : ws)),
     onRemove: (i: number) =>
       setWorksheet((ws) => (ws ? removeProblem(ws, i) : ws)),
-    onMove: (i: number, dir: -1 | 1) =>
-      setWorksheet((ws) => (ws ? moveProblem(ws, i, dir) : ws)),
+    onReorder: (from: number, to: number) =>
+      setWorksheet((ws) => (ws ? reorderProblem(ws, from, to) : ws)),
   };
 
   async function save() {

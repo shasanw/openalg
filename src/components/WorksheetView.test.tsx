@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import { WorksheetView } from "./WorksheetView";
 import { buildWorksheet } from "@/engine/worksheet";
 import { QUADRATIC_FACTORING_ID } from "@/engine/generators/quadraticFactoring";
@@ -17,10 +17,10 @@ describe("WorksheetView curation controls", () => {
     expect(screen.queryByLabelText("Re-roll problem")).not.toBeInTheDocument();
   });
 
-  it("renders a toolbar per problem and routes each action to the right index", () => {
+  it("routes re-roll and remove to the right index", () => {
     const curation = {
       onReroll: vi.fn(),
-      onMove: vi.fn(),
+      onReorder: vi.fn(),
       onRemove: vi.fn(),
     };
     render(
@@ -35,23 +35,33 @@ describe("WorksheetView curation controls", () => {
 
     within(items[1]).getByLabelText("Remove problem").click();
     expect(curation.onRemove).toHaveBeenCalledWith(1);
-
-    within(items[1]).getByLabelText("Move up").click();
-    expect(curation.onMove).toHaveBeenCalledWith(1, -1);
-
-    within(items[1]).getByLabelText("Move down").click();
-    expect(curation.onMove).toHaveBeenCalledWith(1, 1);
   });
 
-  it("disables Move up on the first problem and Move down on the last", () => {
-    const curation = { onReroll: vi.fn(), onMove: vi.fn(), onRemove: vi.fn() };
+  it("reorders via drag-and-drop, reporting (from, to) on drop", () => {
+    const curation = { onReroll: vi.fn(), onReorder: vi.fn(), onRemove: vi.fn() };
     render(
       <WorksheetView worksheet={sheet()} showAnswers={false} curation={curation} />,
     );
     const items = screen.getAllByRole("listitem");
-    expect(within(items[0]).getByLabelText("Move up")).toBeDisabled();
-    expect(within(items[0]).getByLabelText("Move down")).toBeEnabled();
-    expect(within(items[2]).getByLabelText("Move down")).toBeDisabled();
-    expect(within(items[2]).getByLabelText("Move up")).toBeEnabled();
+    expect(items.every((li) => li.getAttribute("draggable") === "true")).toBe(
+      true,
+    );
+
+    fireEvent.dragStart(items[0]);
+    fireEvent.dragEnter(items[2]);
+    fireEvent.dragOver(items[2]);
+    fireEvent.drop(items[2]);
+    expect(curation.onReorder).toHaveBeenCalledWith(0, 2);
+  });
+
+  it("does not fire onReorder when dropped on its own slot", () => {
+    const curation = { onReroll: vi.fn(), onReorder: vi.fn(), onRemove: vi.fn() };
+    render(
+      <WorksheetView worksheet={sheet()} showAnswers={false} curation={curation} />,
+    );
+    const items = screen.getAllByRole("listitem");
+    fireEvent.dragStart(items[1]);
+    fireEvent.drop(items[1]);
+    expect(curation.onReorder).not.toHaveBeenCalled();
   });
 });

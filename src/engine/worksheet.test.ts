@@ -5,7 +5,7 @@ import {
   regenerateAll,
   rerollProblem,
   removeProblem,
-  moveProblem,
+  reorderProblem,
 } from "./worksheet";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
 
@@ -174,20 +174,35 @@ describe("per-problem curation", () => {
     });
   });
 
-  describe("moveProblem", () => {
-    it("swaps a problem with its neighbor", () => {
+  describe("reorderProblem", () => {
+    it("moves a problem to a later slot, shifting the rest to fill the gap", () => {
       const ws = sheet();
-      const down = moveProblem(ws, 1, 1);
-      expect(down.problems[1]).toEqual(ws.problems[2]);
-      expect(down.problems[2]).toEqual(ws.problems[1]);
-      const up = moveProblem(ws, 3, -1);
-      expect(up.problems[3]).toEqual(ws.problems[2]);
-      expect(up.problems[2]).toEqual(ws.problems[3]);
+      const next = reorderProblem(ws, 1, 3);
+      // problem 1 lands at index 3; the items between shift left by one
+      expect(next.problems).toEqual([
+        ws.problems[0],
+        ws.problems[2],
+        ws.problems[3],
+        ws.problems[1],
+        ws.problems[4],
+      ]);
+    });
+
+    it("moves a problem to an earlier slot", () => {
+      const ws = sheet();
+      const next = reorderProblem(ws, 3, 0);
+      expect(next.problems).toEqual([
+        ws.problems[3],
+        ws.problems[0],
+        ws.problems[1],
+        ws.problems[2],
+        ws.problems[4],
+      ]);
     });
 
     it("preserves the multiset of problems and the count", () => {
       const ws = sheet();
-      const next = moveProblem(ws, 0, 1);
+      const next = reorderProblem(ws, 0, 4);
       expect(next.count).toBe(5);
       const bySeed = (a: { seed: number }, b: { seed: number }) =>
         a.seed - b.seed;
@@ -196,10 +211,11 @@ describe("per-problem curation", () => {
       );
     });
 
-    it("is a no-op at the ends", () => {
+    it("is a no-op for same-slot or out-of-range moves", () => {
       const ws = sheet();
-      expect(moveProblem(ws, 0, -1)).toEqual(ws);
-      expect(moveProblem(ws, 4, 1)).toEqual(ws);
+      expect(reorderProblem(ws, 2, 2)).toEqual(ws);
+      expect(reorderProblem(ws, -1, 2)).toEqual(ws);
+      expect(reorderProblem(ws, 2, 5)).toEqual(ws);
     });
   });
 });
