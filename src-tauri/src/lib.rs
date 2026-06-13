@@ -3,15 +3,51 @@ mod pdf;
 use rfd::FileDialog;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
-/// Save a worksheet (JSON) to a user-chosen file. Returns false if cancelled.
+/// Worksheet files use a branded `.oalg` extension (JSON inside) so they're
+/// recognizable in the OS, carry the app icon, and open on double-click.
+const WORKSHEET_EXT: &str = "oalg";
+
+/// Path of a worksheet OpenAlg was asked to open at launch (double-click / "open
+/// with" while the app was closed), held until the frontend collects it.
+struct LaunchFile(Mutex<Option<PathBuf>>);
+
+/// Pick the first `.oalg` path out of a process's argv (its launch arguments).
+fn worksheet_arg(args: &[String]) -> Option<PathBuf> {
+    args.iter()
+        .skip(1)
+        .map(PathBuf::from)
+        .find(|p| p.extension().and_then(|e| e.to_str()) == Some(WORKSHEET_EXT))
+}
+
+/// Read a worksheet file and emit it to the window so the frontend can load it.
+/// Used for files opened while the app is already running.
+fn emit_open_file(app: &tauri::AppHandle, path: &std::path::Path) {
+    if let Ok(contents) = fs::read_to_string(path) {
+        let _ = app.emit("open-file", contents);
+    }
+}
+
+/// Hand the frontend any file passed at launch (its JSON contents), once. None
+/// if the app wasn't launched by opening a worksheet.
+#[tauri::command]
+fn take_launch_file(state: tauri::State<LaunchFile>) -> Result<Option<String>, String> {
+    let path = state.0.lock().unwrap().take();
+    match path {
+        Some(p) => Ok(Some(fs::read_to_string(&p).map_err(|e| e.to_string())?)),
+        None => Ok(None),
+    }
+}
+
+/// Save a worksheet (JSON) to a user-chosen `.oalg` file. False if cancelled.
 #[tauri::command]
 fn save_worksheet(json: String, suggested_name: String) -> Result<bool, String> {
     let path = FileDialog::new()
         .set_file_name(&suggested_name)
-        .add_filter("OpenAlg worksheet", &["json"])
+        .add_filter("OpenAlg worksheet", &[WORKSHEET_EXT])
         .save_file();
     match path {
         Some(p) => {
@@ -22,11 +58,12 @@ fn save_worksheet(json: String, suggested_name: String) -> Result<bool, String> 
     }
 }
 
-/// Open a worksheet (JSON) the user picks. Returns None if cancelled.
+/// Open a worksheet the user picks. Accepts the `.oalg` format and legacy
+/// `.json` files. Returns None if cancelled.
 #[tauri::command]
 fn open_worksheet() -> Result<Option<String>, String> {
     let path = FileDialog::new()
-        .add_filter("OpenAlg worksheet", &["json"])
+        .add_filter("OpenAlg worksheet", &[WORKSHEET_EXT, "json"])
         .pick_file();
     match path {
         Some(p) => Ok(Some(fs::read_to_string(&p).map_err(|e| e.to_string())?)),
@@ -184,9 +221,28 @@ fn render_preview(source: String, math: Vec<String>) -> Result<Vec<String>, Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // A worksheet path may be on our own argv when launched by double-clicking a
+    // .oalg file (Windows/Linux). Capture it for the frontend to collect once it
+    // mounts (see take_launch_file).
+    let launch_file = worksheet_arg(&std::env::args().collect::<Vec<_>>());
+
     tauri::Builder::default()
+        // single-instance MUST be the first plugin. When a .oalg file is opened
+        // while the app is already running, the OS starts a second process; this
+        // forwards that process's argv here and focuses the existing window
+        // instead of opening a duplicate.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(path) = worksheet_arg(&argv) {
+                emit_open_file(app, &path);
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
+        .manage(LaunchFile(Mutex::new(launch_file)))
         .invoke_handler(tauri::generate_handler![
+            take_launch_file,
             save_worksheet,
             open_worksheet,
             library_save,
@@ -196,6 +252,17 @@ pub fn run() {
             export_pdf,
             render_preview
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|_app, _event| {
+            // macOS delivers "open with" via an Apple Event, not argv.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &_event {
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        emit_open_file(_app, &path);
+                    }
+                }
+            }
+        });
 }

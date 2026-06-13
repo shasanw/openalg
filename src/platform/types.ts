@@ -24,6 +24,16 @@ export interface Platform {
   /** Import a worksheet from a file the user picks; null if they cancel. */
   openWorksheet(): Promise<Worksheet | null>;
   /**
+   * A worksheet file the app was asked to open at launch (double-click / "Open
+   * with" while the app was closed); null if it wasn't launched that way.
+   */
+  takeLaunchWorksheet(): Promise<Worksheet | null>;
+  /**
+   * Subscribe to worksheet files opened while the app is already running
+   * (double-click / "Open with"). Returns an unsubscribe function.
+   */
+  onOpenWorksheet(handler: (worksheet: Worksheet) => void): Promise<() => void>;
+  /**
    * Silently persist a worksheet to the managed library under a stable id
    * (overwrites in place). This is the auto-save path — no dialog, no file
    * paths surfaced to the user.

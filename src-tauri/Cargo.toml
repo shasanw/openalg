@@ -20,6 +20,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+# Forwards a second launch (e.g. double-clicking a .oalg file while the app is
+# already open) to the running instance, with the file path in its argv.
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

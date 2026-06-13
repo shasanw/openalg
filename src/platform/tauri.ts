@@ -3,6 +3,7 @@
 // and Typst PDF compilation happen in the Rust core via these commands.
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   serializeWorksheet,
   deserializeWorksheet,
@@ -20,6 +21,23 @@ export const tauriPlatform: Platform = {
   async openWorksheet() {
     const json = await invoke<string | null>("open_worksheet");
     return json ? deserializeWorksheet(json) : null;
+  },
+
+  async takeLaunchWorksheet() {
+    const json = await invoke<string | null>("take_launch_file");
+    return json ? deserializeWorksheet(json) : null;
+  },
+
+  async onOpenWorksheet(handler) {
+    return await listen<string>("open-file", (event) => {
+      try {
+        handler(deserializeWorksheet(event.payload));
+      } catch (e) {
+        // A malformed/foreign file double-clicked into the app: log and ignore
+        // rather than crashing the listener.
+        console.error(e);
+      }
+    });
   },
 
   async autosaveWorksheet(id, worksheet) {
