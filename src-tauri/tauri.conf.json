@@ -32,6 +32,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["oalg"],
+        "name": "OpenAlg Worksheet",
+        "description": "OpenAlg worksheet",
+        "role": "Editor",
+        "mimeType": "application/x-openalg-worksheet"
+      }
     ]
   }
 }

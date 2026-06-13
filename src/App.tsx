@@ -151,6 +151,32 @@ function App() {
     platform.listLibrary().then(setRecents).catch((e) => console.error(e));
   }, [view]);
 
+  // OS file-open integration: load a .oalg file the app was launched with
+  // (double-click while closed), and listen for files opened while running
+  // (double-click / "Open with" on a second launch). Mount-only.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let active = true;
+    platform
+      .takeLaunchWorksheet()
+      .then((ws) => {
+        if (active && ws) adoptWorksheet(ws);
+      })
+      .catch((e) => console.error(e));
+    platform
+      .onOpenWorksheet((ws) => adoptWorksheet(ws))
+      .then((un) => {
+        if (active) unlisten = un;
+        else un();
+      })
+      .catch((e) => console.error(e));
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Build a filled worksheet from a topic template and enter the workspace. */
   function openTopic(id: string) {
     const g = getGenerator(id)!;
@@ -193,6 +219,20 @@ function App() {
         title: "Untitled worksheet",
       }),
     );
+    setView("doc");
+  }
+
+  /**
+   * Load a worksheet object into the workspace as a fresh document (new library
+   * id). Shared by file import, recents-less opens, and OS "open with".
+   */
+  function adoptWorksheet(ws: Worksheet) {
+    setDocId(newDocId());
+    setWorksheet(ws);
+    setGeneratorId(ws.generatorId);
+    setParams(ws.params);
+    setCount(ws.count || DEFAULT_COUNT);
+    setShowAnswers(false);
     setView("doc");
   }
 
@@ -284,12 +324,12 @@ function App() {
     if (!worksheet || saving) return;
     setSaving(true);
     try {
-      const ok = await platform.saveWorksheet(worksheet, `${worksheet.title}.json`);
+      const ok = await platform.saveWorksheet(worksheet, `${worksheet.title}.oalg`);
       if (ok) {
         toast({
           variant: "success",
           title: "Saved a copy",
-          description: `${worksheet.title}.json`,
+          description: `${worksheet.title}.oalg`,
         });
       }
     } catch (e) {
@@ -307,12 +347,7 @@ function App() {
       // so a loaded worksheet is ready to drive the workspace as-is.
       const ws = await platform.openWorksheet();
       if (!ws) return;
-      setDocId(newDocId());
-      setWorksheet(ws);
-      setGeneratorId(ws.generatorId);
-      setParams(ws.params);
-      setCount(ws.count || DEFAULT_COUNT);
-      setView("doc");
+      adoptWorksheet(ws);
     } catch (e) {
       console.error(e);
       toast({
