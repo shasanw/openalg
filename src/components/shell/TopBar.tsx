@@ -2,12 +2,27 @@
 // Worksheet/Test mode toggle, and global file actions. Test mode (multi-section)
 // is a staged follow-up — its button is present but disabled for now.
 
-import { FileDown, FolderOpen, Printer, Save, Settings, Sigma } from "lucide-react";
+import {
+  FileDown,
+  FolderOpen,
+  Loader2,
+  Printer,
+  Save,
+  Settings,
+  Sigma,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import type { Theme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
 
 export type DocMode = "worksheet" | "test";
+
+/** A spinning placeholder swapped in for a button's icon while it's busy. */
+function Spinner() {
+  return <Loader2 className="animate-spin" />;
+}
 
 export function TopBar({
   title,
@@ -22,6 +37,11 @@ export function TopBar({
   onPrintConfig,
   canSave,
   canExport,
+  saving,
+  exporting,
+  printing,
+  theme,
+  onThemeChange,
 }: {
   title: string;
   /** When provided, the title becomes editable inline. */
@@ -36,6 +56,11 @@ export function TopBar({
   onPrintConfig: () => void;
   canSave: boolean;
   canExport: boolean;
+  saving: boolean;
+  exporting: boolean;
+  printing: boolean;
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
 }) {
   return (
     <header className="bg-sidebar flex h-13 shrink-0 items-center gap-3 rounded-xl border px-3 shadow-sm">
@@ -88,9 +113,15 @@ export function TopBar({
       <Button variant="ghost" size="sm" onClick={onOpen}>
         <FolderOpen /> Open
       </Button>
-      <Button variant="ghost" size="sm" onClick={onSave} disabled={!canSave}>
-        <Save /> Save
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onSave}
+        disabled={!canSave || saving}
+      >
+        {saving ? <Spinner /> : <Save />} Save
       </Button>
+      <ThemeToggle theme={theme} onThemeChange={onThemeChange} className="size-8" />
       <Button
         variant="ghost"
         size="icon"
@@ -105,17 +136,17 @@ export function TopBar({
         variant="outline"
         size="sm"
         onClick={onExport}
-        disabled={!canExport}
+        disabled={!canExport || exporting}
       >
-        <FileDown /> Export PDF
+        {exporting ? <Spinner /> : <FileDown />} Export PDF
       </Button>
       <Button
         variant="default"
         size="sm"
         onClick={onPrint}
-        disabled={!canExport}
+        disabled={!canExport || printing}
       >
-        <Printer /> Print
+        {printing ? <Spinner /> : <Printer />} Print
       </Button>
     </header>
   );

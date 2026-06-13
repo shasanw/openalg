@@ -123,7 +123,7 @@ function Pages({
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 p-8 pb-24">
+    <div className="flex flex-col items-center gap-6 p-6 pb-24">
       {pages.map((svg, i) => (
         <div
           key={i}

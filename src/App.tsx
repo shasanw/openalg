@@ -10,6 +10,7 @@ import {
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
 import { platform } from "@/platform";
+import { useTheme } from "@/lib/useTheme";
 import { HomeScreen } from "@/components/home/HomeScreen";
 import { TopBar, type DocMode } from "@/components/shell/TopBar";
 import { Navigator } from "@/components/shell/Navigator";
@@ -95,6 +96,13 @@ function App() {
   const [showAnswers, setShowAnswers] = useState(false);
   const [mode, setMode] = useState<DocMode>("worksheet");
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  // Async file/print actions hit the disk and the Typst compiler, so they can
+  // run well past a frame; track each so its button can show progress and
+  // guard against double-firing.
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   /** Build a worksheet for the given topic and enter the workspace. */
   function openTopic(id: string) {
@@ -162,11 +170,14 @@ function App() {
     setWorksheet((ws) => (ws ? { ...ws, print } : ws));
 
   async function save() {
-    if (!worksheet) return;
+    if (!worksheet || saving) return;
+    setSaving(true);
     try {
       await platform.saveWorksheet(worksheet, `${worksheet.title}.json`);
     } catch (e) {
       console.error(e);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -186,7 +197,8 @@ function App() {
   }
 
   async function exportPdf() {
-    if (!worksheet) return;
+    if (!worksheet || exporting) return;
+    setExporting(true);
     try {
       await platform.exportPdf(
         buildTypstDocument(worksheet, { keyFormat: "full" }),
@@ -194,15 +206,20 @@ function App() {
       );
     } catch (e) {
       console.error(e);
+    } finally {
+      setExporting(false);
     }
   }
 
   async function print() {
-    if (!worksheet) return;
+    if (!worksheet || printing) return;
+    setPrinting(true);
     try {
       await printWorksheet(worksheet);
     } catch (e) {
       console.error(e);
+    } finally {
+      setPrinting(false);
     }
   }
 
@@ -212,6 +229,8 @@ function App() {
         onNewWorksheet={() => openTopic(GENERATORS[0].id)}
         onOpenTemplate={openTopic}
         onOpen={open}
+        theme={theme}
+        onThemeChange={setTheme}
       />
     );
   }
@@ -231,9 +250,14 @@ function App() {
         onPrintConfig={() => setPrintDialogOpen(true)}
         canSave={!!worksheet}
         canExport={!!worksheet}
+        saving={saving}
+        exporting={exporting}
+        printing={printing}
+        theme={theme}
+        onThemeChange={setTheme}
       />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[236px_1fr_320px] gap-2.5">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(180px,236px)_minmax(0,1fr)_minmax(260px,320px)] gap-2.5">
         <Navigator generatorId={generatorId} onSelect={selectTopic} />
         <Canvas
           worksheet={worksheet}

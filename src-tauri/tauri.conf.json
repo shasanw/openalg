@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "OpenAlg",
-        "width": 800,
-        "height": 600
+        "width": 1180,
+        "height": 780,
+        "minWidth": 940,
+        "minHeight": 600
       }
     ],
     "security": {

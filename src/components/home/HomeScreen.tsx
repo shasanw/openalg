@@ -5,6 +5,8 @@
 import { FolderOpen, Plus, Search, Settings, Sigma } from "lucide-react";
 import { GENERATORS } from "@/engine/registry";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import type { Theme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
 
 function greeting(): string {
@@ -18,10 +20,14 @@ export function HomeScreen({
   onNewWorksheet,
   onOpenTemplate,
   onOpen,
+  theme,
+  onThemeChange,
 }: {
   onNewWorksheet: () => void;
   onOpenTemplate: (generatorId: string) => void;
   onOpen: () => void;
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
 }) {
   return (
     <div className="bg-background h-screen overflow-y-auto">
@@ -41,6 +47,7 @@ export function HomeScreen({
             placeholder="Search your worksheets…"
           />
         </div>
+        <ThemeToggle theme={theme} onThemeChange={onThemeChange} className="size-9" />
         <Button variant="outline" size="icon" className="size-9" title="Settings">
           <Settings />
         </Button>
@@ -141,23 +148,24 @@ function StartCard({
 function Thumb({ blank, test }: { blank?: boolean; test?: boolean }) {
   if (blank) {
     return (
-      <div className="border-border text-primary flex aspect-[8.5/11] items-center justify-center rounded-lg border border-dashed bg-white">
+      <div className="text-primary flex aspect-[8.5/11] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white">
         <Plus className="size-7" />
       </div>
     );
   }
-  // Abstract "mini paper" preview lines.
+  // Abstract "mini paper" preview lines. The thumbnail is always white paper, so
+  // these use fixed neutrals (not theme tokens) to stay visible in dark mode.
   const Line = ({ w }: { w: string }) => (
-    <div className={cn("bg-border mb-1.5 h-1 rounded-full", w)} />
+    <div className={cn("mb-1.5 h-1 rounded-full bg-slate-300", w)} />
   );
   return (
-    <div className="border-border/70 relative aspect-[8.5/11] overflow-hidden rounded-lg border bg-white p-3">
+    <div className="relative aspect-[8.5/11] overflow-hidden rounded-lg border border-slate-200 bg-white p-3">
       {test && (
         <span className="text-chart-2 bg-chart-2/10 absolute top-2 right-2 rounded px-1.5 text-[8px] font-bold">
           A · B
         </span>
       )}
-      <div className="bg-muted-foreground/40 mb-2.5 h-1.5 w-3/5 rounded-full" />
+      <div className="mb-2.5 h-1.5 w-3/5 rounded-full bg-slate-400" />
       <div className="flex gap-2">
         <div className="flex-1">
           <Line w="w-5/6" />
