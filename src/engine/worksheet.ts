@@ -33,10 +33,30 @@ export function buildWorksheet(opts: BuildOptions): Worksheet {
     throw new Error(`Unknown generator: ${opts.generatorId}`);
   }
   const params = opts.params ?? {};
+
+  // Reject-and-resample so a sheet never shows the same question twice: draw
+  // seeds deterministically from the base seed and skip any problem whose prompt
+  // duplicates one already placed. The draw budget is bounded, so when the
+  // requested count approaches the generator's finite problem space we still
+  // terminate instead of spinning forever hunting for a uniqueness that can't
+  // exist.
   const problems: Problem[] = [];
-  for (let i = 0; i < opts.count; i++) {
-    problems.push(generator.generate(params, deriveSeed(opts.baseSeed, i)));
+  const seen = new Set<string>();
+  const maxDraws = opts.count * 64;
+  let draw = 0;
+  while (problems.length < opts.count && draw < maxDraws) {
+    const problem = generator.generate(params, deriveSeed(opts.baseSeed, draw));
+    draw++;
+    if (seen.has(problem.prompt)) continue;
+    seen.add(problem.prompt);
+    problems.push(problem);
   }
+  // If the option-space was too small to fill uniquely, top up with repeats so
+  // the teacher still gets the count they asked for (degrades gracefully).
+  while (problems.length < opts.count) {
+    problems.push(generator.generate(params, deriveSeed(opts.baseSeed, draw++)));
+  }
+
   return {
     version: 1,
     title: opts.title ?? generator.title,
@@ -59,4 +79,64 @@ export function regenerateAll(ws: Worksheet, newBaseSeed: number): Worksheet {
     title: ws.title,
     directions: ws.directions,
   });
+}
+
+// --- Per-problem curation (issue #4) -----------------------------------------
+//
+// Curation operates on the `problems[]` array, which is the source of truth once
+// a sheet has been hand-edited. Each Problem self-carries its recipe
+// (generatorId, params, seed), so a single problem can be re-rolled from its own
+// recipe without touching the rest of the sheet — staying answer-from-construction.
+// `count` is kept equal to `problems.length` so the worksheet recipe always stays
+// consistent with what's displayed.
+
+function withProblems(ws: Worksheet, problems: Problem[]): Worksheet {
+  return { ...ws, problems, count: problems.length };
+}
+
+/**
+ * Re-roll a single problem: regenerate it from its OWN recipe with a new seed,
+ * leaving every other problem byte-identical. Out-of-range indices are a no-op.
+ */
+export function rerollProblem(
+  ws: Worksheet,
+  index: number,
+  newSeed: number,
+): Worksheet {
+  const target = ws.problems[index];
+  if (!target) return ws;
+  const generator = getGenerator(target.generatorId);
+  if (!generator) {
+    throw new Error(`Unknown generator: ${target.generatorId}`);
+  }
+  const fresh = generator.generate(target.params, newSeed);
+  const problems = ws.problems.slice();
+  problems[index] = fresh;
+  return withProblems(ws, problems);
+}
+
+/** Remove a single problem. Out-of-range indices are a no-op. */
+export function removeProblem(ws: Worksheet, index: number): Worksheet {
+  if (index < 0 || index >= ws.problems.length) return ws;
+  const problems = ws.problems.slice();
+  problems.splice(index, 1);
+  return withProblems(ws, problems);
+}
+
+/**
+ * Move the problem at `from` to the slot at `to`, shifting the rest to fill the
+ * gap (drag-and-drop reorder semantics). Out-of-range indices, or a no-op move
+ * (from === to), return the worksheet unchanged.
+ */
+export function reorderProblem(
+  ws: Worksheet,
+  from: number,
+  to: number,
+): Worksheet {
+  const n = ws.problems.length;
+  if (from === to || from < 0 || from >= n || to < 0 || to >= n) return ws;
+  const problems = ws.problems.slice();
+  const [moved] = problems.splice(from, 1);
+  problems.splice(to, 0, moved);
+  return withProblems(ws, problems);
 }

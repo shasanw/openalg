@@ -4,6 +4,9 @@ import { resolveParams, type ParamValues } from "@/engine/types";
 import {
   buildWorksheet,
   regenerateAll,
+  rerollProblem,
+  removeProblem,
+  reorderProblem,
   type Worksheet,
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
@@ -79,6 +82,18 @@ function App() {
     if (worksheet) setWorksheet(regenerateAll(worksheet, randomSeed()));
   }
 
+  // Per-problem curation (issue #4). Each op produces a new worksheet whose
+  // `problems`/recipe stay consistent; re-roll uses the problem's own recipe so
+  // it remains correct-by-construction.
+  const curation = {
+    onReroll: (i: number) =>
+      setWorksheet((ws) => (ws ? rerollProblem(ws, i, randomSeed()) : ws)),
+    onRemove: (i: number) =>
+      setWorksheet((ws) => (ws ? removeProblem(ws, i) : ws)),
+    onReorder: (from: number, to: number) =>
+      setWorksheet((ws) => (ws ? reorderProblem(ws, from, to) : ws)),
+  };
+
   async function save() {
     if (!worksheet) return;
     try {
@@ -144,6 +159,7 @@ function App() {
           worksheet={worksheet}
           showAnswers={showAnswers}
           onToggleAnswers={setShowAnswers}
+          curation={curation}
         />
         <Inspector
           generator={generator}

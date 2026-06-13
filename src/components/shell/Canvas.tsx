@@ -3,7 +3,7 @@
 // 8.5 x 11 proportions at all times — it never shrinks to fit the content (short
 // sheets leave honest whitespace at the bottom, exactly as they will print).
 
-import { WorksheetView } from "@/components/WorksheetView";
+import { WorksheetView, type CurationHandlers } from "@/components/WorksheetView";
 import { Label } from "@/components/ui/label";
 import type { Worksheet } from "@/engine/worksheet";
 
@@ -18,10 +18,12 @@ export function Canvas({
   worksheet,
   showAnswers,
   onToggleAnswers,
+  curation,
 }: {
   worksheet: Worksheet | null;
   showAnswers: boolean;
   onToggleAnswers: (show: boolean) => void;
+  curation?: CurationHandlers;
 }) {
   return (
     <div className="bg-sidebar flex min-h-0 flex-col overflow-hidden rounded-xl border shadow-sm">
@@ -46,9 +48,18 @@ export function Canvas({
       >
         {worksheet ? (
           <div className="flex justify-center p-8 pb-24">
-            {/* US-Letter page: aspect-locked, fixed width, never scales to content. */}
-            <div className="font-paper aspect-[8.5/11] w-full max-w-[760px] rounded-sm bg-white px-[64px] py-[60px] shadow-[0_1px_2px_rgba(20,20,20,0.08),0_20px_46px_-18px_rgba(20,20,20,0.20)]">
-              <WorksheetView worksheet={worksheet} showAnswers={showAnswers} />
+            {/* US-Letter page. `min-h` (not a locked aspect) keeps a full blank
+                page for short sheets while letting long ones GROW to contain
+                every problem — so nothing spills past the page into an
+                invisible-but-still-interactive zone. NOTE: this is the
+                walking-skeleton HTML preview, not the Typst output; a faithful,
+                paginated preview that matches the exported PDF is issue #7. */}
+            <div className="font-paper min-h-[980px] w-full max-w-[760px] rounded-sm bg-white px-[64px] py-[60px] shadow-[0_1px_2px_rgba(20,20,20,0.08),0_20px_46px_-18px_rgba(20,20,20,0.20)]">
+              <WorksheetView
+                worksheet={worksheet}
+                showAnswers={showAnswers}
+                curation={curation}
+              />
             </div>
           </div>
         ) : (
