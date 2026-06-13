@@ -48,7 +48,7 @@ export function Canvas({
         className="no-scrollbar bg-background relative min-h-0 flex-1 overflow-auto"
         style={DOT_SURFACE}
       >
-        {worksheet ? (
+        {worksheet && worksheet.problems.length > 0 ? (
           <Pages worksheet={worksheet} showAnswers={showAnswers} />
         ) : (
           <div className="text-muted-foreground flex h-full items-center justify-center px-8 text-center text-sm">

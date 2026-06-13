@@ -3,6 +3,8 @@
 // is a staged follow-up — its button is present but disabled for now.
 
 import {
+  Check,
+  CloudOff,
   FileDown,
   FolderOpen,
   Loader2,
@@ -14,10 +16,34 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import type { AutosaveState } from "@/App";
 import type { Theme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
 
 export type DocMode = "worksheet" | "test";
+
+/** Subtle "your work is saved" indicator for the silent library auto-save. */
+function AutosaveIndicator({ state }: { state: AutosaveState }) {
+  if (state === "idle") return null;
+  const map = {
+    saving: { icon: <Loader2 className="size-3.5 animate-spin" />, text: "Saving…" },
+    saved: { icon: <Check className="size-3.5" />, text: "Saved" },
+    error: { icon: <CloudOff className="size-3.5 text-destructive" />, text: "Not saved" },
+  } as const;
+  const { icon, text } = map[state];
+  return (
+    <span
+      className={cn(
+        "text-muted-foreground flex items-center gap-1 text-xs font-medium",
+        state === "error" && "text-destructive",
+      )}
+      aria-live="polite"
+    >
+      {icon}
+      {text}
+    </span>
+  );
+}
 
 /** A spinning placeholder swapped in for a button's icon while it's busy. */
 function Spinner() {
@@ -37,6 +63,7 @@ export function TopBar({
   onPrintConfig,
   canSave,
   canExport,
+  autosave,
   saving,
   exporting,
   printing,
@@ -56,6 +83,7 @@ export function TopBar({
   onPrintConfig: () => void;
   canSave: boolean;
   canExport: boolean;
+  autosave: AutosaveState;
   saving: boolean;
   exporting: boolean;
   printing: boolean;
@@ -87,6 +115,8 @@ export function TopBar({
       ) : (
         <span className="truncate text-sm font-semibold">{title}</span>
       )}
+
+      <AutosaveIndicator state={autosave} />
 
       <Separator orientation="vertical" className="h-5" />
 

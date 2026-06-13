@@ -3,20 +3,46 @@
 // and Typst PDF compilation happen in the Rust core via these commands.
 
 import { invoke } from "@tauri-apps/api/core";
-import type { Worksheet } from "../engine/worksheet";
-import type { Platform } from "./types";
+import {
+  serializeWorksheet,
+  deserializeWorksheet,
+} from "../engine/persist";
+import type { LibraryEntry, Platform } from "./types";
 
 export const tauriPlatform: Platform = {
   async saveWorksheet(worksheet, suggestedName) {
     return await invoke<boolean>("save_worksheet", {
-      json: JSON.stringify(worksheet, null, 2),
+      json: serializeWorksheet(worksheet),
       suggestedName,
     });
   },
 
   async openWorksheet() {
     const json = await invoke<string | null>("open_worksheet");
-    return json ? (JSON.parse(json) as Worksheet) : null;
+    return json ? deserializeWorksheet(json) : null;
+  },
+
+  async autosaveWorksheet(id, worksheet) {
+    await invoke("library_save", { id, json: serializeWorksheet(worksheet) });
+  },
+
+  async listLibrary() {
+    return await invoke<LibraryEntry[]>("library_list");
+  },
+
+  async loadLibrary(id) {
+    try {
+      const json = await invoke<string>("library_load", { id });
+      return deserializeWorksheet(json);
+    } catch {
+      // Missing or unparseable file — treat as "not found" so the caller can
+      // show a friendly message instead of a raw error.
+      return null;
+    }
+  },
+
+  async deleteLibrary(id) {
+    await invoke("library_delete", { id });
   },
 
   async exportPdf(doc, suggestedName) {

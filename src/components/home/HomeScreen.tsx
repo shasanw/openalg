@@ -1,9 +1,10 @@
 // The launch screen, shown when no document is open. Word-style: "start new"
 // (blank worksheet / test + topic templates) on top, recent documents below.
-// Recents are a stub until persistence (#3) lands a recent-files store.
+// Recents come from the managed worksheet library (auto-saved documents).
 
-import { FolderOpen, Plus, Search, Settings, Sigma } from "lucide-react";
-import { GENERATORS } from "@/engine/registry";
+import { FolderOpen, Plus, Search, Settings, Sigma, Trash2 } from "lucide-react";
+import { GENERATORS, getGenerator } from "@/engine/registry";
+import type { LibraryEntry } from "@/platform/types";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Theme } from "@/lib/useTheme";
@@ -16,16 +17,34 @@ function greeting(): string {
   return "Good evening";
 }
 
+/** A compact "x ago" stamp for the recents list. */
+function relativeTime(ms: number): string {
+  const min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr} hr ago`;
+  const day = Math.round(hr / 24);
+  if (day < 7) return `${day} day${day > 1 ? "s" : ""} ago`;
+  return new Date(ms).toLocaleDateString();
+}
+
 export function HomeScreen({
   onNewWorksheet,
   onOpenTemplate,
   onOpen,
+  recents,
+  onOpenRecent,
+  onDeleteRecent,
   theme,
   onThemeChange,
 }: {
   onNewWorksheet: () => void;
   onOpenTemplate: (generatorId: string) => void;
   onOpen: () => void;
+  recents: LibraryEntry[];
+  onOpenRecent: (id: string) => void;
+  onDeleteRecent: (id: string) => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
 }) {
@@ -85,19 +104,36 @@ export function HomeScreen({
         </div>
 
         {/* Recent */}
-        <SectionTitle>Recent</SectionTitle>
-        <div className="border-border bg-card flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-14 text-center">
-          <FolderOpen className="text-muted-foreground/60 size-8" />
-          <p className="text-foreground mt-3 text-sm font-medium">
-            No worksheets yet
-          </p>
-          <p className="text-muted-foreground mt-1 text-[13px]">
-            Saved worksheets will show up here.
-          </p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={onOpen}>
-            <FolderOpen /> Open a worksheet…
+        <div className="mt-9 mb-4 flex items-center justify-between">
+          <h2 className="text-muted-foreground text-xs font-bold tracking-wide uppercase">
+            Recent
+          </h2>
+          <Button variant="ghost" size="sm" onClick={onOpen}>
+            <FolderOpen /> Open a file…
           </Button>
         </div>
+        {recents.length === 0 ? (
+          <div className="border-border bg-card flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-14 text-center">
+            <FolderOpen className="text-muted-foreground/60 size-8" />
+            <p className="text-foreground mt-3 text-sm font-medium">
+              No worksheets yet
+            </p>
+            <p className="text-muted-foreground mt-1 text-[13px]">
+              Worksheets you create are saved automatically and show up here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recents.map((r) => (
+              <RecentCard
+                key={r.id}
+                entry={r}
+                onOpen={() => onOpenRecent(r.id)}
+                onDelete={() => onDeleteRecent(r.id)}
+              />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
@@ -108,6 +144,57 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     <h2 className="text-muted-foreground mt-9 mb-4 text-xs font-bold tracking-wide uppercase">
       {children}
     </h2>
+  );
+}
+
+function RecentCard({
+  entry,
+  onOpen,
+  onDelete,
+}: {
+  entry: LibraryEntry;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const topic = getGenerator(entry.generatorId)?.title ?? "Worksheet";
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="group bg-card hover:border-primary relative flex cursor-pointer items-center gap-3 rounded-2xl border p-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-16px_var(--primary)]"
+    >
+      <div className="bg-primary/10 text-primary grid size-11 shrink-0 place-content-center rounded-xl">
+        <Sigma className="size-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13.5px] font-semibold">{entry.title}</div>
+        <div className="text-muted-foreground truncate text-[11.5px]">
+          {topic} · {entry.count} problem{entry.count === 1 ? "" : "s"}
+        </div>
+        <div className="text-muted-foreground/80 text-[11px]">
+          {relativeTime(entry.updatedAt)}
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-label="Delete worksheet"
+        title="Delete worksheet"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive absolute top-2 right-2 rounded-md p-1.5 opacity-0 transition-all group-hover:opacity-100"
+      >
+        <Trash2 className="size-3.5" />
+      </button>
+    </div>
   );
 }
 

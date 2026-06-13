@@ -24,6 +24,17 @@ describe("buildWorksheet", () => {
     expect(ws.problems).toHaveLength(12);
   });
 
+  it("produces an empty sheet for count 0 (a blank worksheet)", () => {
+    const ws = buildWorksheet({
+      generatorId: QUADRATIC_FACTORING_ID,
+      baseSeed: 1,
+      count: 0,
+      title: "Untitled worksheet",
+    });
+    expect(ws.problems).toEqual([]);
+    expect(ws.title).toBe("Untitled worksheet");
+  });
+
   it("is deterministic for the same recipe", () => {
     fc.assert(
       fc.property(anySeed, (baseSeed) => {
