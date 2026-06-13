@@ -47,6 +47,13 @@ const MARGIN_IN: Record<PrintConfig["margin"], string> = {
   wide: "1.5in",
 };
 
+/** PrintConfig body font-size preset -> points. */
+const FONT_PT: Record<PrintConfig["fontSize"], string> = {
+  small: "10pt",
+  normal: "12pt",
+  large: "14pt",
+};
+
 /** Escape characters Typst would otherwise interpret as markup. */
 export function escapeTypstText(s: string): string {
   return s.replace(/[\\#$[\]*_`@<>]/g, (c) => "\\" + c);
@@ -61,6 +68,7 @@ export function buildTypstDocument(
   const spacing = SPACING_EM[print.spacing];
   const paper = PAPER[print.paper];
   const margin = MARGIN_IN[print.margin];
+  const fontSize = FONT_PT[print.fontSize];
   const flipped = print.orientation === "landscape";
   // Typst page numbering: a pattern string prints a footer number; `none` omits it.
   const numbering = print.pageNumbers ? `"1"` : "none";
@@ -102,7 +110,7 @@ export function buildTypstDocument(
     : `#text(size: 16pt, weight: "bold")[${escapeTypstText(ws.title)}]`;
 
   let source = `#set page(paper: "${paper}", flipped: ${flipped}, margin: ${margin}, numbering: ${numbering})
-#set text(size: 11pt)
+#set text(size: ${fontSize})
 
 #let blank(w) = box(width: w, stroke: (bottom: 0.6pt + luma(110)), outset: (bottom: 3pt))[]
 

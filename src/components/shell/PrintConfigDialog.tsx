@@ -75,6 +75,18 @@ export function PrintConfigDialog({
             />
           </Row>
 
+          <Row label="Text size">
+            <Segmented
+              value={value.fontSize}
+              onChange={(v) => set("fontSize", v)}
+              options={[
+                { value: "small", label: "Small" },
+                { value: "normal", label: "Normal" },
+                { value: "large", label: "Large" },
+              ]}
+            />
+          </Row>
+
           <Row
             label="Work space"
             hint="Vertical room under each free-response problem."

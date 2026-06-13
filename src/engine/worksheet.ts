@@ -18,6 +18,8 @@ export interface PrintConfig {
   orientation: "portrait" | "landscape";
   /** Page margin preset; mapped to inches by the Typst layout. */
   margin: "narrow" | "normal" | "wide";
+  /** Body text size preset; mapped to points by the Typst layout. */
+  fontSize: "small" | "normal" | "large";
   /** Print a page number in the footer. */
   pageNumbers: boolean;
   /** Vertical work space under each free-response problem. */
@@ -30,6 +32,7 @@ export const DEFAULT_PRINT_CONFIG: PrintConfig = {
   paper: "us-letter",
   orientation: "portrait",
   margin: "normal",
+  fontSize: "normal",
   pageNumbers: true,
   spacing: "normal",
   showNameDatePeriod: true,

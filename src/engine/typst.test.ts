@@ -71,6 +71,15 @@ describe("buildTypstDocument print config", () => {
     ).toContain("flipped: true");
   });
 
+  it("reflects body font size in points", () => {
+    expect(buildTypstDocument(ws(2, { fontSize: "small" })).source).toContain(
+      "text(size: 10pt)",
+    );
+    expect(buildTypstDocument(ws(2, { fontSize: "large" })).source).toContain(
+      "text(size: 14pt)",
+    );
+  });
+
   it("reflects margin presets in inches", () => {
     expect(buildTypstDocument(ws(2, { margin: "narrow" })).source).toContain(
       "margin: 0.5in",
