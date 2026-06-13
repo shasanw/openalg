@@ -10,27 +10,58 @@
 //! the three call sites below (font loading, `compile()`, or `mitex::convert_math`);
 //! they're isolated on purpose. Paste the error and we'll pin/adjust.
 
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
+
 use typst::foundations::Bytes;
 use typst::layout::PagedDocument;
 use typst::text::Font;
 use typst_as_lib::TypstEngine;
 use typst_pdf::{pdf, PdfOptions};
 
-/// Load Typst's default fonts (New Computer Modern, etc.) bundled via typst-assets.
-fn load_fonts() -> Vec<Font> {
+/// Typst's default fonts (New Computer Modern, etc.), bundled via typst-assets
+/// and decoded exactly once for the process lifetime. Decoding the full family
+/// from bytes costs tens of ms; the live preview recompiles on every edit, so
+/// re-decoding per compile was pure waste. `Font` is internally reference-counted,
+/// so cloning this `Vec` per compile is cheap (just bumps refcounts).
+static FONTS: LazyLock<Vec<Font>> = LazyLock::new(|| {
     typst_assets::fonts()
         .flat_map(|data| Font::iter(Bytes::new(data)))
         .collect()
-}
+});
 
-/// Convert one LaTeX math snippet into a Typst inline-math string `$ ... $`.
-/// On conversion failure we fall back to showing the raw LaTeX as text rather
-/// than silently dropping content.
+/// How many compile generations a memoized Typst layout fragment survives without
+/// being reused before comemo evicts it. typst-as-lib defaults this to `0`, which
+/// wipes Typst's *global* incremental-layout cache after every compile — so a
+/// one-character title edit re-lays-out every problem from scratch. A small,
+/// bounded window keeps unchanged content cached across consecutive edits (the
+/// common live-preview case) while still bounding memory.
+const COMEMO_EVICT_MAX_AGE: usize = 16;
+
+/// Cache of converted math, keyed by the raw LaTeX snippet. `mitex::convert_math`
+/// is pure, so identical input always yields identical Typst. The preview
+/// recompiles on every edit (title, spacing, margins…), but the problems' math
+/// rarely changes between those edits — without this cache we'd re-run mitex over
+/// every snippet on every keystroke.
+static MATH_CACHE: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Convert one LaTeX math snippet into a Typst inline-math string `$ ... $`,
+/// memoized by input. On conversion failure we fall back to showing the raw
+/// LaTeX as text rather than silently dropping content.
 fn latex_to_typst(latex: &str) -> String {
-    match mitex::convert_math(latex, None) {
+    if let Some(cached) = MATH_CACHE.lock().unwrap().get(latex) {
+        return cached.clone();
+    }
+    let converted = match mitex::convert_math(latex, None) {
         Ok(body) => format!("${}$", body),
         Err(_) => format!("#raw({:?})", latex),
-    }
+    };
+    MATH_CACHE
+        .lock()
+        .unwrap()
+        .insert(latex.to_string(), converted.clone());
+    converted
 }
 
 /// Replace every `@@M<i>@@` placeholder with its converted Typst math.
@@ -45,13 +76,17 @@ fn fill_math(source: &str, math: &[String]) -> String {
 /// Compile a worksheet's Typst source (+ its LaTeX math) into a paged document.
 /// Shared by the PDF export and the SVG live preview so both render from the
 /// identical layout — the preview is print-truth (issue #7).
+///
+/// We rebuild a `TypstEngine` per call (it's cheap once `FONTS` is cached), but
+/// raise comemo's eviction window so Typst's global memoization cache survives
+/// between compiles — that's what makes incremental edits fast, not the engine
+/// struct itself.
 fn compile_document(source: &str, math: &[String]) -> Result<PagedDocument, String> {
     let full = fill_math(source, math);
 
-    let engine = TypstEngine::builder()
-        .main_file(full)
-        .fonts(load_fonts())
-        .build();
+    let mut builder = TypstEngine::builder();
+    builder.comemo_evict_max_age(Some(COMEMO_EVICT_MAX_AGE));
+    let engine = builder.main_file(full).fonts(FONTS.clone()).build();
 
     engine
         .compile()

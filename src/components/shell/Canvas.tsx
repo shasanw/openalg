@@ -79,10 +79,13 @@ function Pages({
 
   useEffect(() => {
     let cancelled = false;
-    const doc = buildTypstDocument(worksheet, {
-      keyFormat: showAnswers ? "full" : "none",
-    });
+    // Build the Typst source inside the debounce timer so rapid edits that are
+    // superseded before the 200ms elapses don't pay for assembling a document
+    // that's never compiled.
     const timer = setTimeout(() => {
+      const doc = buildTypstDocument(worksheet, {
+        keyFormat: showAnswers ? "full" : "none",
+      });
       platform
         .renderPreview(doc)
         .then((svgs) => {
