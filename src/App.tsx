@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GENERATORS, getGenerator } from "@/engine/registry";
 import { resolveParams, type ParamValues } from "@/engine/types";
 import {
   buildWorksheet,
-  normalizeWorksheet,
   regenerateAll,
   type PrintConfig,
   type Worksheet,
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
 import { platform } from "@/platform";
+import type { LibraryEntry } from "@/platform/types";
 import { useTheme } from "@/lib/useTheme";
+import { useToast } from "@/components/ui/toast";
 import { HomeScreen } from "@/components/home/HomeScreen";
 import { TopBar, type DocMode } from "@/components/shell/TopBar";
 import { Navigator } from "@/components/shell/Navigator";
@@ -24,7 +25,15 @@ function randomSeed(): number {
   return Math.floor(Math.random() * 0xffffffff) >>> 0;
 }
 
+/** A stable id for a worksheet's library file (the auto-save filename). */
+function newDocId(): string {
+  return crypto.randomUUID();
+}
+
 const DEFAULT_COUNT = 10;
+
+/** How a document is being persisted to the library, for the top-bar indicator. */
+export type AutosaveState = "idle" | "saving" | "saved" | "error";
 
 // PrintConfig paper -> CSS @page size keyword.
 const PAGE_SIZE: Record<Worksheet["print"]["paper"], string> = {
@@ -93,6 +102,9 @@ function App() {
   );
   const [count, setCount] = useState(DEFAULT_COUNT);
   const [worksheet, setWorksheet] = useState<Worksheet | null>(null);
+  // Stable id of the open document's library file. Assigned when a document is
+  // created/opened and held across edits so auto-save overwrites the same file.
+  const [docId, setDocId] = useState<string | null>(null);
   const [showAnswers, setShowAnswers] = useState(false);
   const [mode, setMode] = useState<DocMode>("worksheet");
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
@@ -102,9 +114,44 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [printing, setPrinting] = useState(false);
+  // Silent library auto-save status, surfaced as a subtle top-bar indicator.
+  const [autosave, setAutosave] = useState<AutosaveState>("idle");
+  // Recent worksheets shown on the home screen, loaded from the library.
+  const [recents, setRecents] = useState<LibraryEntry[]>([]);
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
 
-  /** Build a worksheet for the given topic and enter the workspace. */
+  // Auto-save: whenever the open document changes, debounce a silent write to
+  // its library file. This is the primary persistence path — the user never has
+  // to click Save. Errors surface as a toast (and the top-bar indicator) so a
+  // failed write is never silent.
+  useEffect(() => {
+    if (!worksheet || !docId) return;
+    setAutosave("saving");
+    const timer = setTimeout(() => {
+      platform
+        .autosaveWorksheet(docId, worksheet)
+        .then(() => setAutosave("saved"))
+        .catch((e) => {
+          console.error(e);
+          setAutosave("error");
+          toast({
+            variant: "error",
+            title: "Couldn't auto-save",
+            description: "Your latest changes may not be saved.",
+          });
+        });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [worksheet, docId, toast]);
+
+  // Refresh the recents list whenever we return to the home screen.
+  useEffect(() => {
+    if (view !== "home") return;
+    platform.listLibrary().then(setRecents).catch((e) => console.error(e));
+  }, [view]);
+
+  /** Build a filled worksheet from a topic template and enter the workspace. */
   function openTopic(id: string) {
     const g = getGenerator(id)!;
     const resolved = resolveParams(g.schema, {});
@@ -112,6 +159,7 @@ function App() {
     setParams(resolved);
     setCount(DEFAULT_COUNT);
     setShowAnswers(false);
+    setDocId(newDocId());
     setWorksheet(
       buildWorksheet({
         generatorId: id,
@@ -121,6 +169,68 @@ function App() {
       }),
     );
     setView("doc");
+  }
+
+  /**
+   * Start a blank, untitled worksheet: no problems yet. The canvas shows an
+   * empty state; the teacher fills it by choosing options and pressing Generate
+   * (or switching topics). It's auto-saved on creation like any document.
+   */
+  function newBlank() {
+    const g = GENERATORS[0];
+    const resolved = resolveParams(g.schema, {});
+    setGeneratorId(g.id);
+    setParams(resolved);
+    setCount(DEFAULT_COUNT);
+    setShowAnswers(false);
+    setDocId(newDocId());
+    setWorksheet(
+      buildWorksheet({
+        generatorId: g.id,
+        params: resolved,
+        baseSeed: randomSeed(),
+        count: 0,
+        title: "Untitled worksheet",
+      }),
+    );
+    setView("doc");
+  }
+
+  /** Open a saved worksheet from the library (recents) into the workspace. */
+  async function openRecent(id: string) {
+    try {
+      const ws = await platform.loadLibrary(id);
+      if (!ws) {
+        toast({
+          variant: "error",
+          title: "Couldn't open worksheet",
+          description: "It may have been moved or removed.",
+        });
+        return;
+      }
+      setDocId(id);
+      setWorksheet(ws);
+      setGeneratorId(ws.generatorId);
+      setParams(ws.params);
+      setCount(ws.count || DEFAULT_COUNT);
+      setShowAnswers(false);
+      setView("doc");
+    } catch (e) {
+      console.error(e);
+      toast({ variant: "error", title: "Couldn't open worksheet" });
+    }
+  }
+
+  /** Delete a saved worksheet from the library and drop it from recents. */
+  async function deleteRecent(id: string) {
+    try {
+      await platform.deleteLibrary(id);
+      setRecents((xs) => xs.filter((x) => x.id !== id));
+      toast({ variant: "success", title: "Worksheet deleted" });
+    } catch (e) {
+      console.error(e);
+      toast({ variant: "error", title: "Couldn't delete worksheet" });
+    }
   }
 
   /** Switch topic within the workspace and immediately show a fresh sheet. */
@@ -169,30 +279,47 @@ function App() {
   const setPrint = (print: PrintConfig) =>
     setWorksheet((ws) => (ws ? { ...ws, print } : ws));
 
+  /** Export a portable copy to a user-chosen .json file (auto-save is separate). */
   async function save() {
     if (!worksheet || saving) return;
     setSaving(true);
     try {
-      await platform.saveWorksheet(worksheet, `${worksheet.title}.json`);
+      const ok = await platform.saveWorksheet(worksheet, `${worksheet.title}.json`);
+      if (ok) {
+        toast({
+          variant: "success",
+          title: "Saved a copy",
+          description: `${worksheet.title}.json`,
+        });
+      }
     } catch (e) {
       console.error(e);
+      toast({ variant: "error", title: "Couldn't save a copy" });
     } finally {
       setSaving(false);
     }
   }
 
+  /** Import a worksheet file from disk; it becomes a new document in the library. */
   async function open() {
     try {
-      const loaded = await platform.openWorksheet();
-      if (!loaded) return;
-      const ws = normalizeWorksheet(loaded);
+      // The platform adapter validates and normalizes the file (engine/persist),
+      // so a loaded worksheet is ready to drive the workspace as-is.
+      const ws = await platform.openWorksheet();
+      if (!ws) return;
+      setDocId(newDocId());
       setWorksheet(ws);
       setGeneratorId(ws.generatorId);
       setParams(ws.params);
-      setCount(ws.count);
+      setCount(ws.count || DEFAULT_COUNT);
       setView("doc");
     } catch (e) {
       console.error(e);
+      toast({
+        variant: "error",
+        title: "Couldn't open that file",
+        description: "It isn't a valid OpenAlg worksheet.",
+      });
     }
   }
 
@@ -200,12 +327,20 @@ function App() {
     if (!worksheet || exporting) return;
     setExporting(true);
     try {
-      await platform.exportPdf(
+      const ok = await platform.exportPdf(
         buildTypstDocument(worksheet, { keyFormat: "full" }),
         `${worksheet.title}.pdf`,
       );
+      if (ok) {
+        toast({
+          variant: "success",
+          title: "Exported PDF",
+          description: `${worksheet.title}.pdf`,
+        });
+      }
     } catch (e) {
       console.error(e);
+      toast({ variant: "error", title: "Couldn't export PDF" });
     } finally {
       setExporting(false);
     }
@@ -226,9 +361,12 @@ function App() {
   if (view === "home") {
     return (
       <HomeScreen
-        onNewWorksheet={() => openTopic(GENERATORS[0].id)}
+        onNewWorksheet={newBlank}
         onOpenTemplate={openTopic}
         onOpen={open}
+        recents={recents}
+        onOpenRecent={openRecent}
+        onDeleteRecent={deleteRecent}
         theme={theme}
         onThemeChange={setTheme}
       />
@@ -250,6 +388,7 @@ function App() {
         onPrintConfig={() => setPrintDialogOpen(true)}
         canSave={!!worksheet}
         canExport={!!worksheet}
+        autosave={worksheet ? autosave : "idle"}
         saving={saving}
         exporting={exporting}
         printing={printing}
