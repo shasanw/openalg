@@ -1,11 +1,15 @@
-// The center pane: a thin preview toolbar over a soft, dotted "desk" surface
-// with the worksheet rendered as a real US-Letter page. The page keeps its
-// 8.5 x 11 proportions at all times — it never shrinks to fit the content (short
-// sheets leave honest whitespace at the bottom, exactly as they will print).
+// The center pane: a thin toolbar over a soft, dotted "desk" surface showing the
+// worksheet as real, paginated US-Letter pages. These are the ACTUAL Typst
+// pages compiled to SVG (one per sheet) — pixel-identical to the exported PDF
+// and to what prints, and paginated exactly as it will print (#7). Curation
+// (re-roll / remove / reorder) lives in the inspector's Problems list, not on
+// the page, so this view is pure print-truth.
 
-import { WorksheetView, type CurationHandlers } from "@/components/WorksheetView";
-import { Label } from "@/components/ui/label";
+import { useEffect, useState } from "react";
+import { buildTypstDocument } from "@/engine/typst";
 import type { Worksheet } from "@/engine/worksheet";
+import { platform } from "@/platform";
+import { Label } from "@/components/ui/label";
 
 // A faint dot grid so the white page edges read clearly against the surface.
 const DOT_SURFACE = {
@@ -18,12 +22,10 @@ export function Canvas({
   worksheet,
   showAnswers,
   onToggleAnswers,
-  curation,
 }: {
   worksheet: Worksheet | null;
   showAnswers: boolean;
   onToggleAnswers: (show: boolean) => void;
-  curation?: CurationHandlers;
 }) {
   return (
     <div className="bg-sidebar flex min-h-0 flex-col overflow-hidden rounded-xl border shadow-sm">
@@ -47,21 +49,7 @@ export function Canvas({
         style={DOT_SURFACE}
       >
         {worksheet ? (
-          <div className="flex justify-center p-8 pb-24">
-            {/* US-Letter page. `min-h` (not a locked aspect) keeps a full blank
-                page for short sheets while letting long ones GROW to contain
-                every problem — so nothing spills past the page into an
-                invisible-but-still-interactive zone. NOTE: this is the
-                walking-skeleton HTML preview, not the Typst output; a faithful,
-                paginated preview that matches the exported PDF is issue #7. */}
-            <div className="font-paper min-h-[980px] w-full max-w-[760px] rounded-sm bg-white px-[64px] py-[60px] shadow-[0_1px_2px_rgba(20,20,20,0.08),0_20px_46px_-18px_rgba(20,20,20,0.20)]">
-              <WorksheetView
-                worksheet={worksheet}
-                showAnswers={showAnswers}
-                curation={curation}
-              />
-            </div>
-          </div>
+          <Pages worksheet={worksheet} showAnswers={showAnswers} />
         ) : (
           <div className="text-muted-foreground flex h-full items-center justify-center px-8 text-center text-sm">
             Set your options on the right, then click&nbsp;
@@ -69,6 +57,80 @@ export function Canvas({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Compiles the worksheet to Typst SVG (via the platform) and renders one page
+ * per sheet. Debounced so rapid edits don't fire a compile on every keystroke;
+ * the previous pages stay on screen while the next compile runs, so the view
+ * doesn't flash blank between edits.
+ */
+function Pages({
+  worksheet,
+  showAnswers,
+}: {
+  worksheet: Worksheet;
+  showAnswers: boolean;
+}) {
+  const [pages, setPages] = useState<string[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const doc = buildTypstDocument(worksheet, {
+      keyFormat: showAnswers ? "full" : "none",
+    });
+    const timer = setTimeout(() => {
+      platform
+        .renderPreview(doc)
+        .then((svgs) => {
+          if (cancelled) return;
+          setPages(svgs);
+          setError(null);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          setError(String(e));
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [worksheet, showAnswers]);
+
+  if (error) {
+    return (
+      <div className="text-destructive mx-auto max-w-[760px] p-8 text-sm whitespace-pre-wrap">
+        Couldn&apos;t render the preview:
+        {"\n"}
+        {error}
+      </div>
+    );
+  }
+
+  if (!pages) {
+    return (
+      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+        Rendering preview…
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-6 p-8 pb-24">
+      {pages.map((svg, i) => (
+        <div
+          key={i}
+          // The Typst SVG carries its own page dimensions/viewBox; we cap the
+          // width and let height scale, so each sheet shows at its true aspect.
+          className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full w-full max-w-[760px] overflow-hidden rounded-sm bg-white shadow-[0_1px_2px_rgba(20,20,20,0.08),0_20px_46px_-18px_rgba(20,20,20,0.20)]"
+          // Trusted: SVG is produced by our own Typst compile in the Rust core.
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      ))}
     </div>
   );
 }

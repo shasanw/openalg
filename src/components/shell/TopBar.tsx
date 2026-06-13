@@ -2,7 +2,7 @@
 // Worksheet/Test mode toggle, and global file actions. Test mode (multi-section)
 // is a staged follow-up — its button is present but disabled for now.
 
-import { FileDown, FolderOpen, Save, Settings, Sigma } from "lucide-react";
+import { FileDown, FolderOpen, Printer, Save, Settings, Sigma } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -11,22 +11,29 @@ export type DocMode = "worksheet" | "test";
 
 export function TopBar({
   title,
+  onTitleChange,
   mode,
   onModeChange,
   onHome,
   onOpen,
   onSave,
   onExport,
+  onPrint,
+  onPrintConfig,
   canSave,
   canExport,
 }: {
   title: string;
+  /** When provided, the title becomes editable inline. */
+  onTitleChange?: (title: string) => void;
   mode: DocMode;
   onModeChange: (mode: DocMode) => void;
   onHome: () => void;
   onOpen: () => void;
   onSave: () => void;
   onExport: () => void;
+  onPrint: () => void;
+  onPrintConfig: () => void;
   canSave: boolean;
   canExport: boolean;
 }) {
@@ -45,7 +52,16 @@ export function TopBar({
 
       <Separator orientation="vertical" className="h-5" />
 
-      <span className="truncate text-sm font-semibold">{title}</span>
+      {onTitleChange ? (
+        <input
+          aria-label="Worksheet title"
+          value={title}
+          onChange={(e) => onTitleChange(e.currentTarget.value)}
+          className="hover:bg-accent focus:bg-accent focus:ring-ring/50 min-w-0 max-w-[28ch] flex-shrink truncate rounded-md bg-transparent px-1.5 py-1 text-sm font-semibold outline-none transition-colors focus:ring-2"
+        />
+      ) : (
+        <span className="truncate text-sm font-semibold">{title}</span>
+      )}
 
       <Separator orientation="vertical" className="h-5" />
 
@@ -75,16 +91,31 @@ export function TopBar({
       <Button variant="ghost" size="sm" onClick={onSave} disabled={!canSave}>
         <Save /> Save
       </Button>
-      <Button variant="ghost" size="icon" className="size-8" title="Settings">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        title="Print & layout"
+        onClick={onPrintConfig}
+        disabled={!canExport}
+      >
         <Settings />
       </Button>
       <Button
-        variant="default"
+        variant="outline"
         size="sm"
         onClick={onExport}
         disabled={!canExport}
       >
         <FileDown /> Export PDF
+      </Button>
+      <Button
+        variant="default"
+        size="sm"
+        onClick={onPrint}
+        disabled={!canExport}
+      >
+        <Printer /> Print
       </Button>
     </header>
   );

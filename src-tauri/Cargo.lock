@@ -3318,6 +3318,7 @@ dependencies = [
  "typst-as-lib",
  "typst-assets",
  "typst-pdf",
+ "typst-svg",
 ]
 
 [[package]]
