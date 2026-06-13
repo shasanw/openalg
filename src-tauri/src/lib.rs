@@ -48,6 +48,14 @@ fn export_pdf(source: String, math: Vec<String>, suggested_name: String) -> Resu
     }
 }
 
+/// Compile a worksheet to one SVG string per page. Drives the in-app paginated
+/// preview and the print path (both rendered by the webview), so screen, print
+/// dialog, and exported PDF share the identical Typst layout (#7).
+#[tauri::command]
+fn render_preview(source: String, math: Vec<String>) -> Result<Vec<String>, String> {
+    pdf::compile_svg(&source, &math)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -55,7 +63,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             save_worksheet,
             open_worksheet,
-            export_pdf
+            export_pdf,
+            render_preview
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

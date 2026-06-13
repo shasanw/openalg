@@ -2,10 +2,13 @@ import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import {
   buildWorksheet,
+  normalizeWorksheet,
   regenerateAll,
   rerollProblem,
   removeProblem,
   reorderProblem,
+  DEFAULT_PRINT_CONFIG,
+  type Worksheet,
 } from "./worksheet";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
 
@@ -216,6 +219,52 @@ describe("per-problem curation", () => {
       expect(reorderProblem(ws, 2, 2)).toEqual(ws);
       expect(reorderProblem(ws, -1, 2)).toEqual(ws);
       expect(reorderProblem(ws, 2, 5)).toEqual(ws);
+    });
+  });
+
+  describe("print config (issue #7)", () => {
+    it("buildWorksheet attaches the default print config", () => {
+      const ws = buildWorksheet({
+        generatorId: QUADRATIC_FACTORING_ID,
+        baseSeed: 1,
+        count: 3,
+      });
+      expect(ws.print).toEqual(DEFAULT_PRINT_CONFIG);
+    });
+
+    it("regenerateAll carries the print config forward", () => {
+      const base = buildWorksheet({
+        generatorId: QUADRATIC_FACTORING_ID,
+        baseSeed: 1,
+        count: 3,
+        print: { ...DEFAULT_PRINT_CONFIG, paper: "a4", spacing: "roomy" },
+      });
+      expect(regenerateAll(base, 99).print).toEqual(base.print);
+    });
+
+    it("normalizeWorksheet backfills print on pre-#7 saved files", () => {
+      // A file saved before issue #7 has no `print` block.
+      const legacy = {
+        version: 1,
+        title: "Old sheet",
+        generatorId: QUADRATIC_FACTORING_ID,
+        params: {},
+        directions: "Solve.",
+        baseSeed: 1,
+        count: 1,
+        problems: [],
+      } as unknown as Worksheet;
+      expect(normalizeWorksheet(legacy).print).toEqual(DEFAULT_PRINT_CONFIG);
+    });
+
+    it("normalizeWorksheet preserves an explicit print config", () => {
+      const ws = buildWorksheet({
+        generatorId: QUADRATIC_FACTORING_ID,
+        baseSeed: 1,
+        count: 1,
+        print: { ...DEFAULT_PRINT_CONFIG, orientation: "landscape" },
+      });
+      expect(normalizeWorksheet(ws).print.orientation).toBe("landscape");
     });
   });
 });

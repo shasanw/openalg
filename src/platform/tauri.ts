@@ -26,4 +26,11 @@ export const tauriPlatform: Platform = {
       suggestedName,
     });
   },
+
+  async renderPreview(doc) {
+    return await invoke<string[]>("render_preview", {
+      source: doc.source,
+      math: doc.math,
+    });
+  },
 };

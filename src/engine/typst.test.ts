@@ -1,13 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { buildTypstDocument, escapeTypstText } from "./typst";
-import { buildWorksheet } from "./worksheet";
+import { buildWorksheet, DEFAULT_PRINT_CONFIG, type PrintConfig } from "./worksheet";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
 
-function ws(count: number) {
+function ws(count: number, print?: Partial<PrintConfig>) {
   return buildWorksheet({
     generatorId: QUADRATIC_FACTORING_ID,
     baseSeed: 1,
     count,
+    print: print ? { ...DEFAULT_PRINT_CONFIG, ...print } : undefined,
   });
 }
 
@@ -45,6 +46,77 @@ describe("buildTypstDocument", () => {
 
   it("is deterministic", () => {
     expect(buildTypstDocument(ws(4))).toEqual(buildTypstDocument(ws(4)));
+  });
+});
+
+describe("buildTypstDocument print config", () => {
+  it("reflects paper size, mapping legal to Typst's us-legal", () => {
+    expect(buildTypstDocument(ws(2, { paper: "us-letter" })).source).toContain(
+      `paper: "us-letter"`,
+    );
+    expect(buildTypstDocument(ws(2, { paper: "a4" })).source).toContain(
+      `paper: "a4"`,
+    );
+    expect(buildTypstDocument(ws(2, { paper: "legal" })).source).toContain(
+      `paper: "us-legal"`,
+    );
+  });
+
+  it("reflects orientation via the flipped flag", () => {
+    expect(
+      buildTypstDocument(ws(2, { orientation: "portrait" })).source,
+    ).toContain("flipped: false");
+    expect(
+      buildTypstDocument(ws(2, { orientation: "landscape" })).source,
+    ).toContain("flipped: true");
+  });
+
+  it("reflects body font size in points", () => {
+    expect(buildTypstDocument(ws(2, { fontSize: "small" })).source).toContain(
+      "text(size: 10pt)",
+    );
+    expect(buildTypstDocument(ws(2, { fontSize: "large" })).source).toContain(
+      "text(size: 14pt)",
+    );
+  });
+
+  it("reflects margin presets in inches", () => {
+    expect(buildTypstDocument(ws(2, { margin: "narrow" })).source).toContain(
+      "margin: 0.5in",
+    );
+    expect(buildTypstDocument(ws(2, { margin: "normal" })).source).toContain(
+      "margin: 1in",
+    );
+    expect(buildTypstDocument(ws(2, { margin: "wide" })).source).toContain(
+      "margin: 1.5in",
+    );
+  });
+
+  it("toggles page numbering", () => {
+    expect(buildTypstDocument(ws(2, { pageNumbers: true })).source).toContain(
+      `numbering: "1"`,
+    );
+    expect(buildTypstDocument(ws(2, { pageNumbers: false })).source).toContain(
+      "numbering: none",
+    );
+  });
+
+  it("reflects work-space spacing as the problem grid's row gutter", () => {
+    expect(buildTypstDocument(ws(2, { spacing: "tight" })).source).toContain(
+      "row-gutter: 1.2em",
+    );
+    expect(buildTypstDocument(ws(2, { spacing: "roomy" })).source).toContain(
+      "row-gutter: 7em",
+    );
+  });
+
+  it("shows or hides the name/date/period blanks", () => {
+    expect(
+      buildTypstDocument(ws(2, { showNameDatePeriod: true })).source,
+    ).toContain("Name");
+    expect(
+      buildTypstDocument(ws(2, { showNameDatePeriod: false })).source,
+    ).not.toContain("Name");
   });
 });
 

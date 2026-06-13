@@ -14,4 +14,10 @@ export interface Platform {
   openWorksheet(): Promise<Worksheet | null>;
   /** Compile a Typst document to PDF and save it. False if cancelled. */
   exportPdf(doc: TypstDocument, suggestedName: string): Promise<boolean>;
+  /**
+   * Compile a Typst document to one self-contained SVG string per page. Drives
+   * the paginated in-app preview and the native print path, so the screen and
+   * the printout are the exact Typst layout (#7).
+   */
+  renderPreview(doc: TypstDocument): Promise<string[]>;
 }

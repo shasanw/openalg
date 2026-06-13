@@ -7,6 +7,37 @@ import { deriveSeed } from "./rng";
 import { getGenerator } from "./registry";
 import type { ParamValues, Problem } from "./types";
 
+/**
+ * Print/layout configuration (issue #7). Owned by the worksheet so it persists
+ * across save/load and so the live preview and the exported PDF read from the
+ * exact same settings — the preview is print-truth. The Typst layout
+ * (buildTypstDocument) is the single consumer.
+ */
+export interface PrintConfig {
+  paper: "us-letter" | "a4" | "legal";
+  orientation: "portrait" | "landscape";
+  /** Page margin preset; mapped to inches by the Typst layout. */
+  margin: "narrow" | "normal" | "wide";
+  /** Body text size preset; mapped to points by the Typst layout. */
+  fontSize: "small" | "normal" | "large";
+  /** Print a page number in the footer. */
+  pageNumbers: boolean;
+  /** Vertical work space under each free-response problem. */
+  spacing: "tight" | "normal" | "roomy";
+  /** Render the Name / Date / Period blanks in the header. */
+  showNameDatePeriod: boolean;
+}
+
+export const DEFAULT_PRINT_CONFIG: PrintConfig = {
+  paper: "us-letter",
+  orientation: "portrait",
+  margin: "normal",
+  fontSize: "normal",
+  pageNumbers: true,
+  spacing: "normal",
+  showNameDatePeriod: true,
+};
+
 export interface Worksheet {
   version: 1;
   title: string;
@@ -16,6 +47,8 @@ export interface Worksheet {
   baseSeed: number;
   count: number;
   problems: Problem[];
+  /** Print/layout settings. Optional in older saved files; see normalizeWorksheet. */
+  print: PrintConfig;
 }
 
 export interface BuildOptions {
@@ -25,6 +58,7 @@ export interface BuildOptions {
   count: number;
   title?: string;
   directions?: string;
+  print?: PrintConfig;
 }
 
 export function buildWorksheet(opts: BuildOptions): Worksheet {
@@ -66,6 +100,7 @@ export function buildWorksheet(opts: BuildOptions): Worksheet {
     baseSeed: opts.baseSeed,
     count: opts.count,
     problems,
+    print: opts.print ?? { ...DEFAULT_PRINT_CONFIG },
   };
 }
 
@@ -78,7 +113,20 @@ export function regenerateAll(ws: Worksheet, newBaseSeed: number): Worksheet {
     count: ws.count,
     title: ws.title,
     directions: ws.directions,
+    print: ws.print,
   });
+}
+
+/**
+ * Backfill defaults onto a worksheet loaded from disk. Files saved before
+ * issue #7 have no `print` block; give them the defaults so the rest of the app
+ * can assume `print` is always present.
+ */
+export function normalizeWorksheet(ws: Worksheet): Worksheet {
+  return {
+    ...ws,
+    print: { ...DEFAULT_PRINT_CONFIG, ...ws.print },
+  };
 }
 
 // --- Per-problem curation (issue #4) -----------------------------------------

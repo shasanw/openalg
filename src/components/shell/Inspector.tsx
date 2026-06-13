@@ -16,6 +16,8 @@ export function Inspector({
   generator,
   params,
   onParamsChange,
+  directions,
+  onDirectionsChange,
   count,
   onCountChange,
   onGenerate,
@@ -25,6 +27,9 @@ export function Inspector({
   generator: Generator;
   params: ParamValues;
   onParamsChange: (next: ParamValues) => void;
+  /** Worksheet directions; null when no worksheet is open yet. */
+  directions: string | null;
+  onDirectionsChange: (next: string) => void;
   count: number;
   onCountChange: (n: number) => void;
   onGenerate: () => void;
@@ -43,6 +48,23 @@ export function Inspector({
           values={params}
           onChange={onParamsChange}
         />
+
+        {directions !== null && (
+          <>
+            <Separator className="my-4" />
+            <Label className="flex-col items-start gap-1.5">
+              <span className="text-muted-foreground font-medium">
+                Directions
+              </span>
+              <textarea
+                value={directions}
+                onChange={(e) => onDirectionsChange(e.currentTarget.value)}
+                rows={2}
+                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 min-h-16 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]"
+              />
+            </Label>
+          </>
+        )}
 
         <Separator className="my-4" />
 
