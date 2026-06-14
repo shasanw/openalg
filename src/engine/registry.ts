@@ -3,8 +3,12 @@
 
 import type { Generator } from "./types";
 import { generator as quadraticFactoring } from "./generators/quadraticFactoring";
+import { generator as quadraticFormula } from "./generators/quadraticFormula";
 
-export const GENERATORS: readonly Generator[] = [quadraticFactoring];
+export const GENERATORS: readonly Generator[] = [
+  quadraticFactoring,
+  quadraticFormula,
+];
 
 const byId: Record<string, Generator> = Object.fromEntries(
   GENERATORS.map((g) => [g.id, g]),
