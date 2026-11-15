@@ -18,10 +18,9 @@
 //   keeps c = (b^2 - D) / 4a an integer (the quadratic-formula generator's trick).
 //   This is also what gives standard-form problems fractional vertices.
 //
-// Graphs (#9): this Topic is text-only for now. When the shared plot(spec) ->
-// SVG plotter lands, the graph spec attaches to the Problem in generate() below;
-// the construction already carries everything a plot needs (a, b, c, vertex,
-// intercepts).
+// Graphs (#9): this Topic stays text-only. Graphing a parabola is its own Topic
+// (./graphingQuadratics), which reuses this file's facts, Answer and
+// Distractors and adds the coordinate grid and answer graph.
 
 import { createRng, type Rng } from "../rng";
 import {
@@ -422,8 +421,6 @@ export const generator: Generator = {
       prompt: promptToLatex(k),
       answer: answerToLatex(k.facts, ask),
       distractorHints: distractors(k, ask),
-      // #9: attach the graph spec here (e.g. `spec: parabolaSpec(k)`) once the
-      // shared plot(spec) -> SVG plotter exists. Text-only until then.
     };
   },
 };

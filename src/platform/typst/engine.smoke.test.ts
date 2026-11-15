@@ -21,6 +21,8 @@ import { GENERATORS } from "../../engine/registry";
 import type { ParamValues } from "../../engine/types";
 import { QUADRATIC_FORMULA_ID } from "../../engine/generators/quadraticFormula";
 import { QUADRATIC_FACTORING_ID } from "../../engine/generators/quadraticFactoring";
+import { GRAPHING_QUADRATICS_ID } from "../../engine/generators/graphingQuadratics";
+import { plot } from "../../engine/plot";
 
 const require = createRequire(import.meta.url);
 const asset = (name: string) =>
@@ -113,6 +115,56 @@ describe("Typst engine (WASM)", () => {
     }
   });
 
+  // Graphs (#9) are plot() SVGs embedded as Typst images. Their labels are
+  // glyph outlines, not <text>, because on screen Typst's SVG page carries the
+  // graph as a nested data: image, which cannot use the page's fonts. So a page
+  // holding only a graph must need no font at all, warn about nothing and fetch
+  // nothing, and its SVG page must carry the graph's outlines untouched.
+  it("embeds a graph with its labels as outlines, needing no font and fetching nothing", async () => {
+    const svg = plot({
+      kind: "plane",
+      x: { min: -10, max: 10 },
+      y: { min: -10, max: 10 },
+      xStep: 1,
+      yStep: 1,
+      points: [{ x: 2, y: -4, label: "(2, −4)" }],
+    });
+    expect(svg).not.toContain("<text");
+    const doc = {
+      source: `#set page(width: 200pt, height: 200pt, margin: 5pt)\n#image(bytes(${typstString(svg)}), format: "svg")`,
+      math: [],
+    };
+    const realFetch = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      throw new Error("no network");
+    }) as typeof fetch;
+    try {
+      const pdf = new TextDecoder("latin1").decode(await engine.pdf(doc));
+      expect(engine.warnings).toEqual([]);
+      expect(pdf).not.toContain("/FontName");
+      const [page] = await engine.svgPages(doc);
+      expect(engine.warnings).toEqual([]);
+      const images = [...page.matchAll(/href="data:image\/svg\+xml;base64,([^"]+)"/g)].map((m) =>
+        Buffer.from(m[1], "base64").toString("utf8"),
+      );
+      expect(images).toEqual([svg]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it("compiles a graphing Worksheet's student copy and keys with no warnings", async () => {
+    const ws = buildWorksheet({ generatorId: GRAPHING_QUADRATICS_ID, baseSeed: 3, count: 6 });
+    for (const keyFormat of ANSWER_KEY_FORMATS) {
+      const pages = await engine.svgPages(buildTypstDocument(ws, { keyFormat }));
+      expect(pages.length).toBeGreaterThan(0);
+      expect(engine.warnings).toEqual([]);
+    }
+  });
+
   it("reports Typst errors instead of returning output", async () => {
     await expect(engine.pdf({ source: "#let x = (", math: [] })).rejects.toThrow(
       /unclosed delimiter/,
@@ -135,7 +187,8 @@ describe("fillMath", () => {
 });
 
 // Every Topic, under every single-option variation, in both Response Formats
-// and every Answer Key format, must compile through the real compiler: this is
+// and every Answer Key format, must compile without warnings (graph Topics and
+// number lines included) through the real compiler: this is
 // what catches LaTeX that KaTeX accepts but mitex cannot convert, and markup
 // that only one key format emits (the in-context key's circled letters).
 describe("every Topic compiles", () => {
@@ -154,6 +207,7 @@ describe("every Topic compiles", () => {
           const pages: Record<string, number> = {};
           for (const keyFormat of ANSWER_KEY_FORMATS) {
             pages[keyFormat] = (await engine.svgPages(buildTypstDocument(ws, { keyFormat }))).length;
+            expect(engine.warnings).toEqual([]);
           }
           expect(pages.none).toBeGreaterThan(0);
           // Every key starts on its own page; in context repeats the whole sheet.

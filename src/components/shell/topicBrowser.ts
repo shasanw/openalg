@@ -2,6 +2,7 @@
 // and the chosen Course and Unit, without any React. The picker renders this.
 
 import { GENERATORS, groupByUnit, type Unit } from "@/engine/registry";
+import { plot } from "@/engine/plot";
 import { resolveParams, type Generator, type Latex } from "@/engine/types";
 import { sectionLetter } from "@/engine/worksheet";
 
@@ -78,6 +79,11 @@ export function usedLabel(letters: readonly string[]): string {
 export interface TopicSample {
   /** Two sample Problem prompts from the default Topic Options. */
   problems: Latex[];
+  /**
+   * The first sample's student graph as an SVG string (e.g. the blank grid a
+   * graphing Topic prints), or null when its Problems print without one.
+   */
+  graph: string | null;
   /** Labels of the Topic Options a teacher can set. */
   options: string[];
   directions: string;
@@ -93,8 +99,11 @@ export function topicSample(g: Generator): TopicSample {
   let s = samples.get(g);
   if (!s) {
     const params = resolveParams(g.schema, {});
+    const generated = SAMPLE_SEEDS.map((seed) => g.generate(params, seed));
+    const graph = generated[0].graph;
     s = {
-      problems: SAMPLE_SEEDS.map((seed) => g.generate(params, seed).prompt),
+      problems: generated.map((p) => p.prompt),
+      graph: graph ? plot(graph) : null,
       options: g.schema.map((f) => f.label),
       directions: g.defaultDirections,
     };

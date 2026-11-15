@@ -376,6 +376,15 @@ function TopicPreview({ topic }: { topic: Generator | undefined }) {
                 </li>
               ))}
             </ol>
+            {sample.graph && (
+              <figure className="mt-2 rounded-md bg-white p-2 shadow-[var(--shadow-page)]">
+                <img
+                  src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(sample.graph)}`}
+                  alt="The graph printed with each Problem"
+                  className="mx-auto w-full max-w-[160px]"
+                />
+              </figure>
+            )}
           </div>
           <div className="space-y-4">
             <div>

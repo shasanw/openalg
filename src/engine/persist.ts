@@ -19,6 +19,9 @@
 //   `answerKeyFormat` (#6, full / odds / in-context / none; absent means full)
 //   and `versions` (#11, Version count and Scramble Mode; absent means one
 //   Version). Versions themselves are never saved: they are derived on load.
+//   Problems may carry `graph` and `answerGraph` (#9, GraphSpec data drawn by
+//   plot()); files without them load unchanged, and an older app reading a
+//   newer file still prints its text, so they need no version bump either.
 
 import {
   ANSWER_KEY_FORMATS,
@@ -30,6 +33,7 @@ import {
   type Worksheet,
 } from "./worksheet";
 import type { Problem } from "./types";
+import { graphSpecProblem } from "./plot";
 
 /** The only format version we write. */
 const CURRENT_VERSION = 2;
@@ -187,5 +191,10 @@ function validateProblem(p: unknown, index: number): asserts p is Problem {
   if (typeof p.answer !== "string") fail(`problem ${index} missing answer`);
   if (!Array.isArray(p.distractorHints)) {
     fail(`problem ${index} missing distractorHints`);
+  }
+  for (const key of ["graph", "answerGraph"] as const) {
+    if (p[key] === undefined) continue;
+    const problem = graphSpecProblem(p[key]);
+    if (problem) fail(`problem ${index} ${key} ${problem}`);
   }
 }

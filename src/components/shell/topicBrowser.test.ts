@@ -120,6 +120,15 @@ describe("topicSample", () => {
     expect(s.directions).toBe(g.defaultDirections);
   });
 
+  it("carries the blank grid a graphing Topic prints with its Problems, and no graph otherwise", () => {
+    const graphing = topicSample(getGenerator("graphing-quadratics")!);
+    expect(graphing.graph).toMatch(/^<svg [^]*<\/svg>$/);
+    // a blank grid: no curve, no points, nothing in an ink
+    expect(graphing.graph).not.toContain("<circle");
+    expect(graphing.graph).not.toContain("#c62828");
+    expect(topicSample(getGenerator("quadratic-formula")!).graph).toBeNull();
+  });
+
   it("generates once per Topic", () => {
     const g = stub("once", "Algebra 2", "Quadratics", "Once");
     const spy = vi.spyOn(g, "generate");

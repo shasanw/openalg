@@ -25,6 +25,8 @@ import {
 } from "./mc";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
 import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
+import { GRAPHING_QUADRATICS_ID } from "./generators/graphingQuadratics";
+import { QUADRATIC_INEQUALITIES_ID } from "./generators/quadraticInequalities";
 
 function ws(count: number, print?: Partial<PrintConfig>) {
   return buildWorksheet({
@@ -631,5 +633,121 @@ describe("buildTypstDocument Versions", () => {
         expect(found.sort((a, b) => a - b)).toEqual(doc.math.map((_, i) => i));
       }
     }
+  });
+});
+
+describe("graphs (#9)", () => {
+  const graphing = (params: Record<string, string | boolean> = {}, count = 6) =>
+    buildWorksheet({ generatorId: GRAPHING_QUADRATICS_ID, params, baseSeed: 5, count });
+  /** Each graph drawn, as its frame's name and the name of what is drawn over it (or null). */
+  const uses = (source: string) =>
+    [...source.matchAll(/#oagraph\((oag\d+)(?:, over: (oag\d+))?\)/g)].map((m) => ({
+      frame: m[1],
+      over: m[2] ?? null,
+    }));
+  const refs = (source: string) => uses(source).map((u) => u.over ?? u.frame);
+  const defs = (source: string) =>
+    new Map([...source.matchAll(/^#let (oag\d+) = bytes\((.*)\)$/gm)].map((m) => [m[1], m[2]]));
+
+  it("defines each distinct graph once, as a plain Typst string, and references it by name", () => {
+    const { source } = buildTypstDocument(graphing(), { keyFormat: "none" });
+    // every student grid is the same blank grid: one definition, six uses
+    expect([...defs(source).keys()]).toEqual(["oag0"]);
+    expect(refs(source)).toEqual(Array(6).fill("oag0"));
+    const literal = defs(source).get("oag0")!;
+    expect(literal).toMatch(/^"<svg [^"\\]*<\/svg>"$/);
+    expect(source).toContain("#let oagraph(frame, over: none) = ");
+  });
+
+  it("keeps a cell with a graph on one page", () => {
+    const { source } = buildTypstDocument(graphing(), { keyFormat: "full" });
+    expect(source.match(/grid\.cell\(breakable: false\)/g)).toHaveLength(12);
+  });
+
+  it("emits no graph markup for Topics without graphs", () => {
+    const { source } = buildTypstDocument(ws(4), { keyFormat: "in-context" });
+    expect(source).not.toContain("oagraph");
+    expect(source).not.toContain("breakable");
+  });
+
+  it("prints no grid on the student copy when the work space is the student's own paper", () => {
+    const { source } = buildTypstDocument(graphing({ workSpace: "none" }), { keyFormat: "none" });
+    expect(source).not.toContain("oagraph");
+  });
+
+  it("the full and odds keys draw each Answer's graph in the key colour after its text Answer", () => {
+    const sheet = graphing();
+    for (const keyFormat of ["full", "odds"] as const) {
+      const { source } = buildTypstDocument(sheet, { keyFormat });
+      const key = source.slice(source.indexOf("Answer Key"));
+      const keyUses = uses(key);
+      expect(keyUses).toHaveLength(keyFormat === "full" ? 6 : 3);
+      for (const u of keyUses) {
+        // drawn on the student's own blank grid, which carries no key ink
+        expect(u.frame).toBe("oag0");
+        expect(defs(source).get(u.over!)).toContain("#c62828");
+      }
+      expect(defs(source).get("oag0")).not.toContain("#c62828");
+    }
+  });
+
+  it("the in-context key draws the Answer on the student's grid, in its place", () => {
+    const sheet = graphing();
+    const { source } = buildTypstDocument(sheet, { keyFormat: "in-context" });
+    const key = source.slice(source.indexOf(`[Answer Key]`));
+    const keyUses = uses(key);
+    expect(keyUses).toHaveLength(6);
+    for (const u of keyUses) {
+      expect(u.frame).toBe("oag0");
+      expect(u.over).not.toBeNull();
+    }
+    // each answer graph comes before its "Answer:" line
+    const first = key.indexOf("#oagraph(");
+    expect(first).toBeLessThan(key.indexOf("Answer:"));
+  });
+
+  it("the in-context key puts a number line with no blank line to replace after the Answer", () => {
+    const sheet = buildWorksheet({ generatorId: QUADRATIC_INEQUALITIES_ID, baseSeed: 2, count: 2 });
+    const { source } = buildTypstDocument(sheet, { keyFormat: "in-context" });
+    const key = source.slice(source.indexOf(`[Answer Key]`));
+    expect(key.indexOf("Answer:")).toBeLessThan(key.indexOf("#oagraph("));
+    // and the student copy shows none
+    expect(refs(source.slice(0, source.indexOf(`[Answer Key]`)))).toEqual([]);
+  });
+
+  it("multiple choice: the grid sits between the prompt and the choices, and the in-context key fills it in", () => {
+    const sheet = setResponseFormat(graphing(), { mode: "multiple-choice", choices: 4 });
+    const { source } = buildTypstDocument(sheet, { keyFormat: "in-context" });
+    const firstCell = source.slice(source.indexOf("grid.cell"), source.indexOf("(B)"));
+    expect(firstCell).toContain("#oagraph(oag0)");
+    expect(firstCell.indexOf("#oagraph(")).toBeLessThan(firstCell.indexOf("(A)"));
+    const key = source.slice(source.indexOf(`[Answer Key]`));
+    expect(uses(key)).toHaveLength(6);
+    expect(uses(key).every((u) => u.frame === "oag0" && u.over !== null)).toBe(true);
+  });
+
+  it("every Version prints its own graphs", () => {
+    for (const mode of ["scramble-order", "new-questions"] as const) {
+      const sheet = setVersionSettings(graphing(), { count: 3, mode });
+      const all = buildTypstDocument(sheet, { version: "all", keyFormat: "full" });
+      // three student copies of 6 grids, three keys of 6 answer graphs
+      expect(uses(all.source)).toHaveLength(36);
+      for (const u of uses(all.source)) {
+        expect(defs(all.source).has(u.frame)).toBe(true);
+        if (u.over) expect(defs(all.source).has(u.over)).toBe(true);
+      }
+    }
+  });
+
+  it("keeps the source small: 20 graphs share one frame, each answer is a small overlay", () => {
+    const { source } = buildTypstDocument(graphing({}, 20), { keyFormat: "in-context" });
+    expect(source.length).toBeLessThan(40_000);
+    const lines = buildWorksheet({
+      generatorId: QUADRATIC_INEQUALITIES_ID,
+      params: { showNumberLine: true },
+      baseSeed: 5,
+      count: 20,
+    });
+    expect(buildTypstDocument(lines, { keyFormat: "in-context" }).source.length).toBeLessThan(40_000);
   });
 });

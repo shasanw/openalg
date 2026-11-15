@@ -6,9 +6,19 @@
 // platform's PDF/SVG compiler converts each snippet to Typst math (via mitex) and
 // substitutes the placeholders. This keeps the single LaTeX representation while
 // letting Typst own page layout, columns, and pagination.
+//
+// Graphs (#9) are plot(spec) SVG strings embedded as Typst images, in two
+// stacked layers (plotLayers): the frame, then what is drawn on it. Each
+// distinct SVG is defined once at the top of the source (`#let oag<i> =
+// bytes("<svg…>")`) and referenced by name, so a sheet of identical blank grids
+// carries one copy of the grid, and every answer graph on the key reuses it
+// under its own small overlay. plot() emits single-quoted SVG
+// with no backslashes or newlines, so it sits in a Typst string unchanged
+// (typstStringLiteral escapes defensively all the same).
 
 import { ANSWER_PART_SEPARATOR } from "./format";
 import { choiceLetter } from "./mc";
+import { plotLayers, PLOT_WIDTH_PT, type GraphSpec } from "./plot";
 import type { Problem } from "./types";
 import {
   deriveVersion,
@@ -52,7 +62,8 @@ export interface TypstOptions {
 }
 
 /** Ink for Answers printed on the in-context key, so they stand out from the copy. */
-const KEY_COLOR = `rgb("#c62828")`;
+const KEY_HEX = "#c62828";
+const KEY_COLOR = `rgb("${KEY_HEX}")`;
 
 // Vertical work space below each free-response problem (the grid's row gutter).
 // Sized so the three settings are clearly distinct on paper: roomy leaves
@@ -115,6 +126,19 @@ export function buildTypstDocument(
     math.push(latex);
     return `@@M${i}@@`;
   };
+  const graphs = new Map<string, string>();
+  const named = (svg: string): string => {
+    let name = graphs.get(svg);
+    if (name === undefined) {
+      name = `oag${graphs.size}`;
+      graphs.set(svg, name);
+    }
+    return name;
+  };
+  const graph: GraphMarkup = (spec, { answer }) => {
+    const { frame, content } = plotLayers(spec, answer ? { ink: KEY_HEX } : {});
+    return content ? `#oagraph(${named(frame)}, over: ${named(content)})` : `#oagraph(${named(frame)})`;
+  };
 
   const versions =
     opts.version === "all" ? deriveVersions(ws) : [deriveVersion(ws, opts.version ?? 0)];
@@ -125,7 +149,7 @@ export function buildTypstDocument(
     .map(
       (v, i) =>
         (i > 0 ? "\n#pagebreak()\n#counter(page).update(1)\n" : "") +
-        worksheetMarkup(v.worksheet, placeholder, {
+        worksheetMarkup(v.worksheet, placeholder, graph, {
           answers: false,
           label: v.label,
           choiceVariant: v.choiceVariant,
@@ -134,7 +158,7 @@ export function buildTypstDocument(
     .join("");
   const keys = versions
     .map((v) =>
-      answerKeyMarkup(v.worksheet, keyFormat, placeholder, {
+      answerKeyMarkup(v.worksheet, keyFormat, placeholder, graph, {
         label: v.label,
         choiceVariant: v.choiceVariant,
         restartPageNumbers: multi,
@@ -142,15 +166,78 @@ export function buildTypstDocument(
     )
     .join("");
 
+  const graphDefs = [...graphs]
+    .map(([svg, name]) => `#let ${name} = bytes(${typstStringLiteral(svg)})\n`)
+    .join("");
+  // A graph sits under its prompt, indented like the prompt's text, at its
+  // drawn size, shrinking only if the column is narrower. What is drawn on it
+  // (`over`, the same size) is placed exactly on top of its frame.
+  const graphHelper = graphs.size
+    ? `#let oagraph(frame, over: none) = pad(left: 1.6em, layout(size => {
+  let w = calc.min(size.width, ${PLOT_WIDTH_PT}pt)
+  block(width: w, {
+    image(frame, format: "svg", width: w)
+    if over != none { place(top + left, image(over, format: "svg", width: w)) }
+  })
+}))
+${graphDefs}`
+    : "";
+
   const source = `#set page(paper: "${paper}", flipped: ${flipped}, margin: ${margin}, numbering: ${numbering})
 #set text(font: "${TEXT_FONT}", size: ${fontSize})
 
 #let blank(w) = box(width: w, stroke: (bottom: 0.6pt + luma(110)), outset: (bottom: 3pt))[]
 #let keycolor = ${KEY_COLOR}
-
+${graphHelper}
 ${students}${keys}`;
 
   return { source, math };
+}
+
+/** A Typst string literal (quotes, backslashes and line breaks escaped). */
+function typstStringLiteral(s: string): string {
+  return `"${s.replace(/[\\"]/g, (c) => "\\" + c).replace(/\n/g, "\\n").replace(/\r/g, "\\r")}"`;
+}
+
+/**
+ * Typst markup drawing a graph: the student's graph, or with `answer` the
+ * Answer drawn in the key colour.
+ */
+export type GraphMarkup = (spec: GraphSpec, opts: { answer: boolean }) => string;
+
+/** A graph on its own lines below what precedes it in a cell. */
+const graphBlock = (markup: string): string => `
+#v(0.4em)
+${markup}`;
+
+/** The prompt, with the Problem's graph (if any) under it, as the student sees it. */
+function promptWithGraph(problem: Problem, placeholder: Placeholder, graph: GraphMarkup): string {
+  const prompt = placeholder(problem.prompt);
+  return problem.graph ? prompt + graphBlock(graph(problem.graph, { answer: false })) : prompt;
+}
+
+/**
+ * The prompt on an in-context key: the student's graph is replaced by the
+ * answer graph, drawn on the same window. A Problem whose answer graph has no
+ * student graph to replace gets it after the Answer instead (`trailing`).
+ */
+function inContextPrompt(
+  problem: Problem,
+  placeholder: Placeholder,
+  graph: GraphMarkup,
+): { prompt: string; trailing: string } {
+  const prompt = placeholder(problem.prompt);
+  const answerGraph = problem.answerGraph;
+  if (problem.graph) {
+    const shown = answerGraph ?? problem.graph;
+    return { prompt: prompt + graphBlock(graph(shown, { answer: !!answerGraph })), trailing: "" };
+  }
+  return { prompt, trailing: answerGraph ? graphBlock(graph(answerGraph, { answer: true })) : "" };
+}
+
+/** The answer graph under a key entry, or nothing. */
+function keyGraph(problem: Problem, graph: GraphMarkup): string {
+  return problem.answerGraph ? graphBlock(graph(problem.answerGraph, { answer: true })) : "";
 }
 
 /**
@@ -158,7 +245,8 @@ ${students}${keys}`;
  * wraps (a long Answer) aligned under its own first line, not under the number.
  */
 const numberedCell = (n: number, body: string): string =>
-  `  grid.cell[#set par(hanging-indent: 1.6em)
+  // A cell with a graph never splits across pages, so a prompt stays with its grid.
+  `  grid.cell${body.includes("#oagraph(") ? "(breakable: false)" : ""}[#set par(hanging-indent: 1.6em)
 #box(width: 1.6em)[${n}\\)] ${body}
 #parbreak()],`;
 
@@ -195,6 +283,7 @@ export function answerMath(latex: string, placeholder: Placeholder): string {
 function worksheetMarkup(
   ws: Worksheet,
   placeholder: Placeholder,
+  graph: GraphMarkup,
   {
     answers,
     label = null,
@@ -214,10 +303,10 @@ function worksheetMarkup(
       const cells = section.problems
         .map((p) => {
           const body = mc
-            ? mcProblemBody(p, choices, placeholder, { showAnswer: answers, choiceVariant })
+            ? mcProblemBody(p, choices, placeholder, graph, { showAnswer: answers, choiceVariant })
             : answers
-              ? frInContextBody(p, placeholder)
-              : placeholder(p.prompt);
+              ? frInContextBody(p, placeholder, graph)
+              : promptWithGraph(p, placeholder, graph);
           return numberedCell(++number, body);
         })
         .join("\n");
@@ -303,6 +392,7 @@ export function answerKeyMarkup(
   ws: Worksheet,
   format: AnswerKeyFormat,
   placeholder: Placeholder,
+  graph: GraphMarkup,
   {
     label = null,
     choiceVariant = 0,
@@ -318,7 +408,7 @@ export function answerKeyMarkup(
     return `
 #pagebreak()
 #counter(page).update(1)
-${worksheetMarkup(ws, placeholder, { answers: true, label, choiceVariant })}`;
+${worksheetMarkup(ws, placeholder, graph, { answers: true, label, choiceVariant })}`;
   }
 
   // One continuous list numbered to match the Problems; odds keeps only the
@@ -331,9 +421,9 @@ ${worksheetMarkup(ws, placeholder, { answers: true, label, choiceVariant })}`;
     .map(({ p, n }) =>
       numberedCell(
         n,
-        mc
+        (mc
           ? mcAnswerBody(p, choices, placeholder, choiceVariant)
-          : answerMath(p.answer, placeholder),
+          : answerMath(p.answer, placeholder)) + keyGraph(p, graph),
       ),
     )
     .join("\n");
@@ -359,11 +449,11 @@ ${answerCells}
 }
 
 /** A free-response Problem on the in-context key: prompt, then its Answer. */
-function frInContextBody(problem: Problem, placeholder: Placeholder): string {
-  const prompt = placeholder(problem.prompt);
+function frInContextBody(problem: Problem, placeholder: Placeholder, graph: GraphMarkup): string {
+  const { prompt, trailing } = inContextPrompt(problem, placeholder, graph);
   return `${prompt}
 #v(0.3em)
-#pad(left: 1.6em)[#text(fill: keycolor)[#strong[Answer:] ${answerMath(problem.answer, placeholder)}]]`;
+#pad(left: 1.6em)[#text(fill: keycolor)[#strong[Answer:] ${answerMath(problem.answer, placeholder)}]]${trailing}`;
 }
 
 // --- Multiple-choice layout (issue #5) --------------------------------------
@@ -389,12 +479,15 @@ export function mcProblemBody(
   problem: Problem,
   choices: number,
   placeholder: Placeholder,
+  graph: GraphMarkup,
   {
     showAnswer = false,
     choiceVariant = 0,
   }: { showAnswer?: boolean; choiceVariant?: number } = {},
 ): string {
-  const prompt = placeholder(problem.prompt);
+  const { prompt, trailing } = showAnswer
+    ? inContextPrompt(problem, placeholder, graph)
+    : { prompt: promptWithGraph(problem, placeholder, graph), trailing: "" };
   const { choices: rendered, correctIndex } = versionChoices(problem, choices, choiceVariant);
   const lines = rendered
     .map((latex, i) => {
@@ -416,7 +509,7 @@ export function mcProblemBody(
   return `${prompt}
 #v(0.3em)
 #pad(left: 1.6em)[#set par(leading: 0.75em, spacing: 0.75em, hanging-indent: 1.8em)
-${lines}${answerLine}]`;
+${lines}${answerLine}]${trailing}`;
 }
 
 /** A multiple-choice Answer Key cell body: the correct letter, then the Answer. */

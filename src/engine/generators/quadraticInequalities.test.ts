@@ -6,7 +6,9 @@ import {
   construct,
   exactValue,
   generator,
+  numberLine,
   numToLatex,
+  numToText,
   solutionToLatex,
   type CriticalPointType,
   type ExactNum,
@@ -14,6 +16,7 @@ import {
   type Op,
   type SymbolMode,
 } from "./quadraticInequalities";
+import { blankGraph, plot } from "../plot";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const POINT_TYPES: CriticalPointType[] = ["integer", "rational", "irrational"];
@@ -441,5 +444,100 @@ describe("quadratic-inequalities: rendering", () => {
       expect(solutionToLatex(set, "interval")).toBe(interval);
       expect(solutionToLatex(set, "inequality")).toBe(inequality);
     }
+  });
+});
+
+// ------------------------------------------------------------- number lines (#9)
+
+describe("quadratic-inequalities: number lines", () => {
+  const lineParams = fc.record({
+    criticalPoints: fc.constantFrom(...POINT_TYPES),
+    symbols: fc.constantFrom(...SYMBOLS),
+    allowNegativeLeading: fc.boolean(),
+    allowLeadingCoefficient: fc.boolean(),
+    allowSpecialCases: fc.boolean(),
+    maxCriticalPoint: fc.integer({ min: 2, max: 12 }),
+    showNumberLine: fc.boolean(),
+  });
+
+  const holds = (a: number, b: number, c: number, op: Op, x: number): boolean => {
+    const v = a * x * x + b * x + c;
+    return op === "<" ? v < 0 : op === ">" ? v > 0 : op === "<=" ? v <= 0 : v >= 0;
+  };
+
+  it("shades exactly the solutions: a sample x is shaded iff it satisfies the inequality", () => {
+    fc.assert(
+      fc.property(anySeed, lineParams, fc.double({ min: -20, max: 20, noNaN: true }), (seed, params, x) => {
+        const k = construct(params, createRng(seed));
+        const line = numberLine(k);
+        const crit = line.points!.map((p) => p.x);
+        // keep clear of the critical points, where float rounding decides
+        if (crit.some((c) => Math.abs(c - x) < 1e-6)) return;
+        const shaded = line.shaded!.some(
+          (s) => (s.from === null || x > s.from) && (s.to === null || x < s.to),
+        );
+        expect(shaded).toBe(holds(k.a, k.b, k.c, k.op, x));
+      }),
+    );
+  });
+
+  it("dots every endpoint of the solution, filled exactly when it is a solution", () => {
+    fc.assert(
+      fc.property(anySeed, lineParams, (seed, params) => {
+        const k = construct(params, createRng(seed));
+        for (const p of numberLine(k).points!) {
+          // exact: the dot sits on a zero of the quadratic
+          expect(Math.abs(k.a * p.x * p.x + k.b * p.x + k.c)).toBeLessThan(1e-9);
+          expect(p.closed).toBe(k.op === "<=" || k.op === ">=");
+        }
+      }),
+    );
+  });
+
+  it("the window holds every critical point, at least a tick inside the ends", () => {
+    fc.assert(
+      fc.property(anySeed, lineParams, (seed, params) => {
+        const k = construct(params, createRng(seed));
+        const line = numberLine(k);
+        const zeros =
+          k.zeros.kind === "two"
+            ? [k.zeros.lo, k.zeros.hi]
+            : k.zeros.kind === "double"
+              ? [k.zeros.at]
+              : [];
+        for (const z of zeros) {
+          const v = exactValue(z);
+          expect(v).toBeGreaterThanOrEqual(line.range.min + line.step);
+          expect(v).toBeLessThanOrEqual(line.range.max - line.step);
+        }
+        expect(line.range.min).toBe(-line.range.max);
+      }),
+    );
+  });
+
+  it("labels only the dots no tick names, with the exact value", () => {
+    const line = numberLine(construct({ criticalPoints: "irrational" }, createRng(4)));
+    for (const p of line.points!) expect(p.label).toMatch(/√/);
+    const ints = numberLine(construct({ criticalPoints: "integer" }, createRng(4)));
+    for (const p of ints.points!) expect(p.label).toBeUndefined();
+    expect(numToText({ p: -3, q: 0, s: 1, r: 2 })).toBe("−3/2");
+    expect(numToText({ p: 2, q: -1, s: 3, r: 1 })).toBe("2 − √3");
+    expect(numToText({ p: 0, q: 2, s: 5, r: 1 })).toBe("2√5");
+    expect(numToText({ p: 1, q: 1, s: 5, r: 2 })).toBe("(1 + √5)/2");
+  });
+
+  it("the Answer Key always gets the number line; the student only a blank one, and only when asked", () => {
+    fc.assert(
+      fc.property(anySeed, lineParams, (seed, params) => {
+        const p = generator.generate(params, seed);
+        expect(p.answerGraph?.kind).toBe("numberLine");
+        if (!params.showNumberLine) {
+          expect(p.graph).toBeUndefined();
+        } else {
+          expect(p.graph).toEqual(blankGraph(p.answerGraph!));
+          expect(plot(p.graph!)).not.toContain("<circle");
+        }
+      }),
+    );
   });
 });

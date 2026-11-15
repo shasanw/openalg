@@ -16,10 +16,12 @@
 //   a((x - h)^2 + m) with m > 0, giving "all reals", "no solution", a single
 //   point, or "all reals except one point".
 //
-// Number lines: the issue asks for number-line graphics via the shared SVG
-// plotter (#9), which does not exist yet. The `SolutionSet` below already holds
-// everything a number line needs (endpoints, which are open/closed, and the
-// shaded regions); see `numberLineSeam` for where the graph `spec` attaches.
+// Number lines (#9): the Answer Key draws the solution set on a number line
+// (`answerGraph`, built by `numberLine` straight from the `SolutionSet`) under
+// the text Answer. The student copy gets a BLANK number line over the same
+// range only when the "Show a blank number line" Topic Option is on. The range
+// is symmetric about 0 (see numberLineWindow), so the blank line hints at the
+// scale only, never at the critical points.
 
 import { createRng, type Rng } from "../rng";
 import {
@@ -30,6 +32,13 @@ import {
   type Problem,
 } from "../types";
 import { fractionToLatex, gcd, quadraticToLatex } from "../format";
+import {
+  blankGraph,
+  numberLineWindow,
+  type NumberLinePoint,
+  type NumberLineSpec,
+  type ShadedInterval,
+} from "../plot";
 
 export const QUADRATIC_INEQUALITIES_ID = "quadratic-inequalities";
 
@@ -102,6 +111,12 @@ export const schema = [
     min: 2,
     max: 12,
     default: 6,
+  },
+  {
+    type: "boolean",
+    key: "showNumberLine",
+    label: "Show a blank number line",
+    default: false,
   },
 ] as const satisfies ParamSchema;
 
@@ -441,15 +456,79 @@ export function distractors(k: InequalityConstruction, notation: Notation): stri
   return out;
 }
 
+/** An exact number as plain text for a number-line label: "3", "−3/2", "2 − √3". */
+export function numToText(x: ExactNum): string {
+  const minus = "\u2212";
+  const signed = (v: number) => (v < 0 ? minus + Math.abs(v) : String(v));
+  if (x.q === 0 || x.s === 1) {
+    const v = x.p + x.q;
+    if (x.r === 1) return signed(v);
+    return `${v < 0 ? minus : ""}${Math.abs(v)}/${x.r}`;
+  }
+  const rad = `${Math.abs(x.q) === 1 ? "" : Math.abs(x.q)}\u221a${x.s}`;
+  const numer =
+    x.p === 0 ? `${x.q < 0 ? minus : ""}${rad}` : `${signed(x.p)} ${x.q < 0 ? minus : "+"} ${rad}`;
+  return x.r === 1 ? numer : `(${numer})/${x.r}`;
+}
+
+/** Every critical point the number line must show. */
+function criticalPoints(z: Zeros): ExactNum[] {
+  switch (z.kind) {
+    case "two":
+      return [z.lo, z.hi];
+    case "double":
+      return [z.at];
+    case "none":
+      return [];
+  }
+}
+
 /**
- * SEAM for #9 (number lines). When the shared SVG plotter lands, build its
- * number-line spec here from `k.solution` (endpoints via `exactValue`, open vs
- * closed dots from `closed` / `kind`, shaded regions from `kind`) and attach it
- * to the Problem as its graph `spec`. Kept as a no-op so the generator's output
- * is stable until then.
+ * The solution set on a number line: closed or open dots at its endpoints and
+ * the solution shaded (rays run off the ends). Its range is fixed by the
+ * critical points alone (numberLineWindow), not by the solution, so the blank
+ * line for the same Problem is identical whatever the inequality symbol.
+ * A dot that is not an integer is labelled, since no tick names it.
  */
-export function numberLineSeam(_k: InequalityConstruction): undefined {
-  return undefined;
+export function numberLine(k: InequalityConstruction): NumberLineSpec {
+  const window = numberLineWindow(criticalPoints(k.zeros).map(exactValue));
+  const dot = (x: ExactNum, closed: boolean): NumberLinePoint => {
+    const p: NumberLinePoint = { x: exactValue(x), closed };
+    if (!(x.r === 1 && (x.q === 0 || x.s === 1))) p.label = numToText(x);
+    return p;
+  };
+  const s = k.solution;
+  let points: NumberLinePoint[] = [];
+  let shaded: ShadedInterval[] = [];
+  switch (s.kind) {
+    case "between":
+      points = [dot(s.lo, s.closed), dot(s.hi, s.closed)];
+      shaded = [{ from: exactValue(s.lo), to: exactValue(s.hi) }];
+      break;
+    case "outside":
+      points = [dot(s.lo, s.closed), dot(s.hi, s.closed)];
+      shaded = [
+        { from: null, to: exactValue(s.lo) },
+        { from: exactValue(s.hi), to: null },
+      ];
+      break;
+    case "all":
+      shaded = [{ from: null, to: null }];
+      break;
+    case "none":
+      break;
+    case "point":
+      points = [dot(s.at, true)];
+      break;
+    case "allBut":
+      points = [dot(s.at, false)];
+      shaded = [
+        { from: null, to: exactValue(s.at) },
+        { from: exactValue(s.at), to: null },
+      ];
+      break;
+  }
+  return { kind: "numberLine", ...window, points, shaded };
 }
 
 export const generator: Generator = {
@@ -463,8 +542,8 @@ export const generator: Generator = {
     const resolved = resolveParams(schema, params);
     const k = construct(resolved, createRng(seed));
     const notation = resolved.notation as Notation;
-    // #9: attach `spec: numberLineSeam(k)` here once Problem carries a graph spec.
-    return {
+    const line = numberLine(k);
+    const problem: Problem = {
       kind: "generated",
       generatorId: QUADRATIC_INEQUALITIES_ID,
       params: resolved,
@@ -472,6 +551,9 @@ export const generator: Generator = {
       prompt: promptLatex(k, resolved.standardForm as boolean),
       answer: solutionToLatex(k.solution, notation),
       distractorHints: distractors(k, notation),
+      answerGraph: line,
     };
+    if (resolved.showNumberLine) problem.graph = blankGraph(line);
+    return problem;
   },
 };

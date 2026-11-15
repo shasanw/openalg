@@ -17,6 +17,8 @@ import {
 import { buildTypstDocument } from "./typst";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
 import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
+import { GRAPHING_QUADRATICS_ID } from "./generators/graphingQuadratics";
+import { QUADRATIC_INEQUALITIES_ID } from "./generators/quadraticInequalities";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 
@@ -369,5 +371,62 @@ describe("Versions setting", () => {
       const bad = { ...sampleWorksheet(), versions };
       expect(() => deserializeWorksheet(JSON.stringify(bad))).toThrow(/versions/);
     }
+  });
+});
+
+describe("graphs (#9)", () => {
+  function graphWorksheet(): Worksheet {
+    const ws = buildWorksheet({ generatorId: GRAPHING_QUADRATICS_ID, baseSeed: 5, count: 4 });
+    const line = buildSection({
+      generatorId: QUADRATIC_INEQUALITIES_ID,
+      params: { showNumberLine: true, criticalPoints: "rational" },
+      baseSeed: 6,
+      count: 3,
+    });
+    return { ...ws, sections: [...ws.sections, line] };
+  }
+
+  it("round-trips Problems with a graph and an answer graph byte-identically", () => {
+    const ws = graphWorksheet();
+    expect(ws.sections[0].problems[0].graph?.kind).toBe("plane");
+    expect(ws.sections[1].problems[0].answerGraph?.kind).toBe("numberLine");
+    const json = serializeWorksheet(ws);
+    const loaded = deserializeWorksheet(json);
+    expect(loaded).toEqual(ws);
+    expect(serializeWorksheet(loaded)).toBe(json);
+  });
+
+  it("a reopened Worksheet draws the same graphs in every key format", () => {
+    const ws = setResponseFormat(graphWorksheet(), { mode: "multiple-choice", choices: 4 });
+    const loaded = deserializeWorksheet(serializeWorksheet(ws));
+    for (const keyFormat of ANSWER_KEY_FORMATS) {
+      expect(buildTypstDocument(loaded, { keyFormat })).toEqual(buildTypstDocument(ws, { keyFormat }));
+    }
+  });
+
+  it("loads a file saved before #9, whose Problems have no graphs", () => {
+    const ws = graphWorksheet();
+    const old = JSON.parse(serializeWorksheet(ws));
+    for (const s of old.sections) {
+      for (const p of s.problems) {
+        delete p.graph;
+        delete p.answerGraph;
+      }
+    }
+    const loaded = deserializeWorksheet(JSON.stringify(old));
+    expect(loaded.version).toBe(2);
+    expect(loaded.sections[0].problems[0].graph).toBeUndefined();
+    expect(() => buildTypstDocument(loaded, { keyFormat: "in-context" })).not.toThrow();
+  });
+
+  it("rejects a damaged graph instead of breaking the Preview", () => {
+    const data = JSON.parse(serializeWorksheet(graphWorksheet()));
+    data.sections[0].problems[1].answerGraph = { kind: "plane", x: { min: 3, max: 1 } };
+    expect(() => deserializeWorksheet(JSON.stringify(data))).toThrow(
+      /problem 1 answerGraph has an invalid window/,
+    );
+    data.sections[0].problems[1].answerGraph = undefined;
+    data.sections[0].problems[1].graph = "grid";
+    expect(() => deserializeWorksheet(JSON.stringify(data))).toThrow(/problem 1 graph is not an object/);
   });
 });
