@@ -1,43 +1,46 @@
-// The application top bar: brand (click → home), the document title, the
-// Worksheet/Test mode toggle, and global file actions. Test mode (multi-section)
-// is a staged follow-up — its button is present but disabled for now.
+// The editor's top bar: the logo and a Library breadcrumb (both go home), the
+// editable Worksheet title, the save status once there is something saved,
+// and the file actions: Open (quiet), a More menu, Export PDF (secondary) and
+// Print, the one primary button.
 
 import {
   Check,
+  ChevronRight,
   CloudOff,
   FileDown,
   FolderOpen,
   Loader2,
+  Moon,
+  MoreHorizontal,
   Printer,
   Save,
-  Settings,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/LogoMark";
-import { Separator } from "@/components/ui/separator";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import type { AutosaveState } from "@/App";
+import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import type { Theme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
 
-export type DocMode = "worksheet" | "test";
+/** How the open Worksheet is being kept in the Library, for the save status. */
+export type AutosaveState = "idle" | "saving" | "saved" | "error";
 
-/** Subtle "your work is saved" indicator for the silent library auto-save. */
-function AutosaveIndicator({ state }: { state: AutosaveState }) {
+/** "Saved to Library" and friends; nothing until the first save starts. */
+export function SaveStatus({ state }: { state: AutosaveState }) {
   if (state === "idle") return null;
   const map = {
     saving: { icon: <Loader2 className="size-3.5 animate-spin" />, text: "Saving…" },
-    saved: { icon: <Check className="size-3.5" />, text: "Saved" },
-    error: { icon: <CloudOff className="size-3.5 text-destructive" />, text: "Not saved" },
+    saved: { icon: <Check className="size-3.5" />, text: "Saved to Library" },
+    error: { icon: <CloudOff className="size-3.5" />, text: "Not saved" },
   } as const;
   const { icon, text } = map[state];
   return (
     <span
+      role="status"
       className={cn(
-        "text-muted-foreground flex items-center gap-1 text-xs font-medium",
-        state === "error" && "text-destructive",
+        "flex shrink-0 items-center gap-1 text-[12px] whitespace-nowrap",
+        state === "error" ? "text-destructive" : "text-muted-foreground",
       )}
-      aria-live="polite"
     >
       {icon}
       {text}
@@ -45,7 +48,6 @@ function AutosaveIndicator({ state }: { state: AutosaveState }) {
   );
 }
 
-/** A spinning placeholder swapped in for a button's icon while it's busy. */
 function Spinner() {
   return <Loader2 className="animate-spin" />;
 }
@@ -53,15 +55,11 @@ function Spinner() {
 export function TopBar({
   title,
   onTitleChange,
-  mode,
-  onModeChange,
   onHome,
   onOpen,
-  onSave,
+  onSaveCopy,
   onExport,
   onPrint,
-  onPrintConfig,
-  canSave,
   canExport,
   autosave,
   saving,
@@ -71,17 +69,14 @@ export function TopBar({
   onThemeChange,
 }: {
   title: string;
-  /** When provided, the title becomes editable inline. */
-  onTitleChange?: (title: string) => void;
-  mode: DocMode;
-  onModeChange: (mode: DocMode) => void;
+  onTitleChange: (title: string) => void;
   onHome: () => void;
   onOpen: () => void;
-  onSave: () => void;
+  /** Download a Worksheet File (.oalg) copy. */
+  onSaveCopy: () => void;
   onExport: () => void;
   onPrint: () => void;
-  onPrintConfig: () => void;
-  canSave: boolean;
+  /** False while there is nothing to print (no Sections yet). */
   canExport: boolean;
   autosave: AutosaveState;
   saving: boolean;
@@ -90,124 +85,70 @@ export function TopBar({
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
 }) {
+  const nextTheme: Theme = theme === "dark" ? "light" : "dark";
   return (
-    <header className="bg-sidebar flex h-13 shrink-0 items-center gap-3 rounded-xl border px-3 shadow-sm">
-      <button
-        onClick={onHome}
-        className="hover:bg-accent flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors"
-        title="Home"
-      >
-        <LogoMark className="shadow-sm" />
-        <span className="text-[17px] font-bold tracking-tight">OpenAlg</span>
-      </button>
-
-      <Separator orientation="vertical" className="h-5" />
-
-      {onTitleChange ? (
+    <header className="bg-panel flex h-12 shrink-0 items-center gap-2 border-b px-3">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onHome}
+          className="hover:bg-hover flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1"
+          title="Home"
+        >
+          <LogoMark className="size-6" />
+          <span className="font-semibold">OpenAlg</span>
+        </button>
+        <ChevronRight aria-hidden className="text-subtle-foreground size-4 shrink-0" />
+        <button
+          type="button"
+          onClick={onHome}
+          className="text-muted-foreground hover:bg-hover hover:text-foreground shrink-0 rounded-md px-1.5 py-1"
+        >
+          Library
+        </button>
+        <ChevronRight aria-hidden className="text-subtle-foreground size-4 shrink-0" />
         <input
           aria-label="Worksheet title"
           value={title}
           onChange={(e) => onTitleChange(e.currentTarget.value)}
-          className="hover:bg-accent focus:bg-accent focus:ring-ring/50 min-w-0 max-w-[28ch] flex-shrink truncate rounded-md bg-transparent px-1.5 py-1 text-sm font-semibold outline-none transition-colors focus:ring-2"
+          placeholder="Untitled worksheet"
+          spellCheck={false}
+          // Sized to its text so the save status sits right after the title.
+          style={{ width: `${Math.min(48, Math.max(12, title.length + 2))}ch` }}
+          className="hover:border-border-strong placeholder:text-subtle-foreground h-7 min-w-0 truncate rounded-md border border-transparent bg-transparent px-1.5 font-semibold transition-colors"
         />
-      ) : (
-        <span className="truncate text-sm font-semibold">{title}</span>
-      )}
-
-      <AutosaveIndicator state={autosave} />
-
-      <Separator orientation="vertical" className="h-5" />
-
-      {/* Worksheet / Test mode */}
-      <div className="bg-muted flex gap-0.5 rounded-lg border p-0.5">
-        <ModeButton
-          active={mode === "worksheet"}
-          onClick={() => onModeChange("worksheet")}
-        >
-          Worksheet
-        </ModeButton>
-        <ModeButton
-          active={mode === "test"}
-          disabled
-          title="Multi-section tests — coming soon"
-          onClick={() => onModeChange("test")}
-        >
-          Test
-        </ModeButton>
-      </div>
+      </nav>
+      <SaveStatus state={autosave} />
 
       <div className="flex-1" />
 
-      <Button variant="ghost" size="sm" onClick={onOpen}>
-        <FolderOpen /> Open
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onSave}
-        disabled={!canSave || saving}
-      >
-        {saving ? <Spinner /> : <Save />} Save
-      </Button>
-      <ThemeToggle theme={theme} onThemeChange={onThemeChange} className="size-8" />
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-8"
-        title="Print & layout"
-        onClick={onPrintConfig}
-        disabled={!canExport}
-      >
-        <Settings />
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onExport}
-        disabled={!canExport || exporting}
-      >
-        {exporting ? <Spinner /> : <FileDown />} Export PDF
-      </Button>
-      <Button
-        variant="default"
-        size="sm"
-        onClick={onPrint}
-        disabled={!canExport || printing}
-      >
-        {printing ? <Spinner /> : <Printer />} Print
-      </Button>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Button variant="quiet" onClick={onOpen}>
+          <FolderOpen /> Open
+        </Button>
+        <Menu>
+          <MenuTrigger asChild>
+            <Button variant="quiet" size="icon" aria-label="More">
+              <MoreHorizontal />
+            </Button>
+          </MenuTrigger>
+          <MenuContent>
+            <MenuItem onSelect={onSaveCopy} disabled={saving}>
+              <Save /> Save a copy as a file…
+            </MenuItem>
+            <MenuSeparator />
+            <MenuItem onSelect={() => onThemeChange(nextTheme)}>
+              {theme === "dark" ? <Sun /> : <Moon />} Switch to {nextTheme} theme
+            </MenuItem>
+          </MenuContent>
+        </Menu>
+        <Button onClick={onExport} disabled={!canExport || exporting}>
+          {exporting ? <Spinner /> : <FileDown />} Export PDF
+        </Button>
+        <Button variant="primary" onClick={onPrint} disabled={!canExport || printing}>
+          {printing ? <Spinner /> : <Printer />} Print
+        </Button>
+      </div>
     </header>
-  );
-}
-
-function ModeButton({
-  active,
-  disabled,
-  title,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  disabled?: boolean;
-  title?: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      title={title}
-      onClick={onClick}
-      className={cn(
-        "h-7 rounded-md px-3 text-[13px] font-medium transition-colors",
-        active
-          ? "bg-card text-primary shadow-sm"
-          : "text-muted-foreground hover:text-foreground",
-        disabled && "cursor-not-allowed opacity-50 hover:text-muted-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }

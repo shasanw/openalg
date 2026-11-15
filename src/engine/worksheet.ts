@@ -338,6 +338,7 @@ export interface EmptyWorksheetOptions {
   print?: PrintConfig;
   responseFormat?: ResponseFormat;
   answerKeyFormat?: AnswerKeyFormat;
+  versions?: VersionSettings;
 }
 
 /** A Worksheet with no Sections yet: what "New Worksheet" starts from. */
@@ -349,6 +350,7 @@ export function emptyWorksheet(opts: EmptyWorksheetOptions = {}): Worksheet {
     print: opts.print ?? { ...DEFAULT_PRINT_CONFIG },
     responseFormat: opts.responseFormat ?? { ...DEFAULT_RESPONSE_FORMAT },
     answerKeyFormat: opts.answerKeyFormat ?? DEFAULT_ANSWER_KEY_FORMAT,
+    versions: opts.versions ?? { ...DEFAULT_VERSION_SETTINGS },
   };
 }
 

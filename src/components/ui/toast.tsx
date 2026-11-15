@@ -19,6 +19,8 @@ interface ToastInput {
   title: string;
   description?: string;
   variant?: ToastVariant;
+  /** One optional follow-up, such as Undo; clicking it dismisses the toast. */
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastItem extends ToastInput {
@@ -37,6 +39,8 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 let nextId = 1;
 
 const AUTO_DISMISS_MS = 4500;
+/** Toasts with an action stay up longer so there's time to use it. */
+const ACTION_DISMISS_MS = 8000;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
@@ -49,7 +53,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     ({ variant = "info", ...rest }: ToastInput) => {
       const id = nextId++;
       setItems((xs) => [...xs, { id, variant, ...rest }]);
-      setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
+      setTimeout(() => dismiss(id), rest.action ? ACTION_DISMISS_MS : AUTO_DISMISS_MS);
     },
     [dismiss],
   );
@@ -79,7 +83,7 @@ const ICONS: Record<ToastVariant, typeof Info> = {
 };
 
 const ICON_TONE: Record<ToastVariant, string> = {
-  success: "text-emerald-500",
+  success: "text-accent-text",
   error: "text-destructive",
   info: "text-primary",
 };
@@ -89,18 +93,31 @@ function ToastCard({ item, onClose }: { item: ToastItem; onClose: () => void }) 
   return (
     <div
       role="status"
-      className="bg-popover text-popover-foreground pointer-events-auto flex items-start gap-3 rounded-xl border p-3 shadow-lg"
+      className="bg-popover text-popover-foreground pointer-events-auto flex items-start gap-3 border-border-strong rounded-lg border p-3 shadow-[var(--shadow-pop)]"
     >
       <Icon className={cn("mt-0.5 size-4.5 shrink-0", ICON_TONE[item.variant])} />
       <div className="min-w-0 flex-1">
-        <p className="text-[13.5px] leading-snug font-semibold">{item.title}</p>
+        <p className="text-[13px] leading-snug font-semibold">{item.title}</p>
         {item.description && (
-          <p className="text-muted-foreground mt-0.5 text-[12.5px] leading-snug">
+          <p className="text-muted-foreground mt-0.5 text-[12px] leading-snug">
             {item.description}
           </p>
         )}
       </div>
+      {item.action && (
+        <button
+          type="button"
+          onClick={() => {
+            item.action!.onClick();
+            onClose();
+          }}
+          className="border-border-strong hover:bg-hover -my-0.5 h-7 shrink-0 rounded-md border px-2.5 text-[12px] font-medium"
+        >
+          {item.action.label}
+        </button>
+      )}
       <button
+        type="button"
         onClick={onClose}
         aria-label="Dismiss"
         className="text-muted-foreground hover:text-foreground -m-1 rounded p-1 transition-colors"

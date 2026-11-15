@@ -19,7 +19,7 @@ export function ThemeToggle({
   const next: Theme = theme === "dark" ? "light" : "dark";
   return (
     <Button
-      variant="ghost"
+      variant="quiet"
       size={size}
       className={className}
       title={`Switch to ${next} mode`}

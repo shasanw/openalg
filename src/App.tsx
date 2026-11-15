@@ -1,16 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { GENERATORS, getGenerator } from "@/engine/registry";
-import { resolveParams, type ParamValues } from "@/engine/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getGenerator } from "@/engine/registry";
+import { resolveParams } from "@/engine/types";
 import {
   buildWorksheet,
-  regenerateAll,
-  setResponseFormat as withResponseFormat,
-  setSectionDirections,
-  setVersionSettings,
-  type PrintConfig,
-  type VersionSettings,
-  type ResponseFormat,
-  type AnswerKeyFormat,
+  DEFAULT_SECTION_PROBLEMS,
+  emptyWorksheet,
   type Worksheet,
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
@@ -24,11 +18,9 @@ import { useTheme } from "@/lib/useTheme";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import { useToast } from "@/components/ui/toast";
 import { HomeScreen } from "@/components/home/HomeScreen";
-import { TopBar, type DocMode } from "@/components/shell/TopBar";
-import { Navigator } from "@/components/shell/Navigator";
-import { Canvas } from "@/components/shell/Canvas";
-import { Inspector } from "@/components/shell/Inspector";
-import { PrintConfigDialog } from "@/components/shell/PrintConfigDialog";
+import { TopBar, type AutosaveState } from "@/components/shell/TopBar";
+import { Editor } from "@/components/shell/Editor";
+import { randomSeed } from "@/lib/randomSeed";
 
 function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
@@ -47,21 +39,10 @@ function restoreDescription(s: LibraryRestoreSummary): string {
   return parts.length > 0 ? `${parts.join("; ")}.` : "Every Worksheet in the backup was added.";
 }
 
-function randomSeed(): number {
-  // A fresh seed per user action. Generators never call Math.random themselves;
-  // they consume this seed deterministically.
-  return Math.floor(Math.random() * 0xffffffff) >>> 0;
-}
-
 /** A stable id for a worksheet's library file (the auto-save filename). */
 function newDocId(): string {
   return crypto.randomUUID();
 }
-
-const DEFAULT_COUNT = 10;
-
-/** How a document is being persisted to the library, for the top-bar indicator. */
-export type AutosaveState = "idle" | "saving" | "saved" | "error";
 
 // PrintConfig paper -> CSS @page size keyword.
 const PAGE_SIZE: Record<Worksheet["print"]["paper"], string> = {
@@ -78,9 +59,8 @@ const PAGE_SIZE: Record<Worksheet["print"]["paper"], string> = {
  * temp file — so it's always fresh (Export PDF remains for saving a file).
  */
 async function printWorksheet(ws: Worksheet): Promise<void> {
-  const pages = await platform.renderPreview(
-    buildTypstDocument(ws, { version: "all" }),
-  );
+  // Every Version's student pages, then every Version's Answer Key.
+  const pages = await platform.renderPreview(buildTypstDocument(ws, { version: "all" }));
   if (pages.length === 0) return;
 
   const size = PAGE_SIZE[ws.print.paper];
@@ -121,19 +101,10 @@ async function printWorksheet(ws: Worksheet): Promise<void> {
 
 function App() {
   const [view, setView] = useState<"home" | "doc">("home");
-  const [generatorId, setGeneratorId] = useState(GENERATORS[0].id);
-  const generator = getGenerator(generatorId)!;
-  const [params, setParams] = useState<ParamValues>(() =>
-    resolveParams(generator.schema, {}),
-  );
-  const [count, setCount] = useState(DEFAULT_COUNT);
   const [worksheet, setWorksheet] = useState<Worksheet | null>(null);
   // Stable id of the open document's library file. Assigned when a document is
   // created/opened and held across edits so auto-save overwrites the same file.
   const [docId, setDocId] = useState<string | null>(null);
-  const [showAnswers, setShowAnswers] = useState(false);
-  const [mode, setMode] = useState<DocMode>("worksheet");
-  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   // Async file/print actions hit the disk and the Typst compiler, so they can
   // run well past a frame; track each so its button can show progress and
   // guard against double-firing.
@@ -151,6 +122,10 @@ function App() {
   const [storage, setStorage] = useState<StoragePersistence | null>(null);
   // Persistent storage is requested once per session, after the first save.
   const persistRequested = useRef(false);
+  // Whether the open document has reached the Library yet. A brand-new
+  // Worksheet isn't saved until it has a Section, so opening New and going
+  // straight back home doesn't leave an empty Worksheet in the Library.
+  const inLibrary = useRef(false);
 
   useEffect(() => {
     platform.storagePersistence().then(setStorage).catch(() => setStorage(null));
@@ -162,6 +137,8 @@ function App() {
   // failed write is never silent.
   useEffect(() => {
     if (!worksheet || !docId) return;
+    if (worksheet.sections.length === 0 && !inLibrary.current) return;
+    inLibrary.current = true;
     setAutosave("saving");
     const timer = setTimeout(() => {
       platform
@@ -223,73 +200,44 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Build a filled worksheet from a topic template and enter the workspace. */
+  /** Make `ws` the open document under library id `id` and enter the editor. */
+  function openDocument(ws: Worksheet, id: string, alreadyInLibrary: boolean) {
+    inLibrary.current = alreadyInLibrary;
+    setAutosave("idle");
+    setDocId(id);
+    setWorksheet(ws);
+    setView("doc");
+  }
+
+  /** A one-Section Worksheet from a Topic template on the home screen. */
   function openTopic(id: string) {
     const g = getGenerator(id)!;
-    const resolved = resolveParams(g.schema, {});
-    setGeneratorId(id);
-    setParams(resolved);
-    setCount(DEFAULT_COUNT);
-    setShowAnswers(false);
-    setDocId(newDocId());
-    setWorksheet(
+    openDocument(
       buildWorksheet({
         generatorId: id,
-        params: resolved,
+        params: resolveParams(g.schema, {}),
         baseSeed: randomSeed(),
-        count: DEFAULT_COUNT,
+        count: DEFAULT_SECTION_PROBLEMS,
       }),
+      newDocId(),
+      false,
     );
-    setView("doc");
   }
 
   /**
-   * Start a blank, untitled worksheet: no problems yet. The canvas shows an
-   * empty state; the teacher fills it by choosing options and pressing Generate
-   * (or switching topics). It's auto-saved on creation like any document.
+   * Start a new Worksheet with no Sections. The Preview invites the teacher to
+   * add the first one; it reaches the Library once it has a Section.
    */
   function newBlank() {
-    const g = GENERATORS[0];
-    const resolved = resolveParams(g.schema, {});
-    setGeneratorId(g.id);
-    setParams(resolved);
-    setCount(DEFAULT_COUNT);
-    setShowAnswers(false);
-    setDocId(newDocId());
-    setWorksheet(
-      buildWorksheet({
-        generatorId: g.id,
-        params: resolved,
-        baseSeed: randomSeed(),
-        count: 0,
-        title: "Untitled worksheet",
-      }),
-    );
-    setView("doc");
-  }
-
-  /**
-   * Point the Topic picker and Topic Options at the Worksheet's first Section.
-   * The UI builds single-Section Worksheets only, so that Section is the whole
-   * sheet.
-   */
-  function loadSectionControls(ws: Worksheet) {
-    const section = ws.sections[0];
-    setGeneratorId(section.generatorId);
-    setParams(section.params);
-    setCount(section.count || DEFAULT_COUNT);
+    openDocument(emptyWorksheet(), newDocId(), false);
   }
 
   /**
    * Load a worksheet object into the workspace as a fresh document (new library
-   * id). Shared by file import, recents-less opens, and OS "open with".
+   * id). Shared by file import and OS "open with".
    */
   function adoptWorksheet(ws: Worksheet) {
-    setDocId(newDocId());
-    setWorksheet(ws);
-    loadSectionControls(ws);
-    setShowAnswers(false);
-    setView("doc");
+    openDocument(ws, newDocId(), false);
   }
 
   /** Open a saved worksheet from the library (recents) into the workspace. */
@@ -304,11 +252,7 @@ function App() {
         });
         return;
       }
-      setDocId(id);
-      setWorksheet(ws);
-      loadSectionControls(ws);
-      setShowAnswers(false);
-      setView("doc");
+      openDocument(ws, id, true);
     } catch (e) {
       console.error(e);
       toast({ variant: "error", title: "Couldn't open worksheet" });
@@ -367,67 +311,13 @@ function App() {
     });
   }
 
-  /** Switch topic within the workspace and immediately show a fresh sheet. */
-  function selectTopic(id: string) {
-    const g = getGenerator(id)!;
-    const resolved = resolveParams(g.schema, {});
-    setGeneratorId(id);
-    setParams(resolved);
-    setWorksheet(
-      buildWorksheet({
-        generatorId: id,
-        params: resolved,
-        baseSeed: randomSeed(),
-        count,
-        // Keep the document's print/layout settings, Response Format and Answer
-        // Key format across a topic switch.
-        print: worksheet?.print,
-        responseFormat: worksheet?.responseFormat,
-        answerKeyFormat: worksheet?.answerKeyFormat,
-        versions: worksheet?.versions,
-      }),
-    );
-  }
+  /** Apply an edit to the open Worksheet. */
+  const updateWorksheet = useCallback(
+    (fn: (ws: Worksheet) => Worksheet) => setWorksheet((ws) => (ws ? fn(ws) : ws)),
+    [],
+  );
 
-  function generate() {
-    setWorksheet(
-      buildWorksheet({
-        generatorId,
-        params,
-        baseSeed: randomSeed(),
-        count,
-        // Regenerating problems must not reset the teacher's layout choices
-        // (spacing, paper, margins, …) or free response / multiple choice —
-        // carry the current config forward.
-        print: worksheet?.print,
-        responseFormat: worksheet?.responseFormat,
-        answerKeyFormat: worksheet?.answerKeyFormat,
-        versions: worksheet?.versions,
-      }),
-    );
-  }
-
-  function regenerate() {
-    if (worksheet) setWorksheet(regenerateAll(worksheet, randomSeed()));
-  }
-
-  // Editable worksheet chrome (issue #7): title, directions, and print/layout
-  // config all live on the worksheet so they persist and drive both the preview
-  // and the exported PDF.
-  const setTitle = (title: string) =>
-    setWorksheet((ws) => (ws ? { ...ws, title } : ws));
-  const setDirections = (directions: string) =>
-    setWorksheet((ws) => (ws ? setSectionDirections(ws, 0, directions) : ws));
-  const setPrint = (print: PrintConfig) =>
-    setWorksheet((ws) => (ws ? { ...ws, print } : ws));
-  const setResponseFormat = (responseFormat: ResponseFormat) =>
-    setWorksheet((ws) => (ws ? withResponseFormat(ws, responseFormat) : ws));
-  const setAnswerKeyFormat = (answerKeyFormat: AnswerKeyFormat) =>
-    setWorksheet((ws) => (ws ? { ...ws, answerKeyFormat } : ws));
-  const setVersions = (versions: VersionSettings) =>
-    setWorksheet((ws) => (ws ? setVersionSettings(ws, versions) : ws));
-
-  /** Export a portable copy to a user-chosen .json file (auto-save is separate). */
+  /** Download a Worksheet File (.oalg) copy; the Library autosave is separate. */
   async function save() {
     if (!worksheet || saving) return;
     setSaving(true);
@@ -521,65 +411,34 @@ function App() {
     );
   }
 
+  if (!worksheet) return null;
+  const hasProblems = worksheet.sections.some((sec) => sec.problems.length > 0);
+
   return (
-    <div className="bg-muted flex h-screen flex-col gap-2.5 p-2.5">
-      <TopBar
-        title={worksheet?.title ?? generator.title}
-        onTitleChange={worksheet ? setTitle : undefined}
-        mode={mode}
-        onModeChange={setMode}
-        onHome={() => setView("home")}
-        onOpen={open}
-        onSave={save}
-        onExport={exportPdf}
-        onPrint={print}
-        onPrintConfig={() => setPrintDialogOpen(true)}
-        canSave={!!worksheet}
-        canExport={!!worksheet}
-        autosave={worksheet ? autosave : "idle"}
-        saving={saving}
-        exporting={exporting}
-        printing={printing}
-        theme={theme}
-        onThemeChange={setTheme}
-      />
-
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(180px,236px)_minmax(0,1fr)_minmax(260px,320px)] gap-2.5">
-        <Navigator generatorId={generatorId} onSelect={selectTopic} />
-        <Canvas
-          worksheet={worksheet}
-          showAnswers={showAnswers}
-          onToggleAnswers={setShowAnswers}
+    <Editor
+      // A different document starts with a fresh selection, tab and zoom.
+      key={docId ?? "doc"}
+      worksheet={worksheet}
+      onChange={updateWorksheet}
+      topBar={
+        <TopBar
+          title={worksheet.title}
+          onTitleChange={(title) => updateWorksheet((ws) => ({ ...ws, title }))}
+          onHome={() => setView("home")}
+          onOpen={open}
+          onSaveCopy={save}
+          onExport={exportPdf}
+          onPrint={print}
+          canExport={hasProblems}
+          autosave={autosave}
+          saving={saving}
+          exporting={exporting}
+          printing={printing}
+          theme={theme}
+          onThemeChange={setTheme}
         />
-        <Inspector
-          generator={generator}
-          params={params}
-          onParamsChange={setParams}
-          directions={worksheet?.sections[0]?.directions ?? null}
-          onDirectionsChange={setDirections}
-          responseFormat={worksheet?.responseFormat ?? null}
-          onResponseFormatChange={setResponseFormat}
-          answerKeyFormat={worksheet?.answerKeyFormat ?? null}
-          onAnswerKeyFormatChange={setAnswerKeyFormat}
-          versions={worksheet?.versions ?? null}
-          onVersionsChange={setVersions}
-          count={count}
-          onCountChange={setCount}
-          onGenerate={generate}
-          onRegenerate={regenerate}
-          canRegenerate={!!worksheet}
-        />
-      </div>
-
-      {worksheet && (
-        <PrintConfigDialog
-          open={printDialogOpen}
-          onOpenChange={setPrintDialogOpen}
-          value={worksheet.print}
-          onChange={setPrint}
-        />
-      )}
-    </div>
+      }
+    />
   );
 }
 
