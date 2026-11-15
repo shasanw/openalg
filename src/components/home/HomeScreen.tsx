@@ -1,13 +1,17 @@
-// The launch screen, shown when no document is open. Word-style: "start new"
-// (blank worksheet / test + topic templates) on top, recent documents below.
-// Recents come from the managed worksheet library (auto-saved documents).
+// The launch screen, shown when no document is open. Laid out like Google
+// Docs: a full-width "Start a new Worksheet" band holding one row of
+// templates (a blank Worksheet, then one per Topic, each with a real
+// miniature page) that expands to every Topic, and the Library's recent
+// Worksheets below it, filtered by the header search.
 
+import { useLayoutEffect, useRef, useState } from "react";
 import {
+  ChevronDown,
+  ChevronUp,
   ArchiveRestore,
   Download,
   FolderOpen,
   MonitorDown,
-  Plus,
   Search,
   ShieldCheck,
   Sigma,
@@ -21,14 +25,31 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoMark } from "@/components/LogoMark";
 import type { Theme } from "@/lib/useTheme";
-import { cn } from "@/lib/utils";
+import { BlankThumb, TopicThumb } from "./TopicThumb";
 
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
+/** Width of one Start-new tile and the gap between tiles, in px. */
+const TILE_MIN = 148;
+const TILE_GAP = 16;
+
+/** How many tiles fit on one row of an element, re-measured as it resizes. */
+function useColumns<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+  const ref = useRef<T>(null);
+  const [cols, setCols] = useState(6);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () =>
+      setCols(Math.max(2, Math.floor((el.clientWidth + TILE_GAP) / (TILE_MIN + TILE_GAP))));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, cols];
 }
+
+const EXPANDED_KEY = "openalg-home-all-topics";
 
 /** A compact "x ago" stamp for the recents list. */
 function relativeTime(ms: number): string {
@@ -70,20 +91,49 @@ export function HomeScreen({
   storage: StoragePersistence | null;
   install: InstallPrompt;
 }) {
+  const [query, setQuery] = useState("");
+  const [expanded, setExpandedState] = useState(() => {
+    try {
+      return localStorage.getItem(EXPANDED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setExpanded = (next: boolean) => {
+    setExpandedState(next);
+    try {
+      localStorage.setItem(EXPANDED_KEY, next ? "1" : "0");
+    } catch {
+      // Storage unavailable: the choice just isn't remembered.
+    }
+  };
+  const [tilesRef, cols] = useColumns<HTMLDivElement>();
+  const templates = GENERATORS;
+  // One row: the blank Worksheet plus as many Topics as fit beside it.
+  const shown = expanded ? templates : templates.slice(0, cols - 1);
+  const hidden = templates.length - shown.length;
+
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matching = recents.filter((r) => {
+    const hay = `${r.title} ${getGenerator(r.generatorId)?.title ?? ""}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+
   return (
     <div className="bg-background h-screen overflow-y-auto">
       <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center gap-3 border-b px-6 backdrop-blur">
         <LogoMark className="size-6" />
         <span className="text-[15px] font-semibold">OpenAlg</span>
-        <span className="text-muted-foreground text-[12px]">
-          Algebra 2 · Precalculus
-        </span>
         <div className="flex-1" />
-        <div className="relative hidden sm:block">
+        <div className="relative hidden sm:block" role="search">
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <input
-            className="border-input bg-card placeholder:text-subtle-foreground h-8 w-72 rounded-md border pr-3 pl-9"
-            placeholder="Search your worksheets…"
+            type="search"
+            aria-label="Search your Worksheets"
+            value={query}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            className="border-input bg-card placeholder:text-subtle-foreground h-8 w-80 rounded-md border pr-3 pl-9"
+            placeholder="Search your Worksheets…"
           />
         </div>
         {install.canInstall && (
@@ -96,38 +146,56 @@ export function HomeScreen({
           </Button>
         )}
         <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
-        
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 pt-9 pb-20">
-        <h1 className="text-2xl font-semibold tracking-tight">{greeting()}</h1>
-        <p className="text-muted-foreground mt-1 text-[14px]">
-          Start something new, or pick up where you left off.
-        </p>
-
-        {/* Start new */}
-        <SectionTitle>Start new</SectionTitle>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <StartCard
-            label="New Worksheet"
-            sub="Add Sections as you go"
-            onClick={onNewWorksheet}
-            blank
-          />
-          {GENERATORS.map((g) => (
-            <StartCard
-              key={g.id}
-              label={g.title}
-              sub={`One Section · ${g.unit}`}
-              onClick={() => onOpenTemplate(g.id)}
-            />
-          ))}
+      {/* Start new: a full-width band, one row of templates unless expanded */}
+      <section aria-labelledby="start-new" className="bg-panel border-b">
+        <div className="mx-auto max-w-[1180px] px-6 pt-6 pb-7">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 id="start-new" className="text-[15px] font-medium">
+              Start a new Worksheet
+            </h2>
+            {hidden > 0 || expanded ? (
+              <Button
+                variant="quiet"
+                onClick={() => setExpanded(!expanded)}
+                aria-expanded={expanded}
+                aria-controls="start-new-tiles"
+              >
+                {expanded ? "Fewer Topics" : `All Topics (${templates.length})`}
+                {expanded ? <ChevronUp /> : <ChevronDown />}
+              </Button>
+            ) : null}
+          </div>
+          <div
+            id="start-new-tiles"
+            ref={tilesRef}
+            className="grid gap-x-4 gap-y-6"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+          >
+            <StartCard label="New Worksheet" sub="Add Sections as you go" onClick={onNewWorksheet}>
+              <BlankThumb />
+            </StartCard>
+            {shown.map((g) => (
+              <StartCard
+                key={g.id}
+                label={g.title}
+                sub={g.unit}
+                title={g.title}
+                onClick={() => onOpenTemplate(g.id)}
+              >
+                <TopicThumb topic={g} />
+              </StartCard>
+            ))}
+          </div>
         </div>
+      </section>
 
+      <main className="mx-auto max-w-[1180px] px-6 pt-7 pb-20">
         {/* Recent */}
-        <div className="mt-9 mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-subtle-foreground text-[11px] font-semibold tracking-[0.06em] uppercase">
-            Recent
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-[15px] font-medium">
+            {query ? `Worksheets matching “${query.trim()}”` : "Recent Worksheets"}
           </h2>
           <div className="flex flex-wrap items-center gap-1">
             <Button variant="quiet" onClick={onOpen}>
@@ -135,7 +203,6 @@ export function HomeScreen({
             </Button>
             <Button
               variant="quiet"
-              size="sm"
               onClick={onBackupLibrary}
               disabled={recents.length === 0}
               title="Download one file holding every Worksheet in your Library"
@@ -144,7 +211,6 @@ export function HomeScreen({
             </Button>
             <Button
               variant="quiet"
-              size="sm"
               onClick={onRestoreLibrary}
               title="Rebuild your Library from a Library Backup file"
             >
@@ -155,16 +221,18 @@ export function HomeScreen({
         {recents.length === 0 ? (
           <div className="border-border-strong bg-card flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-14 text-center">
             <FolderOpen className="text-subtle-foreground size-8" />
-            <p className="text-foreground mt-3 font-medium">
-              No worksheets yet
-            </p>
+            <p className="text-foreground mt-3 font-medium">No Worksheets yet</p>
             <p className="text-muted-foreground mt-1 text-[13px]">
               Worksheets you create are saved automatically and show up here.
             </p>
           </div>
+        ) : matching.length === 0 ? (
+          <p className="text-muted-foreground py-10 text-center">
+            No Worksheets match “{query.trim()}”.
+          </p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {recents.map((r) => (
+            {matching.map((r) => (
               <RecentCard
                 key={r.id}
                 entry={r}
@@ -214,14 +282,6 @@ function StorageNote({
         to keep your Worksheets safe.{howToInstall}
       </span>
     </p>
-  );
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="text-muted-foreground mt-9 mb-4 text-subtle-foreground text-[11px] font-semibold tracking-[0.06em] uppercase">
-      {children}
-    </h2>
   );
 }
 
@@ -279,55 +339,23 @@ function RecentCard({
 function StartCard({
   label,
   sub,
+  title,
   onClick,
-  blank,
+  children,
 }: {
   label: string;
   sub: string;
-  onClick?: () => void;
-  blank?: boolean;
+  title?: string;
+  onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group bg-card hover:border-border-strong hover:bg-hover rounded-xl border p-3 text-left transition-colors"
-    >
-      <Thumb blank={blank} />
-      <div className="mt-2.5 truncate font-semibold">{label}</div>
+    <button type="button" onClick={onClick} title={title} className="group flex min-w-0 flex-col self-start text-left">
+      <div className="group-hover:ring-primary group-focus-visible:ring-ring rounded-[4px] ring-offset-2 ring-offset-[var(--panel)] transition-shadow group-hover:ring-2 group-focus-visible:ring-2">
+        {children}
+      </div>
+      <div className="mt-2.5 line-clamp-2 leading-snug font-medium">{label}</div>
       <div className="text-muted-foreground truncate text-[12px]">{sub}</div>
     </button>
-  );
-}
-
-function Thumb({ blank }: { blank?: boolean }) {
-  if (blank) {
-    return (
-      <div className="flex aspect-[8.5/11] items-center justify-center rounded-md border border-dashed border-slate-400 bg-white text-slate-600">
-        <Plus className="size-7" />
-      </div>
-    );
-  }
-  // Abstract "mini paper" preview lines. The thumbnail is always white paper, so
-  // these use fixed neutrals (not theme tokens) to stay visible in dark mode.
-  const Line = ({ w }: { w: string }) => (
-    <div className={cn("mb-1.5 h-1 rounded-full bg-slate-300", w)} />
-  );
-  return (
-    <div className="relative aspect-[8.5/11] overflow-hidden rounded-md border border-slate-200 bg-white p-3">
-      <div className="mb-2.5 h-1.5 w-3/5 rounded-full bg-slate-400" />
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <Line w="w-5/6" />
-          <Line w="w-2/3" />
-          <Line w="w-1/2" />
-        </div>
-        <div className="flex-1">
-          <Line w="w-3/4" />
-          <Line w="w-5/6" />
-          <Line w="w-1/2" />
-        </div>
-      </div>
-    </div>
   );
 }
