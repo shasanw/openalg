@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildTypstDocument, escapeTypstText } from "./typst";
+import { buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
 import {
   buildSection,
   buildWorksheet,
@@ -49,6 +49,13 @@ describe("buildTypstDocument", () => {
     const doc = buildTypstDocument(w);
     expect(doc.source).toContain(escapeTypstText(w.title));
     expect(doc.source).toContain(escapeTypstText(w.sections[0].directions));
+  });
+
+  it("sets the text font explicitly to New Computer Modern", () => {
+    expect(TEXT_FONT).toBe("New Computer Modern");
+    expect(buildTypstDocument(ws(2)).source).toContain(
+      '#set text(font: "New Computer Modern", size: 12pt)',
+    );
   });
 
   it("is deterministic", () => {
@@ -127,10 +134,10 @@ describe("buildTypstDocument print config", () => {
 
   it("reflects body font size in points", () => {
     expect(buildTypstDocument(ws(2, { fontSize: "small" })).source).toContain(
-      "text(size: 10pt)",
+      'text(font: "New Computer Modern", size: 10pt)',
     );
     expect(buildTypstDocument(ws(2, { fontSize: "large" })).source).toContain(
-      "text(size: 14pt)",
+      'text(font: "New Computer Modern", size: 14pt)',
     );
   });
 

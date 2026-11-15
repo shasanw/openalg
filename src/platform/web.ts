@@ -4,8 +4,8 @@
 // `engine/persist`, so a Library record, a downloaded `.oalg` and a desktop-era
 // file are all the same JSON.
 //
-// Preview and PDF compilation (Typst-WASM) are not part of this adapter yet;
-// see issue #24.
+// The Preview, Print and PDF download all come from one Typst compile running
+// as WebAssembly in a Web Worker (ADR 0002); see ./typst/.
 
 import {
   serializeWorksheet,
@@ -23,6 +23,7 @@ import type {
   Platform,
   StoragePersistence,
 } from "./types";
+import { TypstClient, type WorkerPort } from "./typst/client";
 
 const DB_NAME = "openalg";
 const DB_VERSION = 1;
@@ -44,6 +45,19 @@ export interface WebPlatformOptions {
   now?: () => number;
   /** Storage manager for persistence checks; defaults to `navigator.storage`. */
   storage?: Pick<StorageManager, "persist" | "persisted">;
+  /** The Typst compiler client; defaults to one backed by a Web Worker. */
+  typst?: () => TypstClient;
+}
+
+/** The Typst client backed by the real worker, created on first use. */
+function defaultTypstClient(): TypstClient {
+  return new TypstClient({
+    createWorker: () =>
+      new Worker(new URL("./typst/worker.ts", import.meta.url), {
+        type: "module",
+        name: "typst",
+      }) as unknown as WorkerPort,
+  });
 }
 
 function requestToPromise<T>(req: IDBRequest<T>): Promise<T> {
@@ -117,7 +131,10 @@ function withExtension(name: string): string {
 
 /** Trigger a browser download of `text` as `filename`. */
 function downloadText(text: string, filename: string): void {
-  const blob = new Blob([text], { type: "application/json" });
+  downloadBlob(new Blob([text], { type: "application/json" }), filename);
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -171,13 +188,16 @@ function backupFilename(at: Date): string {
   return `OpenAlg Library Backup ${day}${LIBRARY_BACKUP_EXTENSION}`;
 }
 
-const notYetSupported = (what: string) =>
-  new Error(`${what} is not yet supported in the web build.`);
+function withPdfExtension(name: string): string {
+  return name.toLowerCase().endsWith(".pdf") ? name : `${name}.pdf`;
+}
 
 export function createWebPlatform(options: WebPlatformOptions = {}): Platform {
   const dbName = options.dbName ?? DB_NAME;
   const now = options.now ?? Date.now;
   let dbPromise: Promise<IDBDatabase> | null = null;
+  let typstClient: TypstClient | null = null;
+  const typst = () => (typstClient ??= (options.typst ?? defaultTypstClient)());
 
   function db(): Promise<IDBDatabase> {
     if (!dbPromise) {
@@ -342,12 +362,25 @@ export function createWebPlatform(options: WebPlatformOptions = {}): Platform {
       }
     },
 
-    async exportPdf() {
-      throw notYetSupported("PDF export");
+    async exportPdf(doc, suggestedName) {
+      const pdf = await typst().pdf(doc);
+      downloadBlob(
+        new Blob([pdf as BlobPart], { type: "application/pdf" }),
+        withPdfExtension(suggestedName),
+      );
+      return true;
     },
 
-    async renderPreview() {
-      throw notYetSupported("Preview");
+    async renderPreview(doc, renderOptions) {
+      return await typst().svgPages(doc, renderOptions?.latestWins ?? false);
+    },
+
+    prepareRenderer() {
+      typst().start();
+    },
+
+    onRendererStatus(handler) {
+      return typst().onStatus(handler);
     },
   };
 }

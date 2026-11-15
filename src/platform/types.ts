@@ -51,6 +51,34 @@ export interface LibraryRestoreSummary {
  */
 export type StoragePersistence = "persistent" | "best-effort" | "unsupported";
 
+/**
+ * Whether the Preview compiler is usable yet. On a first visit it downloads
+ * (~9 MB compressed) while the app opens, so the Preview shows `loading`
+ * progress; `loaded`/`total` are uncompressed bytes.
+ */
+export type RendererStatus =
+  | { state: "loading"; loaded: number; total: number }
+  | { state: "ready" }
+  | { state: "error"; message: string };
+
+export interface RenderPreviewOptions {
+  /**
+   * The live Preview sets this: a newer latest-wins request replaces an older
+   * one still waiting, and an older one's result is never delivered. Either
+   * way the older promise rejects with a `RenderSupersededError`, which the
+   * caller should ignore. Requests without it (Print) always run.
+   */
+  latestWins?: boolean;
+}
+
+/** A latest-wins render that a newer request replaced. Not a failure. */
+export class RenderSupersededError extends Error {
+  constructor() {
+    super("Superseded by a newer render.");
+    this.name = "RenderSupersededError";
+  }
+}
+
 export interface Platform {
   /** Save a portable copy to a user-chosen file. Resolves false if cancelled. */
   saveWorksheet(worksheet: Worksheet, suggestedName: string): Promise<boolean>;
@@ -96,5 +124,15 @@ export interface Platform {
    * the paginated in-app preview and the native print path, so the screen and
    * the printout are the exact Typst layout (#7).
    */
-  renderPreview(doc: TypstDocument): Promise<string[]>;
+  renderPreview(doc: TypstDocument, options?: RenderPreviewOptions): Promise<string[]>;
+  /**
+   * Start loading the Preview compiler now, so it is ready by the first
+   * Generate. Called once when the app opens; repeat calls do nothing.
+   */
+  prepareRenderer(): void;
+  /**
+   * Subscribe to the Preview compiler's status. The handler is called right
+   * away with the current status. Returns an unsubscribe function.
+   */
+  onRendererStatus(handler: (status: RendererStatus) => void): () => void;
 }

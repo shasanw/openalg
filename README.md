@@ -48,14 +48,27 @@ pnpm install
 
 ```bash
 pnpm tauri dev         # current: desktop shell
-pnpm dev               # after the migration: the web app
+pnpm dev               # the web app (http://localhost:1420)
 ```
 
 ## Testing
 
 ```bash
-pnpm test              # engine unit & property-based tests (Vitest)
+pnpm test              # engine unit & property-based tests (Vitest), incl. a Typst-WASM smoke test
+pnpm build && pnpm check:typst   # browser check: Preview, Print, PDF and ADR 0002 timings (Playwright)
 ```
+
+`pnpm check:typst` drives the production build in headless Chromium and WebKit (`pnpm exec playwright install chromium webkit` once). It opens the app cold (also throttled to 10 Mbps in Chromium), generates quadratic-formula Worksheets with radicals and imaginary roots, times warm recompiles and return visits, exports a PDF and prints. Results land in `check-results/`.
+
+## Deploying
+
+`pnpm build` writes a self-contained static site to `dist/`; nothing is fetched from another origin at runtime. The Typst compiler (WASM), fonts and mitex package are content-hashed files under `dist/assets/`, cached by a service worker (`dist/sw.js`) so they download once. For a fast first visit the host should:
+
+- serve the `.br` (or `.gz`) files the build writes next to each large asset, or compress on the fly with brotli: the compiler is 28 MB raw, 7.2 MB brotli, 10.9 MB gzip;
+- serve `.wasm` as `application/wasm`, and `/assets/*` with `Cache-Control: public, max-age=31536000, immutable`;
+- serve `index.html` and `sw.js` with `Cache-Control: no-cache`.
+
+`pnpm serve:dist` is a local server set up exactly like that.
 
 ## Supported browsers
 

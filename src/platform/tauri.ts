@@ -95,4 +95,12 @@ export const tauriPlatform: Platform = {
       math: doc.math,
     });
   },
+
+  // The Rust core compiles on demand; there is nothing to download first.
+  prepareRenderer() {},
+
+  onRendererStatus(handler) {
+    handler({ state: "ready" });
+    return () => {};
+  },
 };
