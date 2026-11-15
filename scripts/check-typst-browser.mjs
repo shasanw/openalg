@@ -10,7 +10,9 @@
 //  1. Cold visit (fresh profile): opens the app, opens the quadratic-formula
 //     template at once, and times navigation -> first Preview page. Chromium
 //     also runs it throttled to school wifi (10 Mbps / 40 ms RTT) via CDP,
-//     with the loading state checked while the compiler downloads.
+//     reporting first paint, when the Typst download starts, the time to the
+//     first Preview content (the KaTeX draft) and to the exact Typst Preview,
+//     and checking the swap from draft to exact has no blank frame or jump.
 //  2. Generates irrational and imaginary-root Worksheets with the Answer Key
 //     on, checking for radicals and the imaginary unit in the Preview.
 //  3. Warm recompiles: 10 title edits, timed from the input event to the new
@@ -83,10 +85,46 @@ async function previewText(page) {
   );
 }
 
-async function setRootType(page, value) {
-  await page.locator("select").first().selectOption(value);
-  await page.getByRole("button", { name: "Generate", exact: true }).click();
+/** Root type is a segmented control; changing it regenerates the Section. */
+async function setRootType(page, label) {
+  await page.getByRole("radiogroup", { name: "Root type" }).getByRole("radio", { name: label }).click();
 }
+
+/** Switch the Preview to the Answer Key (the Worksheet prints the full key by default). */
+async function showAnswerKey(page) {
+  await page.getByRole("radiogroup", { name: "Preview" }).getByRole("radio", { name: /Answer Key/ }).click();
+}
+
+/**
+ * Logs, once per animation frame, what the Preview shows ("none", "draft" or
+ * "exact") whenever it changes, with the first sheet's box, so a blank frame
+ * or a jump between the draft and the exact Preview shows up.
+ */
+const PREVIEW_LOG = `
+  window.__previewLog = [];
+  addEventListener("click", () => (window.__clickAt ??= Math.round(performance.now())), { capture: true });
+  let last = null;
+  const sample = () => {
+    const exact = document.querySelector("svg.typst-doc");
+    const draft = document.querySelector("[data-preview-draft]");
+    const state = exact ? "exact" : draft ? "draft" : "none";
+    if (state === "draft" && !window.__draftReadable && document.fonts.status === "loaded" &&
+        document.fonts.check("12px KaTeX_Main") && document.fonts.check("italic 12px KaTeX_Math")) {
+      window.__draftReadable = Math.round(performance.now());
+    }
+    if (state !== last) {
+      last = state;
+      const sheet = exact ? exact.parentElement : draft?.querySelector("[data-draft-sheet]");
+      const r = sheet?.getBoundingClientRect();
+      window.__previewLog.push({
+        state,
+        t: Math.round(performance.now()),
+        sheet: r ? { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width) } : null,
+      });
+    }
+    requestAnimationFrame(sample);
+  };
+  requestAnimationFrame(sample);`;
 
 async function waitForPreviewText(page, needle) {
   await page.waitForFunction(
@@ -125,22 +163,97 @@ async function runEngine(name, browserType) {
     });
     // Let the worker inherit the throttling too.
     await cdp.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
+    await ctx.addInitScript(PREVIEW_LOG);
+    await ctx.addInitScript(PRINT_STUB);
+    // When each Typst file was requested, relative to navigation start.
+    const typstRequests = [];
+    let navAt = 0;
+    ctx.on("request", (r) => {
+      if (TYPST_ASSET.test(r.url())) typstRequests.push({ file: r.url().split("/").pop(), at: Date.now() - navAt });
+    });
+    // When the draft's KaTeX fonts arrive (they share the link with Typst).
+    const katexFonts = [];
+    ctx.on("requestfinished", (r) => {
+      if (/\/assets\/KaTeX_/.test(r.url())) katexFonts.push(Date.now() - navAt);
+    });
+    navAt = Date.now();
     await page.goto(base);
     await page.getByText("Solving quadratics by the quadratic formula").first().click();
-    const loading = await page
-      .getByText("Getting the Preview ready")
-      .waitFor({ timeout: 5000 })
+    const draft = await page
+      .locator("[data-preview-draft]")
+      .waitFor({ timeout: 10_000 })
       .then(() => true, () => false);
-    check(loading, "cold 10 Mbps: Preview shows the loading state while the compiler downloads");
+    check(draft, "cold 10 Mbps: Preview shows the draft while the compiler downloads");
+    const banner = await page.getByText("Preparing the exact preview").isVisible().catch(() => false);
+    check(banner, "cold 10 Mbps: the draft is marked as a draft");
     await page.waitForTimeout(3000);
-    const progress = await page.getByRole("progressbar").getAttribute("aria-valuenow").catch(() => null);
+    const progress = await page.getByRole("progressbar").getAttribute("aria-valuenow", { timeout: 1000 }).catch(() => null);
     check(Number(progress) > 0, `cold 10 Mbps: download progress shown (${progress}% after ~3 s)`);
+    if (draft) await page.screenshot({ path: `${outDir}${name}-cold-draft.png` });
+    // Print while the compiler is still downloading: it waits for Typst and
+    // prints the exact pages, never the draft.
+    const printClickedAt = await page.evaluate(() => performance.now());
+    await page.getByRole("button", { name: "Print", exact: true }).click();
     await previewSvgs(page).first().waitFor({ timeout: 120_000 });
-    result.coldSchoolMs = Math.round(await page.evaluate(() => performance.now()));
+    await page.waitForFunction(() => window.__printed !== undefined, null, { timeout: 60_000 });
+    const printed = await page.evaluate(() => window.__printed);
+    // The stubbed print never fires afterprint, so take its overlay down.
+    await page.evaluate(() => document.querySelectorAll("iframe").forEach((f) => f.remove()));
+    await page.screenshot({ path: `${outDir}${name}-cold-exact.png` });
+    check(printed > 0, `cold 10 Mbps: Print clicked during the download (at ${Math.round(printClickedAt)} ms) printed ${printed} exact Typst pages`);
+    const log = await page.evaluate(() => window.__previewLog);
+    const paint = await page.evaluate(() =>
+      Math.round(performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? -1),
+    );
+    const firstContent = log.find((e) => e.state !== "none");
+    const ready = await page.evaluate(() =>
+      Math.round(performance.getEntriesByName("openalg:typst-ready")[0]?.startTime ?? -1),
+    );
+    result.typstReadyMs = ready;
+    // KaTeX's fonts block text until they load, so the draft is readable a little after it appears.
+    result.coldSchoolDraftReadableMs = await page.evaluate(() => window.__draftReadable);
+    const exact = log.find((e) => e.state === "exact");
+    result.coldSchoolFirstContentMs = firstContent?.t;
+    result.coldSchoolMs = exact?.t;
+    result.firstPaintMs = paint;
+    const firstTypst = Math.min(...typstRequests.map((r) => r.at));
+    result.typstDownloadStartMs = firstTypst;
     const bytes = await page.evaluate(() =>
       performance.getEntriesByType("resource").reduce((s, e) => s + (e.transferSize || 0), 0),
     );
-    console.log(`  cold first Preview at 10 Mbps / 40 ms: ${result.coldSchoolMs} ms (page-side transfer ${(bytes / 1e6).toFixed(2)} MB)`);
+    console.log(`  cold 10 Mbps / 40 ms: first paint ${paint} ms; Typst download starts ~${firstTypst} ms after navigation (${typstRequests.length} files)`);
+    result.coldSchoolClickMs = await page.evaluate(() => window.__clickAt);
+    console.log(`  cold 10 Mbps / 40 ms: template clicked at ${result.coldSchoolClickMs} ms; draft ${result.coldSchoolFirstContentMs - result.coldSchoolClickMs} ms after the click`);
+    console.log(`  cold 10 Mbps / 40 ms: compiler loaded at ${ready} ms; draft readable (KaTeX fonts loaded) at ${result.coldSchoolDraftReadableMs} ms`);
+    console.log(`  cold 10 Mbps / 40 ms: first Preview content (${firstContent?.state}) ${result.coldSchoolFirstContentMs} ms, exact Typst Preview ${result.coldSchoolMs} ms (page-side transfer ${(bytes / 1e6).toFixed(2)} MB)`);
+    if (katexFonts.length) {
+      result.katexFontsMs = Math.max(...katexFonts);
+      console.log(`  cold 10 Mbps / 40 ms: draft's ${katexFonts.length} KaTeX fonts all loaded by ${result.katexFontsMs} ms`);
+    }
+    const afterContent = log.slice(log.indexOf(firstContent));
+    check(!afterContent.some((e) => e.state === "none"), `cold 10 Mbps: no blank frame between first content and the exact Preview (${log.map((e) => e.state).join(" -> ")})`);
+    const d = log.find((e) => e.state === "draft");
+    if (d && exact && d.sheet && exact.sheet) {
+      const jump = Math.max(Math.abs(d.sheet.x - exact.sheet.x), Math.abs(d.sheet.y - exact.sheet.y), Math.abs(d.sheet.width - exact.sheet.width));
+      result.swapJumpPx = jump;
+      check(jump <= 2, `cold 10 Mbps: the first sheet keeps its place and width when the exact Preview replaces the draft (moved ${jump} px)`);
+    }
+    await ctx.close();
+  }
+
+  // --- Compiler loaded before the first Worksheet opens (the usual case:
+  // the download overlaps choosing a Topic) ---
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+    const page = await ctx.newPage();
+    await page.goto(base);
+    await page.waitForFunction(() => performance.getEntriesByName("openalg:typst-ready").length > 0, null, { timeout: 60_000 });
+    await page.waitForTimeout(1000);
+    const t0 = await page.evaluate(() => performance.now());
+    await page.getByText("Solving quadratics by the quadratic formula").first().click();
+    await previewSvgs(page).first().waitFor({ timeout: 60_000 });
+    result.firstAfterReadyMs = Math.round((await page.evaluate(() => performance.now())) - t0);
+    console.log(`  first Preview when the compiler finished loading before the Worksheet opened: ${result.firstAfterReadyMs} ms after the click`);
     await ctx.close();
   }
 
@@ -155,15 +268,15 @@ async function runEngine(name, browserType) {
   console.log(`  cold first Preview, localhost: ${result.coldLocalMs} ms`);
 
   // --- Radicals and imaginary roots, with the Answer Key ---
-  await page.getByLabel("Answer key").check();
-  await setRootType(page, "irrational");
+  await showAnswerKey(page);
+  await setRootType(page, "Irrational");
   await waitForPreviewText(page, "√");
   let pages = await previewSvgs(page).count();
   check(pages >= 2, `irrational: ${pages} Preview pages (Problems + Answer Key), one SVG per page`);
   check((await previewText(page)).includes("√"), "irrational: radicals in the Preview");
   await page.screenshot({ path: `${outDir}${name}-irrational.png`, fullPage: false });
 
-  await setRootType(page, "imaginary");
+  await setRootType(page, "Imaginary");
   await waitForPreviewText(page, "𝑖");
   const text = await previewText(page);
   check(text.includes("𝑖") && text.includes("√"), "imaginary: imaginary unit and radicals in the Answer Key");
@@ -320,7 +433,8 @@ try {
 console.log("\n== Budgets (ADR 0002) ==");
 for (const r of results) {
   const rows = [
-    r.coldSchoolMs !== undefined && `cold 10 Mbps ${r.coldSchoolMs} ms (budget < ${BUDGET.coldSchoolMs})`,
+    r.coldSchoolFirstContentMs !== undefined && `cold 10 Mbps first content (draft) ${r.coldSchoolFirstContentMs} ms, readable ${r.coldSchoolDraftReadableMs} ms`,
+    r.coldSchoolMs !== undefined && `cold 10 Mbps exact Preview ${r.coldSchoolMs} ms (budget < ${BUDGET.coldSchoolMs})`,
     `cold localhost ${r.coldLocalMs} ms`,
     `recompile median ${r.recompileMedianMs} / p95 ${r.recompileP95Ms} ms (budget < ${BUDGET.recompileMs})`,
     `return visit ${Math.max(...r.returnVisitMs)} ms worst of ${r.returnVisitMs.length} (budget < ${BUDGET.returnVisitMs})`,
