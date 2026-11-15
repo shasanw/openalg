@@ -118,7 +118,7 @@ export function HomeScreen({
             <StartCard
               key={g.id}
               label={g.title}
-              sub={`One Section · ${g.chapter}`}
+              sub={`One Section · ${g.unit}`}
               onClick={() => onOpenTemplate(g.id)}
             />
           ))}

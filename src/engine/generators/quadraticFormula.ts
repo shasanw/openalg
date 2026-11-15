@@ -121,7 +121,8 @@ export function distractors(k: FormulaConstruction): string[] {
 
 export const generator: Generator = {
   id: QUADRATIC_FORMULA_ID,
-  chapter: "Quadratics",
+  course: "Algebra 2",
+  unit: "Quadratics",
   title: "Solving quadratics by the quadratic formula",
   defaultDirections: "Solve each equation using the quadratic formula.",
   schema,

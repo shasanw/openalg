@@ -454,7 +454,8 @@ export function numberLineSeam(_k: InequalityConstruction): undefined {
 
 export const generator: Generator = {
   id: QUADRATIC_INEQUALITIES_ID,
-  chapter: "Quadratics",
+  course: "Algebra 2",
+  unit: "Quadratics",
   title: "Solving quadratic inequalities",
   defaultDirections: "Solve each inequality.",
   schema,

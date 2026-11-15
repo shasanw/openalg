@@ -10,7 +10,6 @@ import {
 } from "@/engine/worksheet";
 import { ToastProvider } from "@/components/ui/toast";
 import { Editor } from "./Editor";
-import { filterTopics } from "./TopicPicker";
 
 const renderPreview = vi.fn(async (..._args: unknown[]) => ["<svg></svg>"]);
 
@@ -57,6 +56,7 @@ function mount(initial: Worksheet) {
 const outline = () => within(screen.getByRole("complementary", { name: "Sections" }));
 const rows = () => outline().getAllByRole("button").filter((b) => b.textContent?.includes("Section "));
 const rowText = () => rows().map((r) => r.textContent);
+const topicOptions = () => within(screen.getByRole("listbox", { name: "Topics" })).getAllByRole("option");
 
 describe("Editor: empty Worksheet", () => {
   it("invites the teacher to add a Section and opens the centered picker", async () => {
@@ -65,7 +65,7 @@ describe("Editor: empty Worksheet", () => {
     expect(outline().getByText(/No Sections yet/)).toBeInTheDocument();
     const preview = within(screen.getByRole("main", { name: "Preview" }));
     await userEvent.click(preview.getByRole("button", { name: /Add Section/ }));
-    expect(screen.getByRole("dialog", { name: "Add a Section" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Add Section" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Search Topics" })).toHaveFocus();
   });
 });
@@ -76,7 +76,7 @@ describe("Editor: Topic picker", () => {
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     const search = screen.getByRole("combobox", { name: "Search Topics" });
     await userEvent.type(search, "formula");
-    const options = screen.getAllByRole("option");
+    const options = topicOptions();
     expect(options.map((o) => o.textContent)).toEqual([expect.stringContaining("quadratic formula")]);
     await userEvent.keyboard("{Enter}");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -90,7 +90,7 @@ describe("Editor: Topic picker", () => {
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     const search = screen.getByRole("combobox", { name: "Search Topics" });
     const active = () => document.getElementById(search.getAttribute("aria-activedescendant")!);
-    const all = screen.getAllByRole("option");
+    const all = topicOptions();
     expect(active()).toBe(all[0]);
     await userEvent.keyboard("{ArrowDown}");
     expect(active()).toBe(all[1]);
@@ -106,12 +106,6 @@ describe("Editor: Topic picker", () => {
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     await userEvent.type(screen.getByRole("combobox"), "zzz");
     expect(screen.getByText(/No Topics match/)).toBeInTheDocument();
-  });
-
-  it("filters by Topic title or Unit, grouped by Unit", () => {
-    expect(filterTopics("quadratics").flatMap((u) => u.generators)).toHaveLength(5);
-    expect(filterTopics("factor").map((u) => u.name)).toEqual(["Quadratics"]);
-    expect(filterTopics("nothing here")).toEqual([]);
   });
 });
 

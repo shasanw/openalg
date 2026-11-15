@@ -228,7 +228,7 @@ describe("completing-the-square: generate()", () => {
     expect(p.seed).toBe(42);
     expect(p.params.rootType).toBe("irrational");
     expect(p.kind).toBe("generated");
-    expect(generator.chapter).toBe("Quadratics");
+    expect(generator.unit).toBe("Quadratics");
     expect(generator.defaultDirections).toBe(
       "Solve each equation by completing the square.",
     );

@@ -6,8 +6,12 @@ A worksheet and test generator for math teachers (Algebra 2 and Precalculus). A 
 
 ### Content
 
+**Course**:
+A subject a teacher teaches over a year, made of Units (e.g. "Algebra 2", "Precalculus"). Every Topic belongs to one Course, through its Unit.
+_Avoid_: Class, subject, book
+
 **Unit**:
-A grouping of related Topics, mirroring how a course is taught (e.g. "Quadratics").
+A grouping of related Topics within a Course, mirroring how the Course is taught (e.g. "Quadratics").
 _Avoid_: Chapter, module
 
 **Topic**:

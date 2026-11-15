@@ -24,29 +24,32 @@ export function getGenerator(id: string): Generator | undefined {
   return byId[id];
 }
 
-export interface Chapter {
+export interface Unit {
   name: string;
   generators: Generator[];
 }
 
 /**
- * Group the registered generators by chapter for the topic tree. Chapters and
- * the topics within them preserve registration order, so the tree is stable and
- * adding a generator never reshuffles the existing ones.
+ * Group generators by Unit. Units and the Topics within them preserve
+ * registration order, so lists are stable and adding a generator never
+ * reshuffles the existing ones.
  */
-export function groupByChapter(
-  generators: readonly Generator[] = GENERATORS,
-): Chapter[] {
-  const chapters: Chapter[] = [];
-  const byName = new Map<string, Chapter>();
+export function groupByUnit(generators: readonly Generator[] = GENERATORS): Unit[] {
+  const units: Unit[] = [];
+  const byName = new Map<string, Unit>();
   for (const g of generators) {
-    let chapter = byName.get(g.chapter);
-    if (!chapter) {
-      chapter = { name: g.chapter, generators: [] };
-      byName.set(g.chapter, chapter);
-      chapters.push(chapter);
+    let unit = byName.get(g.unit);
+    if (!unit) {
+      unit = { name: g.unit, generators: [] };
+      byName.set(g.unit, unit);
+      units.push(unit);
     }
-    chapter.generators.push(g);
+    unit.generators.push(g);
   }
-  return chapters;
+  return units;
+}
+
+/** The Courses that have at least one Topic, in registration order. */
+export function coursesOf(generators: readonly Generator[] = GENERATORS): string[] {
+  return [...new Set(generators.map((g) => g.course))];
 }

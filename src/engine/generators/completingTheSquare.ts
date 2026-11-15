@@ -148,7 +148,8 @@ export function distractors(k: SquareConstruction): string[] {
 
 export const generator: Generator = {
   id: COMPLETING_THE_SQUARE_ID,
-  chapter: "Quadratics",
+  course: "Algebra 2",
+  unit: "Quadratics",
   title: "Solving quadratics by completing the square",
   defaultDirections: "Solve each equation by completing the square.",
   schema,

@@ -162,7 +162,12 @@ export function Editor({
           onRegenerateAll={() => onChange((ws) => regenerateAll(ws, randomSeed()))}
         />
       </div>
-      <TopicPicker open={pickerOpen} onOpenChange={setPickerOpen} onPick={add} />
+      <TopicPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onPick={add}
+        sections={worksheet.sections.map((s) => s.generatorId)}
+      />
     </div>
   );
 }

@@ -119,7 +119,7 @@ export function SectionOutline({
                     )}
                   >
                     {rangeLabel(ranges[i])}
-                    {topic && ` · ${topic.chapter}`}
+                    {topic && ` · ${topic.unit}`}
                   </span>
                 </span>
               </button>
