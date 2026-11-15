@@ -36,6 +36,14 @@ describe("registry", () => {
     );
   });
 
+  it("files the quadratic-inequalities topic under Quadratics", () => {
+    const g = getGenerator("quadratic-inequalities");
+    expect(g).toBeDefined();
+    expect(g?.chapter).toBe("Quadratics");
+    const quadratics = groupByChapter().find((c) => c.name === "Quadratics");
+    expect(quadratics?.generators).toContain(g);
+  });
+
   it("every registered generator declares a chapter", () => {
     for (const g of GENERATORS) {
       expect(g.chapter).toBeTruthy();

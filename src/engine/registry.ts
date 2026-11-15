@@ -6,12 +6,14 @@ import { generator as quadraticFactoring } from "./generators/quadraticFactoring
 import { generator as quadraticFormula } from "./generators/quadraticFormula";
 import { generator as completingTheSquare } from "./generators/completingTheSquare";
 import { generator as parabolaProperties } from "./generators/parabolaProperties";
+import { generator as quadraticInequalities } from "./generators/quadraticInequalities";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
   quadraticFormula,
   completingTheSquare,
   parabolaProperties,
+  quadraticInequalities,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
