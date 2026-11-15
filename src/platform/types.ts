@@ -1,8 +1,8 @@
-// Platform adapter — the seam that keeps a future web build cheap (PRD: "future
-// web target"). The engine and UI talk ONLY to this interface; they must never
-// import `@tauri-apps/*` directly. The desktop build provides `TauriPlatform`;
-// a web build would later provide a `WebPlatform` (File System Access API +
-// Typst-WASM) without touching the engine or UI.
+// Platform adapter: the seam between the app and the outside world (ADR 0001).
+// The engine and UI talk ONLY to this interface and must never import
+// `@tauri-apps/*` or browser storage APIs directly. The web build provides
+// `webPlatform` (IndexedDB Library + downloaded Worksheet Files); the legacy
+// desktop `tauriPlatform` remains until the Tauri shell is removed (#25).
 
 import type { Worksheet } from "../engine/worksheet";
 import type { TypstDocument } from "../engine/typst";

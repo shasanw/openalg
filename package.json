@@ -38,6 +38,7 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/ui": "^3.1.0",
+    "fake-indexeddb": "^6.2.8",
     "fast-check": "^4.8.0",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4.1.0",
