@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { createWebPlatform } from "./web";
+import { TypstClient, type WorkerPort } from "./typst/client";
+import type { FromWorker, ToWorker } from "./typst/protocol";
 import { serializeWorksheet } from "../engine/persist";
 import { buildSection, buildWorksheet, type Worksheet } from "../engine/worksheet";
 import { QUADRATIC_FACTORING_ID } from "../engine/generators/quadraticFactoring";
@@ -479,5 +481,85 @@ describe("web persistent storage", () => {
     });
     expect(await platform.storagePersistence()).toBe("unsupported");
     expect(await platform.requestPersistentStorage()).toBe("unsupported");
+  });
+});
+
+describe("web Preview and PDF", () => {
+  /** A Typst client whose worker answers every compile at once. */
+  function platformWithTypst() {
+    const sent: ToWorker[] = [];
+    let port: WorkerPort;
+    const typst = new TypstClient({
+      createWorker: () => {
+        port = {
+          onmessage: null,
+          onerror: null,
+          terminate() {},
+          postMessage(msg) {
+            sent.push(msg);
+            const reply = (data: FromWorker) => queueMicrotask(() => port.onmessage?.({ data }));
+            if (msg.type === "init") reply({ type: "ready", memoryBytes: 0 });
+            else
+              reply({
+                type: "result",
+                id: msg.id,
+                pages: msg.format === "svg" ? ["<svg>1</svg>", "<svg>2</svg>"] : undefined,
+                pdf: msg.format === "pdf" ? new TextEncoder().encode("%PDF-1.7") : undefined,
+                warnings: [],
+                memoryBytes: 0,
+              });
+          },
+        };
+        return port;
+      },
+    });
+    const platform = createWebPlatform({ indexedDB: new IDBFactory(), typst: () => typst });
+    return { platform, sent };
+  }
+
+  it("renderPreview returns one SVG per page from the Typst worker", async () => {
+    const { platform, sent } = platformWithTypst();
+    const doc = { source: "Hi @@M0@@", math: ["x"] };
+    expect(await platform.renderPreview(doc, { latestWins: true })).toEqual([
+      "<svg>1</svg>",
+      "<svg>2</svg>",
+    ]);
+    expect(sent).toEqual([
+      { type: "init" },
+      { type: "compile", id: 1, format: "svg", doc },
+    ]);
+  });
+
+  it("exportPdf downloads <name>.pdf", async () => {
+    const { platform } = platformWithTypst();
+    let blob: Blob | undefined;
+    URL.createObjectURL = vi.fn((b: Blob) => {
+      blob = b;
+      return "blob:test";
+    });
+    URL.revokeObjectURL = vi.fn();
+    let downloaded = "";
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloaded = this.download;
+    });
+
+    expect(await platform.exportPdf({ source: "x", math: [] }, "Quiz 3.pdf")).toBe(true);
+    expect(downloaded).toBe("Quiz 3.pdf");
+    expect(blob!.type).toBe("application/pdf");
+    expect(await blobText(blob!)).toBe("%PDF-1.7");
+
+    await platform.exportPdf({ source: "x", math: [] }, "Quiz 4");
+    expect(downloaded).toBe("Quiz 4.pdf");
+  });
+
+  it("reports the renderer as ready once the worker has loaded", async () => {
+    const { platform } = platformWithTypst();
+    const seen: string[] = [];
+    platform.onRendererStatus((s) => seen.push(s.state));
+    platform.prepareRenderer();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(seen.at(-1)).toBe("ready");
   });
 });

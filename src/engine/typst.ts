@@ -1,6 +1,6 @@
 // Builds the Typst source for a worksheet. Layout lives HERE in TypeScript (not
-// in Rust) so it stays web-portable: desktop (Rust Typst) and a future web build
-// (Typst-WASM) compile the very same source. The live preview compiles this same
+// in Rust) so it stays web-portable: the browser (Typst-WASM, ADR 0002) and the
+// legacy desktop shell (Rust Typst) compile the very same source. The live preview compiles this same
 // source to SVG, so the on-screen page is print-truth (issue #7).
 //
 // Math is emitted as `@@M<i>@@` placeholders plus an array of LaTeX snippets. The
@@ -60,6 +60,13 @@ const FONT_PT: Record<PrintConfig["fontSize"], string> = {
   normal: "12pt",
   large: "14pt",
 };
+
+/**
+ * The Worksheet text font. Set explicitly so every compiler renders the same
+ * face: the browser compiler bundles only New Computer Modern (and its math
+ * companion, Typst's default math font), not Typst's default Libertinus Serif.
+ */
+export const TEXT_FONT = "New Computer Modern";
 
 /** Escape characters Typst would otherwise interpret as markup. */
 export function escapeTypstText(s: string): string {
@@ -146,7 +153,7 @@ ${cells}
     : `#text(size: 16pt, weight: "bold")[${escapeTypstText(ws.title)}]`;
 
   let source = `#set page(paper: "${paper}", flipped: ${flipped}, margin: ${margin}, numbering: ${numbering})
-#set text(size: ${fontSize})
+#set text(font: "${TEXT_FONT}", size: ${fontSize})
 
 #let blank(w) = box(width: w, stroke: (bottom: 0.6pt + luma(110)), outset: (bottom: 3pt))[]
 
