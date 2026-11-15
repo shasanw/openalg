@@ -4,10 +4,12 @@
 import type { Generator } from "./types";
 import { generator as quadraticFactoring } from "./generators/quadraticFactoring";
 import { generator as quadraticFormula } from "./generators/quadraticFormula";
+import { generator as parabolaProperties } from "./generators/parabolaProperties";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
   quadraticFormula,
+  parabolaProperties,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

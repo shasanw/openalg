@@ -33,6 +33,10 @@ describe("registry", () => {
       expect(g.chapter).toBeTruthy();
     }
   });
+
+  it("files properties of parabolas under Quadratics", () => {
+    expect(getGenerator("parabola-properties")?.chapter).toBe("Quadratics");
+  });
 });
 
 describe("groupByChapter", () => {
