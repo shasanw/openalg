@@ -5,6 +5,7 @@
 // the Section's baseSeed, so the Section is reproducible, while the baked
 // Problems are also stored for byte-identical reopen.
 
+import { clampChoices, DEFAULT_CHOICES } from "./mc";
 import { deriveSeed } from "./rng";
 import { getGenerator } from "./registry";
 import type { ParamValues, Problem } from "./types";
@@ -41,6 +42,28 @@ export const DEFAULT_PRINT_CONFIG: PrintConfig = {
 };
 
 /**
+ * How every Problem on the Worksheet is answered (issue #5): free response, or
+ * multiple choice with `choices` options each (2 to 5). This is a whole-sheet
+ * setting, so it lives on the Worksheet rather than on each Section. `choices`
+ * is kept while the sheet is free response, so toggling back to multiple
+ * choice restores the teacher's count.
+ */
+export interface ResponseFormat {
+  mode: "free-response" | "multiple-choice";
+  choices: number;
+}
+
+export const DEFAULT_RESPONSE_FORMAT: ResponseFormat = {
+  mode: "free-response",
+  choices: DEFAULT_CHOICES,
+};
+
+/** True when the Worksheet prints lettered choices under each Problem. */
+export function isMultipleChoice(ws: Worksheet): boolean {
+  return ws.responseFormat.mode === "multiple-choice";
+}
+
+/**
  * A run of consecutive Problems from one Topic sharing one set of Directions.
  * `baseSeed` and `count` complete the Section's Recipe; `count` is kept equal to
  * `problems.length` once the Section has been curated.
@@ -61,6 +84,11 @@ export interface Worksheet {
   sections: Section[];
   /** Print Settings. Optional in older saved files; see normalizeWorksheet. */
   print: PrintConfig;
+  /**
+   * Free response or multiple choice. Optional in files saved before #5; see
+   * normalizeWorksheet.
+   */
+  responseFormat: ResponseFormat;
 }
 
 export interface SectionOptions {
@@ -74,6 +102,7 @@ export interface SectionOptions {
 export interface BuildOptions extends SectionOptions {
   title?: string;
   print?: PrintConfig;
+  responseFormat?: ResponseFormat;
 }
 
 /** Build one Section from its Recipe. */
@@ -125,6 +154,7 @@ export function buildWorksheet(opts: BuildOptions): Worksheet {
     title: opts.title ?? getGenerator(section.generatorId)!.title,
     sections: [section],
     print: opts.print ?? { ...DEFAULT_PRINT_CONFIG },
+    responseFormat: opts.responseFormat ?? { ...DEFAULT_RESPONSE_FORMAT },
   };
 }
 
@@ -201,13 +231,30 @@ export function setSectionDirections(
 
 /**
  * Backfill defaults onto a worksheet loaded from disk. Files saved before
- * issue #7 have no `print` block; give them the defaults so the rest of the app
- * can assume `print` is always present.
+ * issue #7 have no `print` block, and files saved before #5 have no
+ * `responseFormat`; give them the defaults (free response) so the rest of the
+ * app can assume both are always present.
  */
 export function normalizeWorksheet(ws: Worksheet): Worksheet {
+  const response = { ...DEFAULT_RESPONSE_FORMAT, ...ws.responseFormat };
   return {
     ...ws,
     print: { ...DEFAULT_PRINT_CONFIG, ...ws.print },
+    responseFormat: { ...response, choices: clampChoices(response.choices) },
+  };
+}
+
+/** Set the whole-sheet Response Format, clamping the choice count to 2 to 5. */
+export function setResponseFormat(
+  ws: Worksheet,
+  responseFormat: ResponseFormat,
+): Worksheet {
+  return {
+    ...ws,
+    responseFormat: {
+      mode: responseFormat.mode,
+      choices: clampChoices(responseFormat.choices),
+    },
   };
 }
 

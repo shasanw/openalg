@@ -146,7 +146,7 @@ function Row({
 }
 
 /** A small segmented control for a string enum. */
-function Segmented<T extends string>({
+export function Segmented<T extends string>({
   value,
   onChange,
   options,

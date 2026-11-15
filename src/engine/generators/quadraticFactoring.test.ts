@@ -99,3 +99,50 @@ describe("format edge cases via distractors()", () => {
     expect(out.every((s) => s.startsWith("x = "))).toBe(true);
   });
 });
+
+describe("quadratic-factoring: mistake-based distractors", () => {
+  // x^2 - x - 6 = 0, roots -2 and 3.
+  const k = { b: -1, c: -6, roots: [3, -2] as [number, number] };
+
+  it("includes the sign error on both roots", () => {
+    expect(distractors(k)).toContain("x = -3, 2");
+  });
+
+  it("includes a single flipped sign", () => {
+    expect(distractors(k)).toContain("x = 2, 3");
+  });
+
+  it("includes a wrong factor pair of c", () => {
+    // -1 * 6 = -6 like the right pair, but sums to 5, not 1.
+    expect(distractors(k)[1]).toBe("x = -1, 6");
+  });
+
+  it("includes a dropped solution", () => {
+    expect(distractors(k)).toContain("x = 3");
+  });
+
+  it("puts the most diagnostic mistakes first", () => {
+    expect(distractors(k)[0]).toBe("x = -3, 2");
+  });
+
+  it("every hint is a solution set of the same shape", () => {
+    fc.assert(
+      fc.property(anySeed, (seed) => {
+        for (const d of generator.generate({}, seed).distractorHints) {
+          expect(d).toMatch(/^x = -?\d+(, -?\d+)?$/);
+        }
+      }),
+    );
+  });
+
+  it("always offers at least three mistake-based hints", () => {
+    fc.assert(
+      fc.property(anySeed, fc.boolean(), (seed, allowEqualRoots) => {
+        const p = generator.generate({ allowEqualRoots }, seed);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(
+          allowEqualRoots ? 1 : 3,
+        );
+      }),
+    );
+  });
+});

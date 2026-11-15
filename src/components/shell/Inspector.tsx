@@ -8,7 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Segmented } from "@/components/shell/PrintConfigDialog";
+import { MAX_CHOICES, MIN_CHOICES } from "@/engine/mc";
 import type { Generator, ParamValues } from "@/engine/types";
+import type { ResponseFormat } from "@/engine/worksheet";
+
+const CHOICE_COUNTS = Array.from(
+  { length: MAX_CHOICES - MIN_CHOICES + 1 },
+  (_, i) => String(MIN_CHOICES + i),
+);
 
 const MAX_PROBLEMS = 50;
 
@@ -18,6 +26,8 @@ export function Inspector({
   onParamsChange,
   directions,
   onDirectionsChange,
+  responseFormat,
+  onResponseFormatChange,
   count,
   onCountChange,
   onGenerate,
@@ -30,6 +40,9 @@ export function Inspector({
   /** Worksheet directions; null when no worksheet is open yet. */
   directions: string | null;
   onDirectionsChange: (next: string) => void;
+  /** Whole-sheet free response / multiple choice; null when no worksheet is open. */
+  responseFormat: ResponseFormat | null;
+  onResponseFormatChange: (next: ResponseFormat) => void;
   count: number;
   onCountChange: (n: number) => void;
   onGenerate: () => void;
@@ -66,6 +79,16 @@ export function Inspector({
           </>
         )}
 
+        {responseFormat !== null && (
+          <>
+            <Separator className="my-4" />
+            <ResponseFormatControls
+              value={responseFormat}
+              onChange={onResponseFormatChange}
+            />
+          </>
+        )}
+
         <Separator className="my-4" />
 
         <Label className="flex-col items-start gap-1.5">
@@ -98,5 +121,42 @@ export function Inspector({
         </Button>
       </div>
     </aside>
+  );
+}
+
+/** Free response / multiple choice for the whole sheet, plus the choice count. */
+function ResponseFormatControls({
+  value,
+  onChange,
+}: {
+  value: ResponseFormat;
+  onChange: (next: ResponseFormat) => void;
+}) {
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="space-y-1.5">
+        <div className="text-muted-foreground font-medium">Answer format</div>
+        <Segmented
+          value={value.mode}
+          onChange={(mode) => onChange({ ...value, mode })}
+          options={[
+            { value: "free-response", label: "Free response" },
+            { value: "multiple-choice", label: "Multiple choice" },
+          ]}
+        />
+      </div>
+      {value.mode === "multiple-choice" && (
+        <div className="space-y-1.5">
+          <div className="text-muted-foreground font-medium">
+            Choices per problem
+          </div>
+          <Segmented
+            value={String(value.choices)}
+            onChange={(n) => onChange({ ...value, choices: Number(n) })}
+            options={CHOICE_COUNTS.map((n) => ({ value: n, label: n }))}
+          />
+        </div>
+      )}
+    </div>
   );
 }

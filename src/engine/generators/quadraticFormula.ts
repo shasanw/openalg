@@ -29,6 +29,7 @@ import {
   discriminants,
   makeRoot,
   rootTypeField,
+  singleRootToLatex,
   type ExactRoot,
   type RootType,
 } from "../quadratics";
@@ -94,7 +95,9 @@ export function construct(params: ParamValues, rng: Rng): FormulaConstruction {
 }
 
 /** Mistake-based distractors for the MC assembler: each models a classic
- * quadratic-formula error. Distinct, and never equal to the correct answer. */
+ * quadratic-formula error (sign of b, dropped the ±, dividing by 2 or a instead
+ * of 2a, i.e. forgetting the leading coefficient, and a sign error in the
+ * discriminant). Distinct, and never equal to the correct answer. */
 export function distractors(k: FormulaConstruction): string[] {
   const { a, b, c, D } = k;
   const correct = answerToLatex(k.root);
@@ -104,10 +107,11 @@ export function distractors(k: FormulaConstruction): string[] {
     makeRoot(-b, b * b + 4 * a * c, 2 * a), // sign error in the discriminant
     makeRoot(-b, D, a), // divided by a instead of 2a
   ];
+  const texts = candidates.map(answerToLatex);
+  texts.splice(1, 0, singleRootToLatex(k.root)); // dropped the ±
   const seen = new Set<string>([correct]);
   const out: string[] = [];
-  for (const root of candidates) {
-    const tex = answerToLatex(root);
+  for (const tex of texts) {
     if (seen.has(tex)) continue;
     seen.add(tex);
     out.push(tex);
