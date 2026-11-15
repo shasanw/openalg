@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
+import { answerMath, buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
+import { ANSWER_PART_SEPARATOR } from "./format";
+import { PARABOLA_PROPERTIES_ID } from "./generators/parabolaProperties";
 import {
   allProblems,
   buildSection,
@@ -367,7 +369,7 @@ describe("Answer Key formats", () => {
     it("prints each free-response Answer directly under its own Problem", () => {
       const sheet = twoSections();
       const doc = buildTypstDocument(sheet, { keyFormat: "in-context" });
-      const cells = [...keyOf(doc.source).matchAll(/grid\.cell\[#box\(width: 1\.6em\)\[(\d+)\\\)\] @@M(\d+)@@[\s\S]*?Answer:\] @@M(\d+)@@/g)];
+      const cells = [...keyOf(doc.source).matchAll(/grid\.cell\[#set par\(hanging-indent: 1\.6em\)\n#box\(width: 1\.6em\)\[(\d+)\\\)\] @@M(\d+)@@[\s\S]*?Answer:\] @@M(\d+)@@/g)];
       const problems = allProblems(sheet);
       expect(cells).toHaveLength(problems.length);
       for (const [, n, prompt, answer] of cells) {
@@ -406,5 +408,52 @@ describe("Answer Key formats", () => {
       expect(student).not.toContain("radius: 50%");
       expect(student).not.toContain("Answer:");
     });
+  });
+});
+
+describe("multi-part Answers wrap between their parts", () => {
+  function collect() {
+    const math: string[] = [];
+    const placeholder = (latex: string) => {
+      math.push(latex);
+      return `@@M${math.length - 1}@@`;
+    };
+    return { math, placeholder };
+  }
+
+  it("emits one unbreakable equation per part, separated by breakable text", () => {
+    const { math, placeholder } = collect();
+    const out = answerMath(
+      ["\\text{Vertex: } (2, -1)", "\\text{Axis: } x = 2"].join(ANSWER_PART_SEPARATOR),
+      placeholder,
+    );
+    expect(math).toEqual(["\\text{Vertex: } (2, -1)", "\\text{Axis: } x = 2"]);
+    // A bare ";" after an embedded call would be swallowed by Typst.
+    expect(out).toBe("#box[@@M0@@]#[;] #box[@@M1@@]");
+  });
+
+  it("leaves a single-part Answer as one breakable equation", () => {
+    const { math, placeholder } = collect();
+    expect(answerMath("x = 3, 5", placeholder)).toBe("@@M0@@");
+    expect(math).toEqual(["x = 3, 5"]);
+  });
+
+  // Regression: the parabola Topic's Answer used to be one long equation that
+  // overflowed into the next column of the key and of multiple-choice options.
+  it.each([
+    ["free response", false],
+    ["multiple choice", true],
+  ])("never sends a whole multi-part Answer as one equation (%s)", (_, mc) => {
+    for (const key of ANSWER_KEY_FORMATS) {
+      let sheet = buildWorksheet({
+        generatorId: PARABOLA_PROPERTIES_ID,
+        baseSeed: 3,
+        count: 8,
+        answerKeyFormat: key,
+      });
+      if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
+      const { math } = buildTypstDocument(sheet);
+      expect(math.some((m) => m.includes(ANSWER_PART_SEPARATOR))).toBe(false);
+    }
   });
 });

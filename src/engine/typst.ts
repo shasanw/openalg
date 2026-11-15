@@ -7,6 +7,7 @@
 // substitutes the placeholders. This keeps the single LaTeX representation while
 // letting Typst own page layout, columns, and pagination.
 
+import { ANSWER_PART_SEPARATOR } from "./format";
 import { assemble, choiceLetter, choiceSeed } from "./mc";
 import type { Problem } from "./types";
 import {
@@ -112,9 +113,32 @@ ${worksheetMarkup(ws, placeholder, { answers: false })}${answerKeyMarkup(ws, key
   return { source, math };
 }
 
-/** Typst markup for one numbered grid cell. */
+/**
+ * Typst markup for one numbered grid cell. The hanging indent keeps a body that
+ * wraps (a long Answer) aligned under its own first line, not under the number.
+ */
 const numberedCell = (n: number, body: string): string =>
-  `  grid.cell[#box(width: 1.6em)[${n}\\)] ${body}],`;
+  `  grid.cell[#set par(hanging-indent: 1.6em)
+#box(width: 1.6em)[${n}\\)] ${body}
+#parbreak()],`;
+
+/**
+ * An Answer or choice as math. A multi-part Answer (parts joined by
+ * ANSWER_PART_SEPARATOR) becomes one equation per part with breakable "; "
+ * text between them, so it wraps between parts instead of running as one
+ * unbreakable equation past the edge of its column. A single-part Answer is
+ * left as one breakable equation.
+ */
+export function answerMath(latex: string, placeholder: Placeholder): string {
+  const parts = latex.split(ANSWER_PART_SEPARATOR);
+  if (parts.length === 1) return placeholder(latex);
+  return parts
+    // Each part is kept whole (boxed), so lines break only between parts.
+    .map((part) => `#box[${placeholder(part)}]`)
+    // `#[;]`, not a bare ";": right after an embedded math call, Typst reads a
+    // bare semicolon as the end of that expression and drops it.
+    .join("#[;] ");
+}
 
 /**
  * The Worksheet itself: header, then each Section's Directions above its own
@@ -231,7 +255,7 @@ ${worksheetMarkup(ws, placeholder, { answers: true })}`;
     .map(({ p, n }) =>
       numberedCell(
         n,
-        mc ? mcAnswerBody(p, choices, placeholder) : placeholder(p.answer),
+        mc ? mcAnswerBody(p, choices, placeholder) : answerMath(p.answer, placeholder),
       ),
     )
     .join("\n");
@@ -260,7 +284,7 @@ function frInContextBody(problem: Problem, placeholder: Placeholder): string {
   const prompt = placeholder(problem.prompt);
   return `${prompt}
 #v(0.3em)
-#pad(left: 1.6em)[#text(fill: keycolor)[#strong[Answer:] ${placeholder(problem.answer)}]]`;
+#pad(left: 1.6em)[#text(fill: keycolor)[#strong[Answer:] ${answerMath(problem.answer, placeholder)}]]`;
 }
 
 // --- Multiple-choice layout (issue #5) --------------------------------------
@@ -297,11 +321,13 @@ export function mcProblemBody(
       if (showAnswer && i === correctIndex) {
         // The bare letter ringed where "(X)" sits on the sheet. Outset (not
         // inset) for the height, so the ring never changes the line spacing.
-        return `#box(width: 1.8em)[#h(0.2em)#box(stroke: 0.9pt + keycolor, radius: 50%, inset: (x: 2.5pt), outset: (y: 2.5pt))[#text(fill: keycolor)[#strong[${choiceLetter(i)}]]]] #text(fill: keycolor)[${placeholder(latex)}]`;
+        return `#box(width: 1.8em)[#h(0.2em)#box(stroke: 0.9pt + keycolor, radius: 50%, inset: (x: 2.5pt), outset: (y: 2.5pt))[#text(fill: keycolor)[#strong[${choiceLetter(i)}]]]] #text(fill: keycolor)[${answerMath(latex, placeholder)}]`;
       }
-      return `#box(width: 1.8em)[(${choiceLetter(i)})] ${placeholder(latex)}`;
+      return `#box(width: 1.8em)[(${choiceLetter(i)})] ${answerMath(latex, placeholder)}`;
     })
-    .join(" \\\n");
+    // One paragraph per choice, so a long choice wraps under its own text
+    // (hanging indent) rather than under its letter.
+    .join("\n\n");
   const answerLine = showAnswer
     ? `
 #v(0.2em)
@@ -309,7 +335,7 @@ export function mcProblemBody(
     : "";
   return `${prompt}
 #v(0.3em)
-#pad(left: 1.6em)[#set par(leading: 0.75em)
+#pad(left: 1.6em)[#set par(leading: 0.75em, spacing: 0.75em, hanging-indent: 1.8em)
 ${lines}${answerLine}]`;
 }
 
@@ -323,5 +349,5 @@ export function mcAnswerBody(
     choices,
     seed: choiceSeed(problem),
   });
-  return `#strong[(${choiceLetter(correctIndex)})] ${placeholder(problem.answer)}`;
+  return `#strong[(${choiceLetter(correctIndex)})] ${answerMath(problem.answer, placeholder)}`;
 }

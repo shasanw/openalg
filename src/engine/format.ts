@@ -82,3 +82,11 @@ export function fractionToLatex(n: number, d: number): string {
   if (d === 1) return String(n);
   return n < 0 ? `-\\frac{${-n}}{${d}}` : `\\frac{${n}}{${d}}`;
 }
+
+/**
+ * Separates the parts of a multi-part Answer (e.g. vertex; axis; intercepts).
+ * Printed layouts split on it so a long Answer can wrap between its parts
+ * instead of overflowing as one unbreakable equation; on screen it renders as
+ * "; " plus a quad.
+ */
+export const ANSWER_PART_SEPARATOR = ";\\quad ";

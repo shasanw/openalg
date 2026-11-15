@@ -32,6 +32,7 @@ import {
   type Problem,
 } from "../types";
 import {
+  ANSWER_PART_SEPARATOR,
   fractionToLatex,
   gcd,
   quadraticToLatex,
@@ -337,7 +338,7 @@ export function answerToLatex(f: Facts, ask: Ask): string {
       `y\\text{-intercept: } ${point(String(f.yIntercept[0]), String(f.yIntercept[1]))}`,
     );
   }
-  return parts.join(";\\quad ");
+  return parts.join(ANSWER_PART_SEPARATOR);
 }
 
 /** y = a(x - h)^2 + k, hiding a unit a, a zero h and a zero k. */
