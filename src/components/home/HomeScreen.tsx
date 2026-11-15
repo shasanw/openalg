@@ -120,32 +120,27 @@ export function HomeScreen({
   });
 
   return (
-    <div className="bg-background h-screen overflow-y-auto">
-      <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center gap-3 border-b px-6 backdrop-blur">
-        <LogoMark className="size-6" />
-        <span className="text-[15px] font-semibold">OpenAlg</span>
-        <div className="flex-1" />
-        <div className="relative hidden sm:block" role="search">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+    <div className="bg-background flex h-screen flex-col overflow-y-auto">
+      {/* Brand left, search centred on the page, settings right. */}
+      <header className="bg-background/80 sticky top-0 z-10 grid h-16 grid-cols-[1fr_minmax(0,600px)_1fr] items-center gap-4 border-b px-6 backdrop-blur">
+        <div className="flex items-center gap-2.5">
+          <LogoMark className="size-9" />
+          <span className="text-[19px] font-semibold tracking-tight">OpenAlg</span>
+        </div>
+        <div className="relative" role="search">
+          <Search className="text-muted-foreground absolute top-1/2 left-4 size-[18px] -translate-y-1/2" />
           <input
             type="search"
             aria-label="Search your Worksheets"
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
-            className="border-input bg-card placeholder:text-subtle-foreground h-8 w-80 rounded-md border pr-3 pl-9"
-            placeholder="Search your Worksheets…"
+            className="border-input bg-card placeholder:text-subtle-foreground focus:border-ring h-11 w-full rounded-full border pr-4 pl-11 text-[14px] outline-none"
+            placeholder="Search your Worksheets"
           />
         </div>
-        {install.canInstall && (
-          <Button
-            variant="secondary"
-            onClick={() => void install.install()}
-            title="Install OpenAlg as an app so your Library is kept safe"
-          >
-            <MonitorDown /> Install app
-          </Button>
-        )}
-        <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
+        <div className="flex justify-end">
+          <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
+        </div>
       </header>
 
       {/* Start new: a full-width band, one row of templates unless expanded */}
@@ -191,7 +186,7 @@ export function HomeScreen({
         </div>
       </section>
 
-      <main className="mx-auto max-w-[1180px] px-6 pt-7 pb-20">
+      <main className="mx-auto w-full max-w-[1180px] flex-1 px-6 pt-7 pb-12">
         {/* Recent */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[15px] font-medium">
@@ -242,8 +237,17 @@ export function HomeScreen({
             ))}
           </div>
         )}
-        {recents.length > 0 && <StorageNote storage={storage} install={install} />}
       </main>
+
+      {/* Library safety status, at the very bottom of the screen (or of the
+          page, once the content is taller than the screen). */}
+      {recents.length > 0 && (
+        <footer className="border-t">
+          <div className="mx-auto max-w-[1180px] px-6 py-3">
+            <StorageNote storage={storage} install={install} />
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
@@ -262,26 +266,34 @@ function StorageNote({
   if (storage === null) return null;
   if (storage === "persistent" || install.installed) {
     return (
-      <p className="text-muted-foreground mt-4 flex items-center gap-1.5 text-[12px]">
+      <p className="text-muted-foreground flex items-center gap-1.5 text-[12px]">
         <ShieldCheck className="size-3.5" />
         Your Library is stored persistently in this browser.
       </p>
     );
   }
-  const howToInstall = install.showAppleHint
-    ? " On iPad, tap Share, then Add to Home Screen."
-    : install.canInstall
-      ? " Use Install app above."
-      : "";
+  const howToInstall = install.showAppleHint ? " On iPad, tap Share, then Add to Home Screen." : "";
   return (
-    <p className="text-muted-foreground mt-4 flex items-start gap-1.5 text-[12px] leading-relaxed">
-      <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-      <span>
-        This browser may clear your Library if storage runs low or site data is
-        cleared. Install OpenAlg as an app and back up your Library now and then
-        to keep your Worksheets safe.{howToInstall}
-      </span>
-    </p>
+    <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] leading-relaxed">
+      <p className="flex min-w-0 flex-1 items-start gap-1.5">
+        <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+        <span>
+          This browser may clear your Library if storage runs low or site data
+          is cleared. Install OpenAlg as an app and back up your Library now and
+          then to keep your Worksheets safe.{howToInstall}
+        </span>
+      </p>
+      {install.canInstall && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void install.install()}
+          title="Install OpenAlg as an app so your Library is kept safe"
+        >
+          <MonitorDown /> Install app
+        </Button>
+      )}
+    </div>
   );
 }
 
