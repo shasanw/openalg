@@ -242,7 +242,7 @@ export function HomeScreen({
       {/* Library safety status, at the very bottom of the screen (or of the
           page, once the content is taller than the screen). */}
       {recents.length > 0 && (
-        <footer className="border-t">
+        <footer>
           <div className="mx-auto max-w-[1180px] px-6 py-3">
             <StorageNote storage={storage} install={install} />
           </div>
