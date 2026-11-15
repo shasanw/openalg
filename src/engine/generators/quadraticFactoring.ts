@@ -55,6 +55,11 @@ export function construct(params: ParamValues, rng: Rng): FactoringConstruction 
     // nudge to a guaranteed-distinct value that stays within [-maxRoot, maxRoot]
     r2 = r1 === maxRoot ? r1 - 1 : r1 + 1;
   }
+  if (r1 === 0 && r2 === 0) {
+    // x^2 = 0 is not a factoring problem and admits no mistake-based
+    // Distractors, so a double root at 0 becomes the roots 0 and 1.
+    r2 = 1;
+  }
 
   const b = -(r1 + r2);
   const c = r1 * r2;
