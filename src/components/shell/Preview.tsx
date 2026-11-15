@@ -3,7 +3,7 @@
 // pages are the ACTUAL Typst pages compiled to SVG (one per sheet), identical
 // to the exported PDF and to what prints (#7).
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { FilePlus2, Minus, Plus } from "lucide-react";
 import { buildTypstDocument } from "@/engine/typst";
 import type { Worksheet } from "@/engine/worksheet";
@@ -219,7 +219,13 @@ export function Pages({
   zoom?: number;
 }) {
   const [pages, setPages] = useState<string[] | null>(null);
+  // Which copy the pages on screen are, so a switch can wait for its render.
+  const [shownAnswers, setShownAnswers] = useState(showAnswers);
   const [error, setError] = useState<string | null>(null);
+  const container = useRef<HTMLDivElement>(null);
+  // Pages in the Student copy: the Answer Key starts right after them.
+  const studentPages = useRef(0);
+  const scrolledFor = useRef(showAnswers);
   const [attempt, setAttempt] = useState(0);
   const status = useRendererStatus();
 
@@ -241,6 +247,8 @@ export function Pages({
         .then((svgs) => {
           if (cancelled) return;
           setPages(svgs);
+          setShownAnswers(showAnswers);
+          if (!showAnswers) studentPages.current = svgs.length;
           setError(null);
         })
         .catch((e) => {
@@ -253,6 +261,16 @@ export function Pages({
       clearTimeout(timer);
     };
   }, [worksheet, showAnswers, version, attempt]);
+
+  // Switching copies jumps to what changed: the first Answer Key page, or
+  // back to the top for the Student copy. Edits within a copy never scroll.
+  useEffect(() => {
+    if (!pages || shownAnswers !== showAnswers || scrolledFor.current === showAnswers) return;
+    scrolledFor.current = showAnswers;
+    const target = showAnswers ? studentPages.current : 0;
+    const page = container.current?.children[target] as HTMLElement | undefined;
+    page?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  }, [pages, shownAnswers, showAnswers]);
 
   if (error) {
     return (
@@ -290,7 +308,7 @@ export function Pages({
   return (
     // min-w-fit lets a zoomed-in page widen the scroll area instead of being
     // clipped on the left by the centering.
-    <div className="flex min-w-fit flex-col items-center gap-6 p-6 pb-24">
+    <div ref={container} className="flex min-w-fit flex-col items-center gap-6 p-6 pb-24">
       {pages.map((svg, i) => (
         <Page key={i} svg={svg} width={PAGE_WIDTH * zoom} fit={zoom <= 1} />
       ))}
@@ -317,7 +335,7 @@ const Page = memo(function Page({
       // The Typst SVG carries its own page dimensions/viewBox; we set the
       // width and let height scale, so each sheet shows at its true aspect.
       style={{ width, maxWidth: fit ? "100%" : undefined }}
-      className="shrink-0 overflow-hidden rounded-sm bg-white shadow-[var(--shadow-page)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+      className="shrink-0 scroll-mt-6 overflow-hidden rounded-sm bg-white shadow-[var(--shadow-page)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
       // Trusted: SVG is produced by our own Typst compile (the Web Worker).
       dangerouslySetInnerHTML={{ __html: svg }}
     />

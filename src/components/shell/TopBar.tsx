@@ -107,16 +107,21 @@ export function TopBar({
           Library
         </button>
         <ChevronRight aria-hidden className="text-subtle-foreground size-4 shrink-0" />
-        <input
-          aria-label="Worksheet title"
-          value={title}
-          onChange={(e) => onTitleChange(e.currentTarget.value)}
-          placeholder="Untitled worksheet"
-          spellCheck={false}
-          // Sized to its text so the save status sits right after the title.
-          style={{ width: `${Math.min(48, Math.max(12, title.length + 2))}ch` }}
-          className="hover:border-border-strong placeholder:text-subtle-foreground h-7 min-w-0 truncate rounded-md border border-transparent bg-transparent px-1.5 font-semibold transition-colors"
-        />
+        {/* The input sizes itself to its text: an invisible copy sets the
+            width, so the save status sits right after the title. */}
+        <span className="relative inline-block max-w-[44ch] min-w-[10ch]">
+          <span aria-hidden className="invisible block h-7 truncate border px-1.5 leading-[26px] font-semibold whitespace-pre">
+            {title || "Untitled worksheet"}
+          </span>
+          <input
+            aria-label="Worksheet title"
+            value={title}
+            onChange={(e) => onTitleChange(e.currentTarget.value)}
+            placeholder="Untitled worksheet"
+            spellCheck={false}
+            className="hover:border-border-strong placeholder:text-subtle-foreground absolute inset-0 h-7 w-full min-w-0 truncate rounded-md border border-transparent bg-transparent px-1.5 font-semibold transition-colors"
+          />
+        </span>
       </nav>
       <SaveStatus state={autosave} />
 
