@@ -154,6 +154,18 @@ export function numberLineWindow(values: readonly number[]): {
   return { range: { min: -r, max: r }, step, labelEvery };
 }
 
+/**
+ * Whether a number line prints a tick label at `v`. A point anywhere else
+ * (a fraction, a radical, or an integer between labelled ticks) needs its own
+ * label for a reader to know where it is.
+ */
+export function isLabelledTick(
+  spec: Pick<NumberLineSpec, "range" | "step" | "labelEvery">,
+  v: number,
+): boolean {
+  return v >= spec.range.min && v <= spec.range.max && isMultiple(v, spec.step * (spec.labelEvery ?? 1));
+}
+
 // ----------------------------------------------------------- validation
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -596,9 +608,8 @@ function numberLineDrawing(spec: NumberLineSpec, ink: string): Drawing {
     arrowhead(leftTip, lineY, -1, 0, "#000"),
     arrowhead(rightTip, lineY, 1, 0, "#000"),
   );
-  const every = spec.labelEvery ?? 1;
   const all = ticks(spec.range, spec.step);
-  const labelled = (v: number) => isMultiple(v, spec.step * every);
+  const labelled = (v: number) => isLabelledTick(spec, v);
   frame.push(
     `<path d='${all.map((v) => `M${n(px(v))} ${n(lineY - (labelled(v) ? 3 : 2))}V${n(lineY + (labelled(v) ? 3 : 2))}`).join("")}' stroke='#000' stroke-width='0.6'/>`,
   );

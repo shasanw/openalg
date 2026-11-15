@@ -333,8 +333,8 @@ export function answerToLatex(f: Facts, ask: Ask): string {
   }
   if (ask !== "vertexAxis") {
     parts.push(
-      `x\\text{-intercepts: } ${xInterceptsLatex(f.xIntercepts)}`,
-      `y\\text{-intercept: } ${point(String(f.yIntercept[0]), String(f.yIntercept[1]))}`,
+      `\\text{$x$-intercepts: } ${xInterceptsLatex(f.xIntercepts)}`,
+      `\\text{$y$-intercept: } ${point(String(f.yIntercept[0]), String(f.yIntercept[1]))}`,
     );
   }
   return parts.join(ANSWER_PART_SEPARATOR);

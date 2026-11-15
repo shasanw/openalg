@@ -706,11 +706,22 @@ describe("graphs (#9)", () => {
     expect(first).toBeLessThan(key.indexOf("Answer:"));
   });
 
-  it("the in-context key puts a number line with no blank line to replace after the Answer", () => {
+  it("the in-context key puts the number line above the Answer, with or without a blank line", () => {
+    for (const showNumberLine of [false, true]) {
+      const sheet = buildWorksheet({
+        generatorId: QUADRATIC_INEQUALITIES_ID,
+        params: { showNumberLine },
+        baseSeed: 2,
+        count: 2,
+      });
+      const { source } = buildTypstDocument(sheet, { keyFormat: "in-context" });
+      const key = source.slice(source.indexOf(`[Answer Key]`));
+      const firstCell = key.slice(key.indexOf("grid.cell"), key.indexOf("grid.cell", key.indexOf("grid.cell") + 1));
+      expect(firstCell.indexOf("#oagraph(")).toBeGreaterThan(-1);
+      expect(firstCell.indexOf("#oagraph(")).toBeLessThan(firstCell.indexOf("Answer:"));
+    }
     const sheet = buildWorksheet({ generatorId: QUADRATIC_INEQUALITIES_ID, baseSeed: 2, count: 2 });
     const { source } = buildTypstDocument(sheet, { keyFormat: "in-context" });
-    const key = source.slice(source.indexOf(`[Answer Key]`));
-    expect(key.indexOf("Answer:")).toBeLessThan(key.indexOf("#oagraph("));
     // and the student copy shows none
     expect(refs(source.slice(0, source.indexOf(`[Answer Key]`)))).toEqual([]);
   });

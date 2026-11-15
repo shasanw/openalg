@@ -9,7 +9,7 @@
 // add, Escape to close. Tab moves into the Units list (up/down picks a Unit;
 // Enter, right arrow or typing goes back to the search), then Cancel and Add.
 
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "radix-ui";
 import { Search, X } from "lucide-react";
 import { GENERATORS, coursesOf } from "@/engine/registry";
@@ -357,10 +357,29 @@ function PickerBody({
 function TopicPreview({ topic }: { topic: Generator | undefined }) {
   // Cached per Topic, so moving the highlight never regenerates Problems.
   const sample = topic ? topicSample(topic) : undefined;
+  // Fade the bottom edge while more of the preview is below it: with macOS's
+  // hidden scrollbars, a cut-off line otherwise looks like a layout bug.
+  const pane = useRef<HTMLElement>(null);
+  const [more, setMore] = useState(false);
+  const measure = useCallback(() => {
+    const el = pane.current;
+    if (el) setMore(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+  }, []);
+  useLayoutEffect(() => {
+    measure();
+    const el = pane.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measure, topic]);
   return (
     <section
+      ref={pane}
+      onScroll={measure}
+      data-more-below={more || undefined}
       aria-label={topic ? `Preview of ${topic.title}` : "Topic preview"}
-      className="col-span-2 max-h-[176px] min-h-0 overflow-y-auto border-t p-4 min-[880px]:col-span-1 min-[880px]:max-h-none min-[880px]:border-t-0 min-[880px]:border-l"
+      className="data-[more-below]:[mask-image:linear-gradient(to_bottom,black_calc(100%-40px),transparent)] col-span-2 max-h-[176px] min-h-0 overflow-y-auto border-t p-4 min-[880px]:col-span-1 min-[880px]:max-h-none min-[880px]:border-t-0 min-[880px]:border-l"
     >
       {!sample ? (
         <p className="text-muted-foreground">Pick a Topic to see sample Problems.</p>
@@ -368,23 +387,26 @@ function TopicPreview({ topic }: { topic: Generator | undefined }) {
         <div className="grid gap-x-6 gap-y-4 max-[879px]:grid-cols-2">
           <div>
             <GroupLabel className="mb-2">Sample Problems</GroupLabel>
-            <ol className="font-paper space-y-1.5 rounded-md bg-white px-3 py-2.5 text-[15px] text-[#16181d] shadow-[var(--shadow-page)]">
-              {sample.problems.map((tex, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="shrink-0">{i + 1})</span>
-                  <TeX tex={tex} />
-                </li>
-              ))}
-            </ol>
-            {sample.graph && (
-              <figure className="mt-2 rounded-md bg-white p-2 shadow-[var(--shadow-page)]">
+            {/* One paper card: the sample Problems, then the graph printed
+                with each Problem (if any) as a small thumbnail under them, so
+                the equations keep the card's full width. */}
+            <div className="rounded-md bg-white px-3 py-2.5 text-[#16181d] shadow-[var(--shadow-page)]">
+              <ol className="font-paper space-y-1.5 text-[15px] whitespace-nowrap">
+                {sample.problems.map((tex, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="shrink-0">{i + 1})</span>
+                    <TeX tex={tex} />
+                  </li>
+                ))}
+              </ol>
+              {sample.graph && (
                 <img
                   src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(sample.graph)}`}
                   alt="The graph printed with each Problem"
-                  className="mx-auto w-full max-w-[160px]"
+                  className="mt-2 w-[96px]"
                 />
-              </figure>
-            )}
+              )}
+            </div>
           </div>
           <div className="space-y-4">
             <div>

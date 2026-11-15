@@ -16,7 +16,7 @@ import {
   type Op,
   type SymbolMode,
 } from "./quadraticInequalities";
-import { blankGraph, plot } from "../plot";
+import { blankGraph, isLabelledTick, plot } from "../plot";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const POINT_TYPES: CriticalPointType[] = ["integer", "rational", "irrational"];
@@ -464,6 +464,21 @@ describe("quadratic-inequalities: number lines", () => {
     const v = a * x * x + b * x + c;
     return op === "<" ? v < 0 : op === ">" ? v > 0 : op === "<=" ? v <= 0 : v >= 0;
   };
+
+  // Regression: an integer endpoint between labelled ticks (5 on a line
+  // labelled every 2) used to print as an unnamed dot.
+  it("names every dot that no tick label names, and only those", () => {
+    fc.assert(
+      fc.property(anySeed, lineParams, (seed, params) => {
+        const line = generator.generate(params, seed).answerGraph;
+        if (line?.kind !== "numberLine") return false;
+        return (line.points ?? []).every((pt) =>
+          isLabelledTick(line, pt.x) ? pt.label === undefined : typeof pt.label === "string",
+        );
+      }),
+      { numRuns: 500 },
+    );
+  });
 
   it("shades exactly the solutions: a sample x is shaded iff it satisfies the inequality", () => {
     fc.assert(

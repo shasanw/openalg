@@ -202,8 +202,8 @@ describe("parabola-properties: Topic Options are honored for any seed", () => {
         const hasVertex = answer.includes("\\text{Vertex: }");
         const hasAxis = answer.includes("\\text{Axis: }");
         const hasIntercepts =
-          answer.includes("x\\text{-intercepts: }") &&
-          answer.includes("y\\text{-intercept: }");
+          answer.includes("\\text{$x$-intercepts: }") &&
+          answer.includes("\\text{$y$-intercept: }");
         expect(hasVertex).toBe(opts.ask !== "intercepts");
         expect(hasAxis).toBe(opts.ask !== "intercepts");
         expect(hasIntercepts).toBe(opts.ask !== "vertexAxis");
@@ -276,8 +276,8 @@ describe("parabola-properties: rendering", () => {
     expect(answerToLatex(facts, "all")).toBe(
       "\\text{Vertex: } \\left(\\frac{3}{2}, -\\frac{1}{4}\\right);\\quad " +
         "\\text{Axis: } x = \\frac{3}{2};\\quad " +
-        "x\\text{-intercepts: } (1, 0), (2, 0);\\quad " +
-        "y\\text{-intercept: } (0, 2)",
+        "\\text{$x$-intercepts: } (1, 0), (2, 0);\\quad " +
+        "\\text{$y$-intercept: } (0, 2)",
     );
   });
 

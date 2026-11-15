@@ -34,6 +34,7 @@ import {
 import { fractionToLatex, gcd, quadraticToLatex } from "../format";
 import {
   blankGraph,
+  isLabelledTick,
   numberLineWindow,
   type NumberLinePoint,
   type NumberLineSpec,
@@ -488,13 +489,15 @@ function criticalPoints(z: Zeros): ExactNum[] {
  * the solution shaded (rays run off the ends). Its range is fixed by the
  * critical points alone (numberLineWindow), not by the solution, so the blank
  * line for the same Problem is identical whatever the inequality symbol.
- * A dot that is not an integer is labelled, since no tick names it.
+ * A dot is labelled unless it sits on a labelled tick: fractions, radicals,
+ * and integers between labelled ticks (5 on a line labelled every 2) all are.
  */
 export function numberLine(k: InequalityConstruction): NumberLineSpec {
   const window = numberLineWindow(criticalPoints(k.zeros).map(exactValue));
   const dot = (x: ExactNum, closed: boolean): NumberLinePoint => {
     const p: NumberLinePoint = { x: exactValue(x), closed };
-    if (!(x.r === 1 && (x.q === 0 || x.s === 1))) p.label = numToText(x);
+    const onTick = x.r === 1 && (x.q === 0 || x.s === 1) && isLabelledTick(window, p.x);
+    if (!onTick) p.label = numToText(x);
     return p;
   };
   const s = k.solution;

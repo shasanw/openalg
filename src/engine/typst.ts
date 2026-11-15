@@ -217,22 +217,14 @@ function promptWithGraph(problem: Problem, placeholder: Placeholder, graph: Grap
 }
 
 /**
- * The prompt on an in-context key: the student's graph is replaced by the
- * answer graph, drawn on the same window. A Problem whose answer graph has no
- * student graph to replace gets it after the Answer instead (`trailing`).
+ * The prompt on an in-context key: the answer graph sits under the prompt,
+ * above the Answer, in the same place whether or not the student copy has a
+ * blank graph there (when it does, the answer is drawn on that same window).
  */
-function inContextPrompt(
-  problem: Problem,
-  placeholder: Placeholder,
-  graph: GraphMarkup,
-): { prompt: string; trailing: string } {
+function inContextPrompt(problem: Problem, placeholder: Placeholder, graph: GraphMarkup): string {
   const prompt = placeholder(problem.prompt);
-  const answerGraph = problem.answerGraph;
-  if (problem.graph) {
-    const shown = answerGraph ?? problem.graph;
-    return { prompt: prompt + graphBlock(graph(shown, { answer: !!answerGraph })), trailing: "" };
-  }
-  return { prompt, trailing: answerGraph ? graphBlock(graph(answerGraph, { answer: true })) : "" };
+  const shown = problem.answerGraph ?? problem.graph;
+  return shown ? prompt + graphBlock(graph(shown, { answer: !!problem.answerGraph })) : prompt;
 }
 
 /** The answer graph under a key entry, or nothing. */
@@ -450,10 +442,10 @@ ${answerCells}
 
 /** A free-response Problem on the in-context key: prompt, then its Answer. */
 function frInContextBody(problem: Problem, placeholder: Placeholder, graph: GraphMarkup): string {
-  const { prompt, trailing } = inContextPrompt(problem, placeholder, graph);
+  const prompt = inContextPrompt(problem, placeholder, graph);
   return `${prompt}
 #v(0.3em)
-#pad(left: 1.6em)[#text(fill: keycolor)[#strong[Answer:] ${answerMath(problem.answer, placeholder)}]]${trailing}`;
+#pad(left: 1.6em)[#text(fill: keycolor)[#strong[Answer:] ${answerMath(problem.answer, placeholder)}]]`;
 }
 
 // --- Multiple-choice layout (issue #5) --------------------------------------
@@ -485,9 +477,9 @@ export function mcProblemBody(
     choiceVariant = 0,
   }: { showAnswer?: boolean; choiceVariant?: number } = {},
 ): string {
-  const { prompt, trailing } = showAnswer
+  const prompt = showAnswer
     ? inContextPrompt(problem, placeholder, graph)
-    : { prompt: promptWithGraph(problem, placeholder, graph), trailing: "" };
+    : promptWithGraph(problem, placeholder, graph);
   const { choices: rendered, correctIndex } = versionChoices(problem, choices, choiceVariant);
   const lines = rendered
     .map((latex, i) => {
@@ -509,7 +501,7 @@ export function mcProblemBody(
   return `${prompt}
 #v(0.3em)
 #pad(left: 1.6em)[#set par(leading: 0.75em, spacing: 0.75em, hanging-indent: 1.8em)
-${lines}${answerLine}]${trailing}`;
+${lines}${answerLine}]`;
 }
 
 /** A multiple-choice Answer Key cell body: the correct letter, then the Answer. */
