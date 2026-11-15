@@ -57,7 +57,9 @@ function counted(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
 }
 
 async function get(url: string): Promise<Response> {
-  const res = await fetch(url);
+  // Low priority, so on an HTTP/2 host the page's own requests (the app's
+  // fonts, the draft's KaTeX fonts) aren't queued behind ~9 MB of compiler.
+  const res = await fetch(url, { priority: "low" });
   if (!res.ok || !res.body) throw new Error(`Couldn't download ${url} (${res.status}).`);
   return res;
 }

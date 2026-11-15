@@ -9,6 +9,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createTypstEngine, fillMath, typstString, type TypstEngine } from "./engine";
 import { FONT_FILES, MITEX_PACKAGE_FILE } from "./assetFiles";
 import { buildTypstDocument } from "../../engine/typst";
+import { WARM_UP_DOCUMENT } from "./warmUp";
 import {
   ANSWER_KEY_FORMATS,
   buildWorksheet,
@@ -62,6 +63,12 @@ const small = {
 };
 
 describe("Typst engine (WASM)", () => {
+  it("compiles the warm-up document cleanly to one page", async () => {
+    const pages = await engine.svgPages(WARM_UP_DOCUMENT);
+    expect(pages).toHaveLength(1);
+    expect(engine.warnings).toEqual([]);
+  });
+
   it("loads only the bundled files, fetching nothing (no CDN fonts)", () => {
     expect(fetched).toEqual([]);
   });

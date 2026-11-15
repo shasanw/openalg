@@ -11,6 +11,9 @@
 // - The Typst heap only grows (comemo keeps old revisions), so once the
 //   worker's WASM memory passes a threshold it is replaced between compiles.
 //   A restart is cheap once the files are cached (~0.1 s plus one cold compile).
+// - A compiler that comes up with nothing to do compiles a small warm-up
+//   document, so the first real Preview doesn't pay the one-off setup (font
+//   parsing, the mitex package) on top of its own compile.
 
 import type { TypstDocument } from "../../engine/typst";
 import { RenderSupersededError, type RendererStatus } from "../types";
@@ -28,6 +31,8 @@ export interface TypstClientOptions {
   createWorker: () => WorkerPort;
   /** Recycle the worker once its WASM memory exceeds this. Default 192 MB. */
   memoryLimitBytes?: number;
+  /** Compiled (and thrown away) when a worker becomes ready with nothing queued. */
+  warmUp?: TypstDocument;
 }
 
 type Result = string[] | Uint8Array;
@@ -46,6 +51,7 @@ export const DEFAULT_MEMORY_LIMIT_BYTES = 192 * 1024 * 1024;
 export class TypstClient {
   private readonly createWorker: () => WorkerPort;
   private readonly memoryLimit: number;
+  private readonly warmUp: TypstDocument | undefined;
   private worker: WorkerPort | null = null;
   private ready = false;
   /** Whether a worker has ever finished loading (later restarts are silent). */
@@ -65,6 +71,7 @@ export class TypstClient {
   constructor(options: TypstClientOptions) {
     this.createWorker = options.createWorker;
     this.memoryLimit = options.memoryLimitBytes ?? DEFAULT_MEMORY_LIMIT_BYTES;
+    this.warmUp = options.warmUp;
   }
 
   /** Start loading the compiler if it isn't already. */
@@ -133,7 +140,20 @@ export class TypstClient {
         this.memoryBytes = msg.memoryBytes;
         if (!this.loadedOnce) {
           this.loadedOnce = true;
+          // For pnpm check:typst, which times the cold load.
+          globalThis.performance?.mark?.("openalg:typst-ready");
           this.setStatus({ state: "ready" });
+        }
+        if (this.warmUp && this.queue.length === 0 && !this.inFlight) {
+          const ignore = () => {};
+          this.queue.push({
+            id: this.nextId++,
+            format: "svg",
+            doc: this.warmUp,
+            latestWins: false,
+            resolve: ignore,
+            reject: ignore,
+          });
         }
         this.pump();
         return;

@@ -24,6 +24,7 @@ import type {
   StoragePersistence,
 } from "./types";
 import { TypstClient, type WorkerPort } from "./typst/client";
+import { WARM_UP_DOCUMENT } from "./typst/warmUp";
 
 const DB_NAME = "openalg";
 const DB_VERSION = 1;
@@ -57,6 +58,7 @@ function defaultTypstClient(): TypstClient {
         type: "module",
         name: "typst",
       }) as unknown as WorkerPort,
+    warmUp: WARM_UP_DOCUMENT,
   });
 }
 

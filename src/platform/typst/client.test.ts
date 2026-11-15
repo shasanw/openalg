@@ -36,7 +36,7 @@ class FakeWorker implements WorkerPort {
   }
 }
 
-function setup(memoryLimitBytes?: number) {
+function setup(memoryLimitBytes?: number, warmUp?: { source: string; math: string[] }) {
   const workers: FakeWorker[] = [];
   const client = new TypstClient({
     createWorker: () => {
@@ -45,6 +45,7 @@ function setup(memoryLimitBytes?: number) {
       return w;
     },
     memoryLimitBytes,
+    warmUp,
   });
   return { client, workers, current: () => workers.at(-1)! };
 }
@@ -222,5 +223,46 @@ describe("TypstClient", () => {
     current().emit({ type: "ready", memoryBytes: 0 });
     current().finishLast();
     expect(await p).toEqual(["a"]);
+  });
+
+  describe("warm-up", () => {
+    const warm = doc("warm");
+
+    it("compiles the warm-up document when the compiler comes up idle", async () => {
+      const { client, current } = setup(undefined, warm);
+      client.start();
+      current().emit({ type: "ready", memoryBytes: 0 });
+      expect(current().compiles().map((m) => m.doc.source)).toEqual(["warm"]);
+      // A Preview asked for during the warm-up waits for it, then runs.
+      const p = client.svgPages(doc("a"), true);
+      expect(current().compiles()).toHaveLength(1);
+      current().finishLast();
+      expect(current().compiles().map((m) => m.doc.source)).toEqual(["warm", "a"]);
+      current().finishLast();
+      expect(await p).toEqual(["a"]);
+    });
+
+    it("skips the warm-up when a request is already waiting", async () => {
+      const { client, current } = setup(undefined, warm);
+      const p = client.svgPages(doc("a"), true);
+      current().emit({ type: "ready", memoryBytes: 0 });
+      expect(current().compiles().map((m) => m.doc.source)).toEqual(["a"]);
+      current().finishLast();
+      expect(await p).toEqual(["a"]);
+    });
+
+    it("never fails anything when the warm-up compile errors", async () => {
+      const { client, current } = setup(undefined, warm);
+      const statuses: RendererStatus[] = [];
+      client.onStatus((s) => statuses.push(s));
+      client.start();
+      current().emit({ type: "ready", memoryBytes: 0 });
+      const job = current().compiles()[0];
+      current().emit({ type: "error", id: job.id, message: "boom", memoryBytes: 0 });
+      expect(statuses.at(-1)).toEqual({ state: "ready" });
+      const p = client.svgPages(doc("a"));
+      current().finishLast();
+      expect(await p).toEqual(["a"]);
+    });
   });
 });
