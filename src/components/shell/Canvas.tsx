@@ -8,9 +8,11 @@
 import { memo, useEffect, useState } from "react";
 import { buildTypstDocument } from "@/engine/typst";
 import { problemCount, type Worksheet } from "@/engine/worksheet";
+import { versionCount, versionLetter } from "@/engine/versions";
 import { platform } from "@/platform";
 import { RenderSupersededError, type RendererStatus } from "@/platform/types";
 import { Label } from "@/components/ui/label";
+import { Segmented } from "@/components/shell/PrintConfigDialog";
 
 // A faint dot grid so the white page edges read clearly against the surface.
 const DOT_SURFACE = {
@@ -28,12 +30,24 @@ export function Canvas({
   showAnswers: boolean;
   onToggleAnswers: (show: boolean) => void;
 }) {
+  // Which Version the Preview shows (Print and Export PDF emit them all).
+  // Clamped so lowering the Version count falls back to the last Version.
+  const [previewVersion, setPreviewVersion] = useState(0);
+  const versions = worksheet ? versionCount(worksheet) : 1;
+  const shownVersion = Math.min(previewVersion, versions - 1);
   return (
     <div className="bg-sidebar flex min-h-0 flex-col overflow-hidden rounded-xl border shadow-sm">
       <div className="bg-sidebar flex h-9 shrink-0 items-center justify-between border-b px-3.5">
         <span className="text-muted-foreground text-[11px] font-bold tracking-wide uppercase">
           Preview
         </span>
+        {versions > 1 && (
+          <VersionSwitcher
+            count={versions}
+            value={shownVersion}
+            onChange={setPreviewVersion}
+          />
+        )}
         <Label className="text-muted-foreground gap-1.5 text-[13px] font-normal">
           <input
             type="checkbox"
@@ -50,7 +64,11 @@ export function Canvas({
         style={DOT_SURFACE}
       >
         {worksheet && problemCount(worksheet) > 0 ? (
-          <Pages worksheet={worksheet} showAnswers={showAnswers} />
+          <Pages
+            worksheet={worksheet}
+            showAnswers={showAnswers}
+            version={shownVersion}
+          />
         ) : (
           <div className="text-muted-foreground flex h-full items-center justify-center px-8 text-center text-sm">
             Set your options on the right, then click&nbsp;
@@ -58,6 +76,31 @@ export function Canvas({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Picks which Version (A, B, ...) the Preview shows. */
+function VersionSwitcher({
+  count,
+  value,
+  onChange,
+}: {
+  count: number;
+  value: number;
+  onChange: (index: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5" aria-label="Previewed version">
+      <span className="text-muted-foreground text-[13px]">Version</span>
+      <Segmented
+        value={String(value)}
+        onChange={(v) => onChange(Number(v))}
+        options={Array.from({ length: count }, (_, i) => ({
+          value: String(i),
+          label: versionLetter(i),
+        }))}
+      />
     </div>
   );
 }
@@ -116,9 +159,12 @@ function LoadingCompiler({ loaded, total }: { loaded: number; total: number }) {
 function Pages({
   worksheet,
   showAnswers,
+  version,
 }: {
   worksheet: Worksheet;
   showAnswers: boolean;
+  /** Which Version to show: one at a time, with its own Answer Key. */
+  version: number;
 }) {
   const [pages, setPages] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +182,7 @@ function Pages({
         // Showing answers previews the Worksheet's own Answer Key format,
         // exactly as it will print; hiding them previews the student copy.
         keyFormat: showAnswers ? undefined : "none",
+        version,
       });
       platform
         .renderPreview(doc, { latestWins: true })
@@ -153,7 +200,7 @@ function Pages({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [worksheet, showAnswers, attempt]);
+  }, [worksheet, showAnswers, version, attempt]);
 
   if (error) {
     return (

@@ -6,7 +6,9 @@ import {
   regenerateAll,
   setResponseFormat as withResponseFormat,
   setSectionDirections,
+  setVersionSettings,
   type PrintConfig,
+  type VersionSettings,
   type ResponseFormat,
   type AnswerKeyFormat,
   type Worksheet,
@@ -77,7 +79,7 @@ const PAGE_SIZE: Record<Worksheet["print"]["paper"], string> = {
  */
 async function printWorksheet(ws: Worksheet): Promise<void> {
   const pages = await platform.renderPreview(
-    buildTypstDocument(ws),
+    buildTypstDocument(ws, { version: "all" }),
   );
   if (pages.length === 0) return;
 
@@ -382,6 +384,7 @@ function App() {
         print: worksheet?.print,
         responseFormat: worksheet?.responseFormat,
         answerKeyFormat: worksheet?.answerKeyFormat,
+        versions: worksheet?.versions,
       }),
     );
   }
@@ -399,6 +402,7 @@ function App() {
         print: worksheet?.print,
         responseFormat: worksheet?.responseFormat,
         answerKeyFormat: worksheet?.answerKeyFormat,
+        versions: worksheet?.versions,
       }),
     );
   }
@@ -420,6 +424,8 @@ function App() {
     setWorksheet((ws) => (ws ? withResponseFormat(ws, responseFormat) : ws));
   const setAnswerKeyFormat = (answerKeyFormat: AnswerKeyFormat) =>
     setWorksheet((ws) => (ws ? { ...ws, answerKeyFormat } : ws));
+  const setVersions = (versions: VersionSettings) =>
+    setWorksheet((ws) => (ws ? setVersionSettings(ws, versions) : ws));
 
   /** Export a portable copy to a user-chosen .json file (auto-save is separate). */
   async function save() {
@@ -465,7 +471,8 @@ function App() {
     setExporting(true);
     try {
       const ok = await platform.exportPdf(
-        buildTypstDocument(worksheet),
+        // Every Version's student pages, then every Version's Answer Key.
+        buildTypstDocument(worksheet, { version: "all" }),
         `${worksheet.title}.pdf`,
       );
       if (ok) {
@@ -554,6 +561,8 @@ function App() {
           onResponseFormatChange={setResponseFormat}
           answerKeyFormat={worksheet?.answerKeyFormat ?? null}
           onAnswerKeyFormatChange={setAnswerKeyFormat}
+          versions={worksheet?.versions ?? null}
+          onVersionsChange={setVersions}
           count={count}
           onCountChange={setCount}
           onGenerate={generate}

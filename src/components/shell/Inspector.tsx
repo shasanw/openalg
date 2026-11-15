@@ -11,7 +11,15 @@ import { Separator } from "@/components/ui/separator";
 import { Segmented } from "@/components/shell/PrintConfigDialog";
 import { MAX_CHOICES, MIN_CHOICES } from "@/engine/mc";
 import type { Generator, ParamValues } from "@/engine/types";
-import type { AnswerKeyFormat, ResponseFormat } from "@/engine/worksheet";
+import {
+  MAX_VERSIONS,
+  MIN_VERSIONS,
+  type AnswerKeyFormat,
+  type ResponseFormat,
+  type ScrambleMode,
+  type VersionSettings,
+} from "@/engine/worksheet";
+import { versionsAreIdentical } from "@/engine/versions";
 
 const CHOICE_COUNTS = Array.from(
   { length: MAX_CHOICES - MIN_CHOICES + 1 },
@@ -30,6 +38,8 @@ export function Inspector({
   onResponseFormatChange,
   answerKeyFormat,
   onAnswerKeyFormatChange,
+  versions = null,
+  onVersionsChange = () => {},
   count,
   onCountChange,
   onGenerate,
@@ -48,6 +58,9 @@ export function Inspector({
   /** The Worksheet's Answer Key format; null when no worksheet is open. */
   answerKeyFormat: AnswerKeyFormat | null;
   onAnswerKeyFormatChange: (next: AnswerKeyFormat) => void;
+  /** Version count and Scramble Mode; null when no worksheet is open. */
+  versions?: VersionSettings | null;
+  onVersionsChange?: (next: VersionSettings) => void;
   count: number;
   onCountChange: (n: number) => void;
   onGenerate: () => void;
@@ -100,6 +113,17 @@ export function Inspector({
             <AnswerKeyControls
               value={answerKeyFormat}
               onChange={onAnswerKeyFormatChange}
+            />
+          </>
+        )}
+
+        {versions !== null && responseFormat !== null && (
+          <>
+            <Separator className="my-4" />
+            <VersionsControls
+              value={versions}
+              onChange={onVersionsChange}
+              identical={versionsAreIdentical({ versions, responseFormat })}
             />
           </>
         )}
@@ -205,6 +229,105 @@ function AnswerKeyControls({
         ]}
       />
       <p className="text-muted-foreground text-xs">{ANSWER_KEY_HINTS[value]}</p>
+    </div>
+  );
+}
+
+const SCRAMBLE_MODE_OPTIONS: { value: ScrambleMode; label: string; hint: string }[] = [
+  {
+    value: "scramble-order",
+    label: "Shuffle problem order",
+    hint: "Same problems, in a different order within each section.",
+  },
+  {
+    value: "scramble-choices",
+    label: "Shuffle answer choices",
+    hint: "Same problems in the same order; the multiple-choice letters move.",
+  },
+  {
+    value: "new-questions",
+    label: "New problems",
+    hint: "Fresh problems from the same options. Hand-picked problems are replaced.",
+  },
+];
+
+/**
+ * How many Versions print (each with its own Answer Key) and how they differ.
+ * Kept self-contained so it can move into the new editor layout (#30).
+ */
+function VersionsControls({
+  value,
+  onChange,
+  identical,
+}: {
+  value: VersionSettings;
+  onChange: (next: VersionSettings) => void;
+  /** True when every Version would print the same (see versionsAreIdentical). */
+  identical: boolean;
+}) {
+  const setCount = (count: number) =>
+    onChange({ ...value, count: Math.min(MAX_VERSIONS, Math.max(MIN_VERSIONS, count)) });
+  const mode = SCRAMBLE_MODE_OPTIONS.find((o) => o.value === value.mode)!;
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted-foreground font-medium">Versions</span>
+        <div className="flex items-center gap-1" role="group" aria-label="Versions">
+          <Button
+            variant="outline"
+            size="sm"
+            className="size-7 px-0"
+            aria-label="Fewer versions"
+            disabled={value.count <= MIN_VERSIONS}
+            onClick={() => setCount(value.count - 1)}
+          >
+            −
+          </Button>
+          <span className="w-6 text-center tabular-nums" aria-live="polite">
+            {value.count}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="size-7 px-0"
+            aria-label="More versions"
+            disabled={value.count >= MAX_VERSIONS}
+            onClick={() => setCount(value.count + 1)}
+          >
+            +
+          </Button>
+        </div>
+      </div>
+      {value.count > 1 && (
+        <Label className="flex-col items-start gap-1.5">
+          <span className="text-muted-foreground font-medium">Versions differ by</span>
+          <select
+            value={value.mode}
+            onChange={(e) =>
+              onChange({ ...value, mode: e.currentTarget.value as ScrambleMode })
+            }
+            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+          >
+            {SCRAMBLE_MODE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-muted-foreground text-xs font-normal">{mode.hint}</span>
+          {identical && (
+            <span role="note" className="text-xs font-normal text-amber-700 dark:text-amber-400">
+              These are free-response problems, so every version will print the same. Switch
+              to multiple choice, or pick another option.
+            </span>
+          )}
+        </Label>
+      )}
+      {value.count > 1 && (
+        <p className="text-muted-foreground text-xs">
+          Printing gives every version, then each version&apos;s answer key.
+        </p>
+      )}
     </div>
   );
 }

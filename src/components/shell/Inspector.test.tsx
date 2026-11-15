@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Inspector } from "./Inspector";
 import { generator } from "@/engine/generators/quadraticFactoring";
 import { resolveParams } from "@/engine/types";
-import type { AnswerKeyFormat, ResponseFormat } from "@/engine/worksheet";
+import type { AnswerKeyFormat, ResponseFormat, VersionSettings } from "@/engine/worksheet";
 
 function renderInspector(
   responseFormat: ResponseFormat | null,
@@ -82,5 +82,70 @@ describe("Inspector answer key", () => {
   it("hides the control when no worksheet is open", () => {
     renderInspector(null);
     expect(screen.queryByText("Answer key")).toBeNull();
+  });
+});
+
+describe("Inspector Versions", () => {
+  function renderVersions(
+    versions: VersionSettings | null,
+    responseFormat: ResponseFormat = { mode: "free-response", choices: 4 },
+  ) {
+    const onVersionsChange = vi.fn();
+    render(
+      <Inspector
+        generator={generator}
+        params={resolveParams(generator.schema, {})}
+        onParamsChange={() => {}}
+        directions="Solve."
+        onDirectionsChange={() => {}}
+        responseFormat={responseFormat}
+        onResponseFormatChange={() => {}}
+        answerKeyFormat="full"
+        onAnswerKeyFormatChange={() => {}}
+        versions={versions}
+        onVersionsChange={onVersionsChange}
+        count={10}
+        onCountChange={() => {}}
+        onGenerate={() => {}}
+        onRegenerate={() => {}}
+        canRegenerate
+      />,
+    );
+    return onVersionsChange;
+  }
+
+  it("steps the Version count between 1 and 10", async () => {
+    const one = renderVersions({ count: 1, mode: "scramble-order" });
+    expect(screen.getByRole("button", { name: "Fewer versions" })).toHaveProperty("disabled", true);
+    // A single Version needs no Scramble Mode.
+    expect(screen.queryByRole("combobox")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "More versions" }));
+    expect(one).toHaveBeenCalledWith({ count: 2, mode: "scramble-order" });
+  });
+
+  it("stops at 10 Versions", () => {
+    renderVersions({ count: 10, mode: "scramble-order" });
+    expect(screen.getByRole("button", { name: "More versions" })).toHaveProperty("disabled", true);
+  });
+
+  it("picks the Scramble Mode", async () => {
+    const onChange = renderVersions({ count: 3, mode: "scramble-order" });
+    await userEvent.selectOptions(screen.getByRole("combobox"), "new-questions");
+    expect(onChange).toHaveBeenCalledWith({ count: 3, mode: "new-questions" });
+  });
+
+  it("explains that shuffled choices leave free-response Versions identical", () => {
+    renderVersions({ count: 3, mode: "scramble-choices" });
+    expect(screen.getByRole("note").textContent).toMatch(/every version will print the same/);
+  });
+
+  it("gives no such warning in multiple choice", () => {
+    renderVersions({ count: 3, mode: "scramble-choices" }, { mode: "multiple-choice", choices: 4 });
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
+  it("hides the control when no worksheet is open", () => {
+    renderVersions(null);
+    expect(screen.queryByText("Versions")).toBeNull();
   });
 });
