@@ -63,7 +63,7 @@ Current Chrome, Edge, Safari and Firefox on laptops and Chromebooks, plus Safari
 
 ## Contributing
 
-Work is tracked in [Issues](https://github.com/shasanw/openalg/issues). Issues labeled `ready-for-agent` are scoped and ready to pick up. Please sign off your commits (`git commit -s`, the [Developer Certificate of Origin](https://developercertificate.org/)).
+Work is tracked in [Issues](https://github.com/shasanw/openalg/issues). Issues labeled `ready-for-agent` are scoped and ready to pick up.
 
 ## License
 
