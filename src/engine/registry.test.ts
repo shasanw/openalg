@@ -28,6 +28,14 @@ describe("registry", () => {
     }
   });
 
+  it("files completing the square under Quadratics, after the formula", () => {
+    const ids = GENERATORS.map((g) => g.id);
+    expect(getGenerator("completing-the-square")?.chapter).toBe("Quadratics");
+    expect(ids.indexOf("completing-the-square")).toBeGreaterThan(
+      ids.indexOf("quadratic-formula"),
+    );
+  });
+
   it("every registered generator declares a chapter", () => {
     for (const g of GENERATORS) {
       expect(g.chapter).toBeTruthy();

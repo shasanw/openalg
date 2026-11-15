@@ -4,10 +4,12 @@
 import type { Generator } from "./types";
 import { generator as quadraticFactoring } from "./generators/quadraticFactoring";
 import { generator as quadraticFormula } from "./generators/quadraticFormula";
+import { generator as completingTheSquare } from "./generators/completingTheSquare";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
   quadraticFormula,
+  completingTheSquare,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
