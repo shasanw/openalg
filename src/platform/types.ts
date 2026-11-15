@@ -1,8 +1,8 @@
 // Platform adapter: the seam between the app and the outside world (ADR 0001).
-// The engine and UI talk ONLY to this interface and must never import
-// `@tauri-apps/*` or browser storage APIs directly. The web build provides
-// `webPlatform` (IndexedDB Library + downloaded Worksheet Files); the legacy
-// desktop `tauriPlatform` remains until the Tauri shell is removed (#25).
+// The engine and UI talk ONLY to this interface and must never use browser
+// storage or file APIs directly. `webPlatform` (IndexedDB Library + downloaded
+// Worksheet Files) is the only implementation today; the interface stays so a
+// desktop app or Library sync could be added later without reshaping the app.
 
 import type { Worksheet } from "../engine/worksheet";
 import type { TypstDocument } from "../engine/typst";

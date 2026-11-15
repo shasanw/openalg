@@ -1,7 +1,6 @@
-// Builds the Typst source for a worksheet. Layout lives HERE in TypeScript (not
-// in Rust) so it stays web-portable: the browser (Typst-WASM, ADR 0002) and the
-// legacy desktop shell (Rust Typst) compile the very same source. The live preview compiles this same
-// source to SVG, so the on-screen page is print-truth (issue #7).
+// Builds the Typst source for a worksheet. Layout lives HERE in TypeScript and
+// is compiled in the browser by Typst-WASM (ADR 0002). The live preview compiles
+// this same source to SVG, so the on-screen page is print-truth (issue #7).
 //
 // Math is emitted as `@@M<i>@@` placeholders plus an array of LaTeX snippets. The
 // platform's PDF/SVG compiler converts each snippet to Typst math (via mitex) and

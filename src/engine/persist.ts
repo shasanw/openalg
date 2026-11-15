@@ -1,5 +1,5 @@
 // Serialization for worksheet persistence (issue #3). The engine owns the
-// on-disk format so every platform adapter (Tauri today, a web build later)
+// on-disk format so every platform adapter (the web build today, any other later)
 // reads and writes byte-identical files through one tested path — the adapters
 // only move bytes, never parse them.
 //

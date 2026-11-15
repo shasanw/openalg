@@ -4,8 +4,6 @@ A worksheet and test generator for math teachers, focused on Algebra 2 and Preca
 
 No install, no account. Worksheets are saved automatically in your browser's Library, and you can download any worksheet as a portable `.oalg` file or back up the whole Library.
 
-> **Status:** mid-migration from a Tauri desktop app to a web-first app. See [ADR 0001](docs/adr/0001-web-first-client-only.md). Until the migration lands, the app still runs through the Tauri shell described under *Develop*.
-
 ## Features
 
 - Topic-driven problem generation, organised by unit, with per-topic options
@@ -34,7 +32,6 @@ No install, no account. Worksheets are saved automatically in your browser's Lib
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (LTS) and [pnpm](https://pnpm.io/)
-- *(Until the Tauri shell is removed)* [Rust](https://www.rust-lang.org/tools/install) (stable) and Tauri's [system dependencies](https://tauri.app/start/prerequisites/)
 
 ### Install
 
@@ -47,8 +44,7 @@ pnpm install
 ### Develop
 
 ```bash
-pnpm tauri dev         # current: desktop shell
-pnpm dev               # the web app (http://localhost:1420)
+pnpm dev               # http://localhost:1420
 ```
 
 ## Testing

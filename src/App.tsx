@@ -93,11 +93,9 @@ async function printWorksheet(ws: Worksheet): Promise<void> {
     .map((svg) => `<div class="page">${svg}</div>`)
     .join("")}</body></html>`;
 
-  // The iframe must cover the whole window: WebView2 anchors/sizes its print
-  // preview to the printing document's viewport, so a 0x0 or corner-pinned
-  // iframe makes the preview overflow past the app's top edge. A full-window
-  // overlay gives the preview the full viewport. It's briefly visible before
-  // the preview covers it, then removed once printing finishes.
+  // A full-window overlay iframe gives the print preview the full viewport.
+  // It's briefly visible before the dialog covers it, then removed once
+  // printing finishes.
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.cssText =
