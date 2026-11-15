@@ -1,7 +1,8 @@
 // The center pane: the exact Preview on a neutral desk, under a toolbar that
 // switches between the Student copy and the Answer Key and sets the zoom. The
 // pages are the ACTUAL Typst pages compiled to SVG (one per sheet), identical
-// to the exported PDF and to what prints (#7).
+// to the exported PDF and to what prints (#7). On a first visit, until the
+// Typst compiler has downloaded, a KaTeX draft (DraftPages) stands in (#29).
 
 import { memo, useEffect, useRef, useState } from "react";
 import { FilePlus2, Minus, Plus } from "lucide-react";
@@ -15,6 +16,7 @@ import { Kbd } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { ANSWER_KEY_LABELS } from "@/components/shell/answerKey";
 import { MOD_KEY } from "@/components/shell/SectionOutline";
+import { DraftPages } from "@/components/shell/DraftPages";
 
 /** Which copy the Preview shows. */
 export type PreviewView = "student" | "key";
@@ -160,32 +162,71 @@ function EmptyWorksheet({ onAddSection }: { onAddSection: () => void }) {
   );
 }
 
+/** The Preview compiler's status right now (the handler is called at once). */
+function currentRendererStatus(): RendererStatus {
+  let status: RendererStatus = { state: "ready" };
+  platform.onRendererStatus((s) => (status = s))();
+  return status;
+}
+
 /** The Preview compiler's loading status, live. */
 function useRendererStatus(): RendererStatus {
-  const [status, setStatus] = useState<RendererStatus>({ state: "ready" });
+  const [status, setStatus] = useState<RendererStatus>(currentRendererStatus);
   useEffect(() => platform.onRendererStatus(setStatus), []);
   return status;
+}
+
+/** What the Preview area shows. */
+export type PreviewStage = "error" | "exact" | "draft" | "rendering";
+
+/**
+ * The exact pages once there are any. Before that, the draft while the Typst
+ * compiler is still downloading, and kept from then until the first exact
+ * pages arrive, so the swap never passes through a blank frame. When the
+ * compiler is already loaded (a return visit, a later Worksheet) the draft
+ * never appears: the exact pages are only a compile away.
+ */
+export function previewStage({
+  hasPages,
+  hasError,
+  renderer,
+  draftStarted,
+}: {
+  hasPages: boolean;
+  hasError: boolean;
+  renderer: RendererStatus["state"];
+  /** Whether this Preview has already shown the draft. */
+  draftStarted: boolean;
+}): PreviewStage {
+  if (hasError) return "error";
+  if (hasPages) return "exact";
+  if (renderer === "loading" || draftStarted) return "draft";
+  return "rendering";
 }
 
 const MB = 1024 * 1024;
 
 /**
- * Shown on a first visit while the Typst compiler (WASM + fonts) downloads.
- * The download starts when the app opens, so this is often already done.
+ * Floats over the draft on a first visit while the Typst compiler (WASM +
+ * fonts) downloads. The download starts when the app opens, so it is often
+ * already under way or done.
  */
-function LoadingCompiler({ loaded, total }: { loaded: number; total: number }) {
-  const fraction = total > 0 ? Math.min(1, loaded / total) : 0;
+function DraftBanner({ status }: { status: RendererStatus }) {
+  const loading = status.state === "loading";
+  const loaded = loading ? status.loaded : 0;
+  const total = loading ? status.total : 0;
+  const fraction = !loading ? 1 : total > 0 ? Math.min(1, loaded / total) : 0;
   return (
     <div
       role="status"
       aria-live="polite"
-      className="text-muted-foreground flex h-full flex-col items-center justify-center gap-3 px-8 text-center"
+      className="bg-panel/95 text-muted-foreground flex h-9 items-center gap-3 rounded-full border px-4 text-[12px] shadow-sm backdrop-blur"
     >
-      <span className="text-foreground">Getting the Preview ready…</span>
+      <span className="text-foreground font-medium">Draft. Preparing the exact preview…</span>
       <div
-        className="bg-border h-1.5 w-56 overflow-hidden rounded-full"
+        className="bg-border h-1.5 w-28 overflow-hidden rounded-full"
         role="progressbar"
-        aria-label="Downloading the Preview"
+        aria-label="Downloading the exact preview"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(fraction * 100)}
@@ -195,10 +236,10 @@ function LoadingCompiler({ loaded, total }: { loaded: number; total: number }) {
           style={{ width: `${Math.max(4, fraction * 100)}%` }}
         />
       </div>
-      <span className="text-xs">
-        {total > 0
-          ? `${(loaded / MB).toFixed(1)} of ${(total / MB).toFixed(1)} MB. Only the first visit downloads this.`
-          : "Only the first visit downloads this."}
+      <span className="tabular-nums">
+        {loading && total > 0
+          ? `${(loaded / MB).toFixed(1)} of ${(total / MB).toFixed(1)} MB, first visit only`
+          : "Almost ready"}
       </span>
     </div>
   );
@@ -233,6 +274,17 @@ export function Pages({
   const scrolledFor = useRef(showAnswers);
   const [attempt, setAttempt] = useState(0);
   const status = useRendererStatus();
+  // Once the draft is on screen it stays until the exact pages replace it.
+  const [draftStarted, setDraftStarted] = useState(false);
+  const stage = previewStage({
+    hasPages: pages !== null,
+    hasError: error !== null,
+    renderer: status.state,
+    draftStarted,
+  });
+  useEffect(() => {
+    if (stage === "draft" && !draftStarted) setDraftStarted(true);
+  }, [stage, draftStarted]);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,7 +329,7 @@ export function Pages({
     page?.scrollIntoView?.({ block: "start", behavior: "smooth" });
   }, [pages, shownAnswers, showAnswers]);
 
-  if (error) {
+  if (stage === "error") {
     return (
       <div className="text-destructive mx-auto flex max-w-[760px] flex-col items-start gap-3 p-8 whitespace-pre-wrap">
         <span>
@@ -299,10 +351,20 @@ export function Pages({
     );
   }
 
+  if (stage === "draft") {
+    return (
+      <DraftPages
+        worksheet={worksheet}
+        showAnswers={showAnswers}
+        version={version}
+        width={PAGE_WIDTH * zoom}
+        fit={zoom <= 1}
+        banner={<DraftBanner status={status} />}
+      />
+    );
+  }
+
   if (!pages) {
-    if (status.state === "loading") {
-      return <LoadingCompiler loaded={status.loaded} total={status.total} />;
-    }
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center">
         Rendering the Preview…
