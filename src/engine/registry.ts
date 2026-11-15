@@ -7,12 +7,14 @@ import { generator as quadraticFormula } from "./generators/quadraticFormula";
 import { generator as completingTheSquare } from "./generators/completingTheSquare";
 import { generator as parabolaProperties } from "./generators/parabolaProperties";
 import { generator as quadraticInequalities } from "./generators/quadraticInequalities";
+import { generator as graphingQuadratics } from "./generators/graphingQuadratics";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
   quadraticFormula,
   completingTheSquare,
   parabolaProperties,
+  graphingQuadratics,
   quadraticInequalities,
 ];
 
