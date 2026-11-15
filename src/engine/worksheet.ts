@@ -83,6 +83,52 @@ export function isAnswerKeyFormat(v: unknown): v is AnswerKeyFormat {
   return (ANSWER_KEY_FORMATS as readonly unknown[]).includes(v);
 }
 
+/**
+ * How a Worksheet's Versions differ from one another (its Scramble Mode):
+ * - "scramble-choices": same Problems in the same order; only the order of
+ *   each multiple-choice Problem's choices changes (so in free response every
+ *   Version prints identically);
+ * - "scramble-order": same Problems, shuffled within each Section (Sections
+ *   and their Directions stay put);
+ * - "new-questions": each Section regenerated from its Recipe with a new seed.
+ */
+export type ScrambleMode = "scramble-choices" | "scramble-order" | "new-questions";
+
+export const SCRAMBLE_MODES: readonly ScrambleMode[] = [
+  "scramble-choices",
+  "scramble-order",
+  "new-questions",
+];
+
+export const MIN_VERSIONS = 1;
+export const MAX_VERSIONS = 10;
+
+/**
+ * How many Versions the Worksheet prints and how they differ. Versions are
+ * always derived from the Worksheet (see ./versions), never stored as content:
+ * this setting is all that is saved.
+ */
+export interface VersionSettings {
+  /** 1 to 10. One Version is the Worksheet itself, unlabelled. */
+  count: number;
+  mode: ScrambleMode;
+}
+
+export const DEFAULT_VERSION_SETTINGS: VersionSettings = {
+  count: 1,
+  mode: "scramble-order",
+};
+
+export function isScrambleMode(v: unknown): v is ScrambleMode {
+  return (SCRAMBLE_MODES as readonly unknown[]).includes(v);
+}
+
+/** Clamp a requested Version count into the supported 1 to 10 range. */
+export function clampVersionCount(n: number): number {
+  if (!Number.isFinite(n)) return MIN_VERSIONS;
+  return Math.min(MAX_VERSIONS, Math.max(MIN_VERSIONS, Math.round(n)));
+}
+
 /** True when the Worksheet prints lettered choices under each Problem. */
 export function isMultipleChoice(ws: Worksheet): boolean {
   return ws.responseFormat.mode === "multiple-choice";
@@ -119,6 +165,11 @@ export interface Worksheet {
    * normalizeWorksheet (defaults to "full", the only key older files printed).
    */
   answerKeyFormat: AnswerKeyFormat;
+  /**
+   * Version count and Scramble Mode. Optional in files saved before #11; see
+   * normalizeWorksheet (defaults to one Version).
+   */
+  versions: VersionSettings;
 }
 
 export interface SectionOptions {
@@ -134,6 +185,7 @@ export interface BuildOptions extends SectionOptions {
   print?: PrintConfig;
   responseFormat?: ResponseFormat;
   answerKeyFormat?: AnswerKeyFormat;
+  versions?: VersionSettings;
 }
 
 /** Build one Section from its Recipe. */
@@ -187,6 +239,7 @@ export function buildWorksheet(opts: BuildOptions): Worksheet {
     print: opts.print ?? { ...DEFAULT_PRINT_CONFIG },
     responseFormat: opts.responseFormat ?? { ...DEFAULT_RESPONSE_FORMAT },
     answerKeyFormat: opts.answerKeyFormat ?? DEFAULT_ANSWER_KEY_FORMAT,
+    versions: opts.versions ?? { ...DEFAULT_VERSION_SETTINGS },
   };
 }
 
@@ -264,9 +317,10 @@ export function setSectionDirections(
 /**
  * Backfill defaults onto a worksheet loaded from disk. Files saved before
  * issue #7 have no `print` block, files saved before #5 have no
- * `responseFormat`, and files saved before #6 have no `answerKeyFormat`; give
- * them the defaults (free response, full key) so the rest of the app can assume
- * all three are always present.
+ * `responseFormat`, files saved before #6 have no `answerKeyFormat`, and files
+ * saved before #11 have no `versions`; give them the defaults (free response,
+ * full key, one Version) so the rest of the app can assume all four are always
+ * present.
  */
 export function normalizeWorksheet(ws: Worksheet): Worksheet {
   const response = { ...DEFAULT_RESPONSE_FORMAT, ...ws.responseFormat };
@@ -277,7 +331,20 @@ export function normalizeWorksheet(ws: Worksheet): Worksheet {
     answerKeyFormat: isAnswerKeyFormat(ws.answerKeyFormat)
       ? ws.answerKeyFormat
       : DEFAULT_ANSWER_KEY_FORMAT,
+    versions: normalizeVersionSettings(ws.versions),
   };
+}
+
+function normalizeVersionSettings(v: Partial<VersionSettings> | undefined): VersionSettings {
+  return {
+    count: clampVersionCount(v?.count ?? DEFAULT_VERSION_SETTINGS.count),
+    mode: isScrambleMode(v?.mode) ? v.mode : DEFAULT_VERSION_SETTINGS.mode,
+  };
+}
+
+/** Set the Version count (clamped to 1 to 10) and Scramble Mode. */
+export function setVersionSettings(ws: Worksheet, versions: VersionSettings): Worksheet {
+  return { ...ws, versions: normalizeVersionSettings(versions) };
 }
 
 /** Set the whole-sheet Response Format, clamping the choice count to 2 to 5. */

@@ -8,8 +8,14 @@
 // letting Typst own page layout, columns, and pagination.
 
 import { ANSWER_PART_SEPARATOR } from "./format";
-import { assemble, choiceLetter, choiceSeed } from "./mc";
+import { choiceLetter } from "./mc";
 import type { Problem } from "./types";
+import {
+  deriveVersion,
+  deriveVersions,
+  versionChoices,
+  type WorksheetVersion,
+} from "./versions";
 import {
   allProblems,
   isMultipleChoice,
@@ -35,6 +41,14 @@ export interface TypstOptions {
    * choice.
    */
   keyFormat?: KeyFormat;
+  /**
+   * Which Version(s) to emit. A Version index (0 is Version A, the default)
+   * gives that one Version's student pages followed by its own Answer Key: the
+   * Preview shows one Version at a time. "all" gives every Version's student
+   * pages, then every Version's Answer Key, in order: what Print and Export PDF
+   * emit. With a single Version the two are identical.
+   */
+  version?: number | "all";
 }
 
 /** Ink for Answers printed on the in-context key, so they stand out from the copy. */
@@ -102,13 +116,39 @@ export function buildTypstDocument(
     return `@@M${i}@@`;
   };
 
+  const versions =
+    opts.version === "all" ? deriveVersions(ws) : [deriveVersion(ws, opts.version ?? 0)];
+  // With several Versions, every Version and every key restarts its page
+  // numbers, so each stack of pages reads "1, 2, ..." on its own.
+  const multi = versions.some((v) => v.label !== null);
+  const students = versions
+    .map(
+      (v, i) =>
+        (i > 0 ? "\n#pagebreak()\n#counter(page).update(1)\n" : "") +
+        worksheetMarkup(v.worksheet, placeholder, {
+          answers: false,
+          label: v.label,
+          choiceVariant: v.choiceVariant,
+        }),
+    )
+    .join("");
+  const keys = versions
+    .map((v) =>
+      answerKeyMarkup(v.worksheet, keyFormat, placeholder, {
+        label: v.label,
+        choiceVariant: v.choiceVariant,
+        restartPageNumbers: multi,
+      }),
+    )
+    .join("");
+
   const source = `#set page(paper: "${paper}", flipped: ${flipped}, margin: ${margin}, numbering: ${numbering})
 #set text(font: "${TEXT_FONT}", size: ${fontSize})
 
 #let blank(w) = box(width: w, stroke: (bottom: 0.6pt + luma(110)), outset: (bottom: 3pt))[]
 #let keycolor = ${KEY_COLOR}
 
-${worksheetMarkup(ws, placeholder, { answers: false })}${answerKeyMarkup(ws, keyFormat, placeholder)}`;
+${students}${keys}`;
 
   return { source, math };
 }
@@ -155,7 +195,11 @@ export function answerMath(latex: string, placeholder: Placeholder): string {
 function worksheetMarkup(
   ws: Worksheet,
   placeholder: Placeholder,
-  { answers }: { answers: boolean },
+  {
+    answers,
+    label = null,
+    choiceVariant = 0,
+  }: { answers: boolean } & VersionMarkupOptions,
 ): string {
   const print = ws.print;
   const spacing = SPACING_EM[print.spacing];
@@ -170,7 +214,7 @@ function worksheetMarkup(
       const cells = section.problems
         .map((p) => {
           const body = mc
-            ? mcProblemBody(p, choices, placeholder, { showAnswer: answers })
+            ? mcProblemBody(p, choices, placeholder, { showAnswer: answers, choiceVariant })
             : answers
               ? frInContextBody(p, placeholder)
               : placeholder(p.prompt);
@@ -196,13 +240,19 @@ ${cells}
   // an optional Name / Date / Period blank filling the rest of the line. When
   // the blanks are off, the title spans the full width on its own. The
   // in-context key always labels itself so it can't be handed out by mistake.
-  const title = `#text(size: 16pt, weight: "bold")[${escapeTypstText(ws.title)}]`;
+  // With several Versions, the Version's label sits under the title on both
+  // the student copy and its in-context key.
+  const titleText = `#text(size: 16pt, weight: "bold")[${escapeTypstText(ws.title)}]`;
+  const title = label
+    ? `${titleText} \\
+#text(size: 12pt, weight: "bold")[${escapeTypstText(label)}]`
+    : titleText;
   const header = answers
     ? `#grid(
   columns: (1fr, auto),
   column-gutter: 1.5em,
   align(horizon)[${title}],
-  align(horizon)[#text(size: 14pt, weight: "bold", fill: keycolor)[Answer Key]],
+  align(horizon)[#text(size: 14pt, weight: "bold", fill: keycolor)[${keyTitle(label)}]],
 )`
     : print.showNameDatePeriod
       ? `#grid(
@@ -227,14 +277,40 @@ ${sectionBlocks}`;
 }
 
 /**
+ * What distinguishes one Version's markup from another's, beyond its own
+ * derived Worksheet: its printed label and its multiple-choice order.
+ * Defaults (no label, variant 0) print the Worksheet itself.
+ */
+export interface VersionMarkupOptions {
+  /** "Version B", printed in the header and on the key; null for none. */
+  label?: WorksheetVersion["label"];
+  /** Passed to choiceSeed; see WorksheetVersion.choiceVariant. */
+  choiceVariant?: number;
+}
+
+/** The Answer Key's title, naming its Version when there is one. */
+function keyTitle(label: string | null): string {
+  return label ? `${escapeTypstText(label)} Answer Key` : "Answer Key";
+}
+
+/**
  * The Answer Key pages for a Worksheet in the given format, or "" for none.
- * A pure function of (worksheet, format) so each Version (#11) can render its
- * own key from its own derived Worksheet.
+ * A pure function of (worksheet, format, Version options) so each Version
+ * (#11) renders its own key from its own derived Worksheet, labelled and with
+ * the same choice letters as that Version's student pages.
  */
 export function answerKeyMarkup(
   ws: Worksheet,
   format: AnswerKeyFormat,
   placeholder: Placeholder,
+  {
+    label = null,
+    choiceVariant = 0,
+    restartPageNumbers = false,
+  }: VersionMarkupOptions & {
+    /** Number the key's pages from 1 (always so for the in-context key). */
+    restartPageNumbers?: boolean;
+  } = {},
 ): string {
   if (format === "none") return "";
   if (format === "in-context") {
@@ -242,7 +318,7 @@ export function answerKeyMarkup(
     return `
 #pagebreak()
 #counter(page).update(1)
-${worksheetMarkup(ws, placeholder, { answers: true })}`;
+${worksheetMarkup(ws, placeholder, { answers: true, label, choiceVariant })}`;
   }
 
   // One continuous list numbered to match the Problems; odds keeps only the
@@ -255,17 +331,20 @@ ${worksheetMarkup(ws, placeholder, { answers: true })}`;
     .map(({ p, n }) =>
       numberedCell(
         n,
-        mc ? mcAnswerBody(p, choices, placeholder) : answerMath(p.answer, placeholder),
+        mc
+          ? mcAnswerBody(p, choices, placeholder, choiceVariant)
+          : answerMath(p.answer, placeholder),
       ),
     )
     .join("\n");
   const heading =
     format === "odds"
-      ? `Answer Key #text(size: 11pt, weight: "regular")[(odd-numbered problems)]`
-      : "Answer Key";
+      ? `${keyTitle(label)} #text(size: 11pt, weight: "regular")[(odd-numbered problems)]`
+      : keyTitle(label);
+  const restart = restartPageNumbers ? "#counter(page).update(1)\n" : "";
   return `
 #pagebreak()
-#align(center)[#text(size: 14pt, weight: "bold")[${heading}]]
+${restart}#align(center)[#text(size: 14pt, weight: "bold")[${heading}]]
 
 #v(0.8em)
 
@@ -290,8 +369,9 @@ function frInContextBody(problem: Problem, placeholder: Placeholder): string {
 // --- Multiple-choice layout (issue #5) --------------------------------------
 //
 // Kept apart from buildTypstDocument so the free-response layout above stays
-// untouched. Both functions run the MC assembler with the Problem's default
-// choice seed, so the sheet and its Answer Key always agree on the letters.
+// untouched. Both functions read choices through versionChoices with the same
+// Version's choice variant, so the sheet and its Answer Key always agree on the
+// letters.
 
 /** Registers a LaTeX snippet and returns its `@@M<i>@@` placeholder. */
 export type Placeholder = (latex: string) => string;
@@ -309,13 +389,13 @@ export function mcProblemBody(
   problem: Problem,
   choices: number,
   placeholder: Placeholder,
-  { showAnswer = false }: { showAnswer?: boolean } = {},
+  {
+    showAnswer = false,
+    choiceVariant = 0,
+  }: { showAnswer?: boolean; choiceVariant?: number } = {},
 ): string {
   const prompt = placeholder(problem.prompt);
-  const { choices: rendered, correctIndex } = assemble(problem, {
-    choices,
-    seed: choiceSeed(problem),
-  });
+  const { choices: rendered, correctIndex } = versionChoices(problem, choices, choiceVariant);
   const lines = rendered
     .map((latex, i) => {
       if (showAnswer && i === correctIndex) {
@@ -344,10 +424,8 @@ export function mcAnswerBody(
   problem: Problem,
   choices: number,
   placeholder: Placeholder,
+  choiceVariant = 0,
 ): string {
-  const { correctIndex } = assemble(problem, {
-    choices,
-    seed: choiceSeed(problem),
-  });
+  const { correctIndex } = versionChoices(problem, choices, choiceVariant);
   return `#strong[(${choiceLetter(correctIndex)})] ${answerMath(problem.answer, placeholder)}`;
 }

@@ -16,12 +16,16 @@
 //   Problems. The only version we write. Later additions are optional fields
 //   backfilled by normalizeWorksheet, so they need no version bump:
 //   `responseFormat` (#5, free response vs multiple choice) and
-//   `answerKeyFormat` (#6, full / odds / in-context / none; absent means full).
+//   `answerKeyFormat` (#6, full / odds / in-context / none; absent means full)
+//   and `versions` (#11, Version count and Scramble Mode; absent means one
+//   Version). Versions themselves are never saved: they are derived on load.
 
 import {
   ANSWER_KEY_FORMATS,
   isAnswerKeyFormat,
+  isScrambleMode,
   normalizeWorksheet,
+  SCRAMBLE_MODES,
   type Section,
   type Worksheet,
 } from "./worksheet";
@@ -97,6 +101,8 @@ function validateWorksheet(data: unknown): Worksheet {
     );
   }
 
+  if (data.versions !== undefined) validateVersions(data.versions);
+
   // Cast is sound now that every consumed field is checked; print is backfilled
   // downstream by normalizeWorksheet.
   return data as unknown as Worksheet;
@@ -136,6 +142,19 @@ function validateResponseFormat(r: unknown): void {
     fail("responseFormat has an invalid mode");
   }
   if (typeof r.choices !== "number") fail("responseFormat missing choices");
+}
+
+/**
+ * `versions` (#11) is optional: files saved before it load as one Version via
+ * normalizeWorksheet. When present it must be well formed; an out-of-range
+ * count is clamped rather than rejected.
+ */
+function validateVersions(v: unknown): void {
+  if (!isObject(v)) fail("versions is not an object");
+  if (typeof v.count !== "number") fail("versions missing count");
+  if (!isScrambleMode(v.mode)) {
+    fail(`versions mode must be one of ${SCRAMBLE_MODES.join(", ")}`);
+  }
 }
 
 function validateSection(

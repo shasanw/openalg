@@ -9,9 +9,13 @@ import {
   ANSWER_KEY_FORMATS,
   DEFAULT_PRINT_CONFIG,
   setResponseFormat,
+  setVersionSettings,
+  type AnswerKeyFormat,
   type PrintConfig,
+  type ScrambleMode,
   type Worksheet,
 } from "./worksheet";
+import { deriveVersion, deriveVersions, versionChoices } from "./versions";
 import {
   assemble,
   choiceLetter,
@@ -454,6 +458,178 @@ describe("multi-part Answers wrap between their parts", () => {
       if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
       const { math } = buildTypstDocument(sheet);
       expect(math.some((m) => m.includes(ANSWER_PART_SEPARATOR))).toBe(false);
+    }
+  });
+});
+
+describe("buildTypstDocument Versions", () => {
+  function quiz(): Worksheet {
+    const first = buildWorksheet({
+      generatorId: QUADRATIC_FACTORING_ID,
+      baseSeed: 21,
+      count: 5,
+      title: "Quiz",
+    });
+    const second = buildSection({
+      generatorId: QUADRATIC_FORMULA_ID,
+      baseSeed: 22,
+      count: 4,
+      directions: "Solve using the quadratic formula.",
+    });
+    return { ...first, sections: [...first.sections, second] };
+  }
+  const sheet = (
+    mode: ScrambleMode,
+    count = 3,
+    opts: { mc?: number; key?: AnswerKeyFormat } = {},
+  ) => {
+    let w = setVersionSettings(quiz(), { count, mode });
+    if (opts.mc) w = setResponseFormat(w, { mode: "multiple-choice", choices: opts.mc });
+    if (opts.key) w = { ...w, answerKeyFormat: opts.key };
+    return w;
+  };
+  /** The source with every math placeholder replaced by its LaTeX. */
+  const resolved = ({ source, math }: { source: string; math: string[] }) =>
+    source.replace(/@@M(\d+)@@/g, (_, i) => `<<${math[Number(i)]}>>`);
+  const MODES: ScrambleMode[] = ["scramble-choices", "scramble-order", "new-questions"];
+
+  it("a single Version prints exactly as before: unlabelled, all equals A", () => {
+    for (const key of ANSWER_KEY_FORMATS) {
+      const w = { ...quiz(), answerKeyFormat: key };
+      const doc = buildTypstDocument(w, { version: "all" });
+      expect(doc).toEqual(buildTypstDocument(w));
+      expect(doc).toEqual(buildTypstDocument(w, { version: 0 }));
+      expect(doc.source).not.toContain("Version");
+    }
+  });
+
+  it("Version A of a multi-Version Worksheet is the base sheet, labelled", () => {
+    for (const mode of MODES) {
+      const multi = sheet(mode, 3, { mc: 4 });
+      const a = buildTypstDocument(multi, { version: 0 });
+      const plain = buildTypstDocument({ ...multi, versions: { count: 1, mode } });
+      expect(a.math).toEqual(plain.math);
+      expect(a.source).toContain("Version A");
+      // Only the labels and the key's restarted page numbers differ.
+      const unlabelled = a.source
+        .replace(` \\\n#text(size: 12pt, weight: "bold")[Version A]`, "")
+        .replace("Version A Answer Key", "Answer Key")
+        .replace("#pagebreak()\n#counter(page).update(1)\n#align", "#pagebreak()\n#align");
+      expect(unlabelled).toEqual(plain.source);
+    }
+  });
+
+  it("the Preview option shows one Version, defaulting to A", () => {
+    const w = sheet("scramble-order", 3);
+    expect(buildTypstDocument(w)).toEqual(buildTypstDocument(w, { version: 0 }));
+    const b = buildTypstDocument(w, { version: 1 }).source;
+    expect(b).toContain("Version B");
+    expect(b).not.toContain("Version A");
+    expect(b).not.toContain("Version C");
+  });
+
+  it("all: every Version's student pages, then every Version's key, in order", () => {
+    const doc = buildTypstDocument(sheet("scramble-order", 3, { key: "full" }), { version: "all" });
+    const at = (s: string) => doc.source.indexOf(s);
+    const order = [
+      'weight: "bold")[Version A]',
+      'weight: "bold")[Version B]',
+      'weight: "bold")[Version C]',
+      "[Version A Answer Key]",
+      "[Version B Answer Key]",
+      "[Version C Answer Key]",
+    ].map(at);
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual(order.slice().sort((a, b) => a - b));
+    // Five fresh starts after the first Version, each restarting page numbers.
+    expect(doc.source.match(/#pagebreak\(\)\n#counter\(page\)\.update\(1\)/g)).toHaveLength(5);
+  });
+
+  it("none prints only the student pages of every Version", () => {
+    const doc = buildTypstDocument(sheet("new-questions", 3, { key: "none" }), { version: "all" });
+    expect(doc.source).not.toContain("Answer Key");
+    expect(doc.source.match(/#pagebreak\(\)/g)).toHaveLength(2);
+  });
+
+  it("every Version's full key matches that Version's Problems and letters", () => {
+    for (const mode of MODES) {
+      for (const choices of [0, 3, 5]) {
+        const w = sheet(mode, 4, { mc: choices || undefined, key: "full" });
+        for (const v of deriveVersions(w)) {
+          const doc = buildTypstDocument(w, { version: v.index });
+          const src = resolved(doc);
+          const key = src.slice(src.indexOf("Answer Key]"));
+          const problems = allProblems(v.worksheet);
+          if (choices) {
+            const entries = [...key.matchAll(/\[(\d+)\\\)\] #strong\[\(([A-E])\)\] <<(.*?)>>/g)];
+            expect(entries).toHaveLength(problems.length);
+            problems.forEach((p, i) => {
+              const { correctIndex } = versionChoices(p, choices, v.choiceVariant);
+              expect(entries[i][1]).toBe(String(i + 1));
+              expect(entries[i][2]).toBe(choiceLetter(correctIndex));
+              expect(entries[i][3]).toBe(p.answer);
+            });
+            // The student page prints that same Version's choices in that order.
+            const student = src.slice(0, src.indexOf("Answer Key]"));
+            problems.forEach((p) => {
+              const { choices: rendered } = versionChoices(p, choices, v.choiceVariant);
+              const at = student.indexOf(`<<${p.prompt}>>`);
+              const block = student.slice(at);
+              const printed = [...block.matchAll(/\[\(([A-E])\)\] <<(.*?)>>/g)]
+                .slice(0, choices)
+                .map((m) => m[2]);
+              expect(printed).toEqual(rendered);
+            });
+          } else {
+            const answers = [...key.matchAll(/\[(\d+)\\\)\] <<(.*?)>>/g)].map((m) => m[2]);
+            expect(answers).toEqual(problems.map((p) => p.answer));
+          }
+        }
+      }
+    }
+  });
+
+  it("every Version's in-context key circles that Version's own letters", () => {
+    for (const mode of MODES) {
+      const w = sheet(mode, 3, { mc: 4, key: "in-context" });
+      const doc = resolved(buildTypstDocument(w, { version: "all" }));
+      for (const v of deriveVersions(w)) {
+        const start = doc.indexOf(`[${v.label} Answer Key]`);
+        const next = doc.indexOf("Answer Key]", start + 20);
+        const key = doc.slice(start, next < 0 ? undefined : next);
+        const circled = [...key.matchAll(/#strong\[([A-E])\]\]\]\] #text\(fill: keycolor\)\[<<(.*?)>>\]/g)];
+        const problems = allProblems(v.worksheet);
+        expect(circled).toHaveLength(problems.length);
+        problems.forEach((p, i) => {
+          const { correctIndex } = versionChoices(p, 4, v.choiceVariant);
+          expect(circled[i][1]).toBe(choiceLetter(correctIndex));
+          expect(circled[i][2]).toBe(p.answer);
+        });
+      }
+    }
+  });
+
+  it("scramble-choices moves letters between Versions; scramble-order does not", () => {
+    const letters = (w: Worksheet, i: number) =>
+      [...buildTypstDocument(w, { version: i, keyFormat: "full" }).source.matchAll(/#strong\[\(([A-E])\)\]/g)].map((m) => m[1]);
+    const choicesSheet = sheet("scramble-choices", 2, { mc: 5 });
+    expect(letters(choicesSheet, 1)).not.toEqual(letters(choicesSheet, 0));
+    const orderSheet = sheet("scramble-order", 2, { mc: 5 });
+    const b = deriveVersion(orderSheet, 1).worksheet;
+    // Same letters per Problem, just listed in Version B's order.
+    const byPrompt = new Map(
+      allProblems(orderSheet).map((p, i) => [p.prompt, letters(orderSheet, 0)[i]]),
+    );
+    expect(letters(orderSheet, 1)).toEqual(allProblems(b).map((p) => byPrompt.get(p.prompt)));
+  });
+
+  it("keeps placeholders and math in step across every Version", () => {
+    for (const mode of MODES) {
+      for (const keyFormat of ANSWER_KEY_FORMATS) {
+        const doc = buildTypstDocument(sheet(mode, 3, { mc: 3 }), { version: "all", keyFormat });
+        const found = [...doc.source.matchAll(/@@M(\d+)@@/g)].map((m) => Number(m[1]));
+        expect(found.sort((a, b) => a - b)).toEqual(doc.math.map((_, i) => i));
+      }
     }
   });
 });

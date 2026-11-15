@@ -8,6 +8,10 @@ import {
   DEFAULT_PRINT_CONFIG,
   DEFAULT_RESPONSE_FORMAT,
   ANSWER_KEY_FORMATS,
+  DEFAULT_VERSION_SETTINGS,
+  SCRAMBLE_MODES,
+  setResponseFormat,
+  setVersionSettings,
   type Worksheet,
 } from "./worksheet";
 import { buildTypstDocument } from "./typst";
@@ -300,5 +304,65 @@ describe("Answer Key format", () => {
   it("rejects an unknown format", () => {
     const bad = { ...sampleWorksheet(), answerKeyFormat: "evens" };
     expect(() => deserializeWorksheet(JSON.stringify(bad))).toThrow(/answerKeyFormat/);
+  });
+});
+
+describe("Versions setting", () => {
+  it("round-trips the Version count and Scramble Mode byte-identically", () => {
+    for (const mode of SCRAMBLE_MODES) {
+      const ws = setVersionSettings(sampleWorksheet(), { count: 4, mode });
+      const json = serializeWorksheet(ws);
+      expect(serializeWorksheet(deserializeWorksheet(json))).toBe(json);
+      expect(deserializeWorksheet(json).versions).toEqual({ count: 4, mode });
+    }
+  });
+
+  it("saves only the setting, never the derived Versions", () => {
+    const ws = setVersionSettings(sampleWorksheet(), { count: 3, mode: "new-questions" });
+    const saved = JSON.parse(serializeWorksheet(ws));
+    expect(saved.versions).toEqual({ count: 3, mode: "new-questions" });
+    expect(saved.sections).toHaveLength(1);
+    expect(saved.sections[0].problems).toEqual(ws.sections[0].problems);
+  });
+
+  it("a reopened multi-Version Worksheet prints every Version identically", () => {
+    const ws = setVersionSettings(
+      setResponseFormat(sampleWorksheet(), { mode: "multiple-choice", choices: 4 }),
+      { count: 3, mode: "scramble-choices" },
+    );
+    const loaded = deserializeWorksheet(serializeWorksheet(ws));
+    expect(buildTypstDocument(loaded, { version: "all" })).toEqual(
+      buildTypstDocument(ws, { version: "all" }),
+    );
+  });
+
+  it("loads a file saved before #11 as one Version that prints as before", () => {
+    const { versions: _drop, ...legacy } = sampleWorksheet();
+    const loaded = deserializeWorksheet(JSON.stringify(legacy));
+    expect(loaded.versions).toEqual(DEFAULT_VERSION_SETTINGS);
+    expect(loaded.versions.count).toBe(1);
+    expect(buildTypstDocument(loaded, { version: "all" })).toEqual(
+      buildTypstDocument(sampleWorksheet()),
+    );
+  });
+
+  it("v1 files load as one Version", () => {
+    expect(deserializeWorksheet(asV1File(sampleWorksheet())).versions).toEqual(
+      DEFAULT_VERSION_SETTINGS,
+    );
+  });
+
+  it("clamps an out-of-range Version count", () => {
+    const hi = { ...sampleWorksheet(), versions: { count: 99, mode: "scramble-order" } };
+    expect(deserializeWorksheet(JSON.stringify(hi)).versions.count).toBe(10);
+    const lo = { ...sampleWorksheet(), versions: { count: 0, mode: "scramble-order" } };
+    expect(deserializeWorksheet(JSON.stringify(lo)).versions.count).toBe(1);
+  });
+
+  it("rejects a malformed versions setting", () => {
+    for (const versions of [7, { count: 2 }, { count: "2", mode: "scramble-order" }, { count: 2, mode: "shuffle" }]) {
+      const bad = { ...sampleWorksheet(), versions };
+      expect(() => deserializeWorksheet(JSON.stringify(bad))).toThrow(/versions/);
+    }
   });
 });

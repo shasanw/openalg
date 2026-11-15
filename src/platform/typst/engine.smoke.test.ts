@@ -12,11 +12,15 @@ import { buildTypstDocument } from "../../engine/typst";
 import {
   ANSWER_KEY_FORMATS,
   buildWorksheet,
+  buildSection,
   setResponseFormat,
+  setVersionSettings,
+  type ScrambleMode,
 } from "../../engine/worksheet";
 import { GENERATORS } from "../../engine/registry";
 import type { ParamValues } from "../../engine/types";
 import { QUADRATIC_FORMULA_ID } from "../../engine/generators/quadraticFormula";
+import { QUADRATIC_FACTORING_ID } from "../../engine/generators/quadraticFactoring";
 
 const require = createRequire(import.meta.url);
 const asset = (name: string) =>
@@ -157,6 +161,43 @@ describe("every Topic compiles", () => {
           expect(pages.odds).toBeGreaterThan(pages.none);
           expect(pages.odds).toBeLessThanOrEqual(pages.full);
           expect(pages["in-context"]).toBeGreaterThanOrEqual(2 * pages.none);
+        }
+      }
+    }, 120_000);
+  }
+});
+
+// Versions (#11): Print and Export PDF emit every Version's student pages, then
+// every Version's Answer Key. A two-Section sheet in three Versions, under each
+// Scramble Mode, in both Response Formats and every key format, must compile,
+// and each Version must take as many pages as the sheet does on its own.
+describe("multi-Version documents compile", () => {
+  const modes: ScrambleMode[] = ["scramble-choices", "scramble-order", "new-questions"];
+  for (const mode of modes) {
+    it(`${mode}: 3 Versions, free response and multiple choice, every Answer Key format`, async () => {
+      const first = buildWorksheet({ generatorId: QUADRATIC_FACTORING_ID, baseSeed: 31, count: 8 });
+      const second = buildSection({
+        generatorId: QUADRATIC_FORMULA_ID,
+        params: { rootType: "imaginary" },
+        baseSeed: 32,
+        count: 6,
+      });
+      const fr = setVersionSettings(
+        { ...first, sections: [...first.sections, second] },
+        { count: 3, mode },
+      );
+      const mc = setResponseFormat(fr, { mode: "multiple-choice", choices: 4 });
+      for (const ws of [fr, mc]) {
+        for (const keyFormat of ANSWER_KEY_FORMATS) {
+          const all = await engine.svgPages(buildTypstDocument(ws, { version: "all", keyFormat }));
+          expect(engine.warnings).toEqual([]);
+          let perVersion = 0;
+          for (const version of [0, 1, 2]) {
+            const one = await engine.svgPages(buildTypstDocument(ws, { version, keyFormat }));
+            expect(one.join("")).toContain(`Version ${"ABC"[version]}`);
+            perVersion += one.length;
+          }
+          expect(all.length).toBe(perVersion);
         }
       }
     }, 120_000);
