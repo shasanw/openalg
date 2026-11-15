@@ -54,7 +54,7 @@ describe("Inspector answer format", () => {
 
   it("hides the control when no worksheet is open", () => {
     renderInspector(null);
-    expect(screen.queryByText("Answer format")).toBeNull();
+    expect(screen.queryByText("Question type")).toBeNull();
   });
 });
 

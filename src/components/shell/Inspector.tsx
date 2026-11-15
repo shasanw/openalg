@@ -150,7 +150,7 @@ function ResponseFormatControls({
   return (
     <div className="space-y-3 text-sm">
       <div className="space-y-1.5">
-        <div className="text-muted-foreground font-medium">Answer format</div>
+        <div className="text-muted-foreground font-medium">Question type</div>
         <Segmented
           value={value.mode}
           onChange={(mode) => onChange({ ...value, mode })}
