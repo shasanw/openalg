@@ -8,6 +8,7 @@ import {
   setSectionDirections,
   type PrintConfig,
   type ResponseFormat,
+  type AnswerKeyFormat,
   type Worksheet,
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
@@ -76,7 +77,7 @@ const PAGE_SIZE: Record<Worksheet["print"]["paper"], string> = {
  */
 async function printWorksheet(ws: Worksheet): Promise<void> {
   const pages = await platform.renderPreview(
-    buildTypstDocument(ws, { keyFormat: "full" }),
+    buildTypstDocument(ws),
   );
   if (pages.length === 0) return;
 
@@ -376,10 +377,11 @@ function App() {
         params: resolved,
         baseSeed: randomSeed(),
         count,
-        // Keep the document's print/layout settings and Response Format across
-        // a topic switch.
+        // Keep the document's print/layout settings, Response Format and Answer
+        // Key format across a topic switch.
         print: worksheet?.print,
         responseFormat: worksheet?.responseFormat,
+        answerKeyFormat: worksheet?.answerKeyFormat,
       }),
     );
   }
@@ -396,6 +398,7 @@ function App() {
         // carry the current config forward.
         print: worksheet?.print,
         responseFormat: worksheet?.responseFormat,
+        answerKeyFormat: worksheet?.answerKeyFormat,
       }),
     );
   }
@@ -415,6 +418,8 @@ function App() {
     setWorksheet((ws) => (ws ? { ...ws, print } : ws));
   const setResponseFormat = (responseFormat: ResponseFormat) =>
     setWorksheet((ws) => (ws ? withResponseFormat(ws, responseFormat) : ws));
+  const setAnswerKeyFormat = (answerKeyFormat: AnswerKeyFormat) =>
+    setWorksheet((ws) => (ws ? { ...ws, answerKeyFormat } : ws));
 
   /** Export a portable copy to a user-chosen .json file (auto-save is separate). */
   async function save() {
@@ -460,7 +465,7 @@ function App() {
     setExporting(true);
     try {
       const ok = await platform.exportPdf(
-        buildTypstDocument(worksheet, { keyFormat: "full" }),
+        buildTypstDocument(worksheet),
         `${worksheet.title}.pdf`,
       );
       if (ok) {
@@ -547,6 +552,8 @@ function App() {
           onDirectionsChange={setDirections}
           responseFormat={worksheet?.responseFormat ?? null}
           onResponseFormatChange={setResponseFormat}
+          answerKeyFormat={worksheet?.answerKeyFormat ?? null}
+          onAnswerKeyFormatChange={setAnswerKeyFormat}
           count={count}
           onCountChange={setCount}
           onGenerate={generate}

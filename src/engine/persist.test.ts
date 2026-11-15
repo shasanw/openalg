@@ -7,6 +7,7 @@ import {
   regenerateAll,
   DEFAULT_PRINT_CONFIG,
   DEFAULT_RESPONSE_FORMAT,
+  ANSWER_KEY_FORMATS,
   type Worksheet,
 } from "./worksheet";
 import { buildTypstDocument } from "./typst";
@@ -271,5 +272,33 @@ describe("Response Format (multiple choice)", () => {
     expect(() => deserializeWorksheet(JSON.stringify(bad))).toThrow(/responseFormat/);
     const bad2 = { ...mcSheet(), responseFormat: { mode: "multiple-choice" } };
     expect(() => deserializeWorksheet(JSON.stringify(bad2))).toThrow(/choices/);
+  });
+});
+
+describe("Answer Key format", () => {
+  it("round-trips every format byte-identically", () => {
+    for (const answerKeyFormat of ANSWER_KEY_FORMATS) {
+      const json = serializeWorksheet({ ...sampleWorksheet(), answerKeyFormat });
+      expect(serializeWorksheet(deserializeWorksheet(json))).toBe(json);
+      expect(deserializeWorksheet(json).answerKeyFormat).toBe(answerKeyFormat);
+    }
+  });
+
+  it("loads a file saved before #6 with the full key it always printed", () => {
+    const { answerKeyFormat: _drop, ...legacy } = sampleWorksheet();
+    const loaded = deserializeWorksheet(JSON.stringify(legacy));
+    expect(loaded.answerKeyFormat).toBe("full");
+    expect(buildTypstDocument(loaded)).toEqual(
+      buildTypstDocument(sampleWorksheet(), { keyFormat: "full" }),
+    );
+  });
+
+  it("v1 files load with a full key", () => {
+    expect(deserializeWorksheet(asV1File(sampleWorksheet())).answerKeyFormat).toBe("full");
+  });
+
+  it("rejects an unknown format", () => {
+    const bad = { ...sampleWorksheet(), answerKeyFormat: "evens" };
+    expect(() => deserializeWorksheet(JSON.stringify(bad))).toThrow(/answerKeyFormat/);
   });
 });

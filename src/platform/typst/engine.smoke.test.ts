@@ -9,7 +9,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createTypstEngine, fillMath, typstString, type TypstEngine } from "./engine";
 import { FONT_FILES, MITEX_PACKAGE_FILE } from "./assetFiles";
 import { buildTypstDocument } from "../../engine/typst";
-import { buildWorksheet, setResponseFormat } from "../../engine/worksheet";
+import {
+  ANSWER_KEY_FORMATS,
+  buildWorksheet,
+  setResponseFormat,
+} from "../../engine/worksheet";
 import { GENERATORS } from "../../engine/registry";
 import type { ParamValues } from "../../engine/types";
 import { QUADRATIC_FORMULA_ID } from "../../engine/generators/quadraticFormula";
@@ -126,9 +130,10 @@ describe("fillMath", () => {
 
 });
 
-// Every Topic, under every single-option variation, in both Response Formats,
-// must compile through the real compiler: this is what catches LaTeX that
-// KaTeX accepts but mitex cannot convert.
+// Every Topic, under every single-option variation, in both Response Formats
+// and every Answer Key format, must compile through the real compiler: this is
+// what catches LaTeX that KaTeX accepts but mitex cannot convert, and markup
+// that only one key format emits (the in-context key's circled letters).
 describe("every Topic compiles", () => {
   for (const g of GENERATORS) {
     const variants: ParamValues[] = [{}];
@@ -137,13 +142,21 @@ describe("every Topic compiles", () => {
       if (f.type === "boolean") variants.push({ [f.key]: !f.default });
       if (f.type === "int") variants.push({ [f.key]: f.min }, { [f.key]: f.max });
     }
-    it(`${g.id}: ${variants.length} option variants, free response and multiple choice`, async () => {
+    it(`${g.id}: ${variants.length} option variants, free response and multiple choice, every Answer Key format`, async () => {
       for (const [i, params] of variants.entries()) {
         const fr = buildWorksheet({ generatorId: g.id, params, baseSeed: 1000 + i, count: 20 });
         const mc = setResponseFormat(fr, { mode: "multiple-choice", choices: 5 });
         for (const ws of [fr, mc]) {
-          const pages = await engine.svgPages(buildTypstDocument(ws, { keyFormat: "full" }));
-          expect(pages.length).toBeGreaterThan(0);
+          const pages: Record<string, number> = {};
+          for (const keyFormat of ANSWER_KEY_FORMATS) {
+            pages[keyFormat] = (await engine.svgPages(buildTypstDocument(ws, { keyFormat }))).length;
+          }
+          expect(pages.none).toBeGreaterThan(0);
+          // Every key starts on its own page; in context repeats the whole sheet.
+          expect(pages.full).toBeGreaterThan(pages.none);
+          expect(pages.odds).toBeGreaterThan(pages.none);
+          expect(pages.odds).toBeLessThanOrEqual(pages.full);
+          expect(pages["in-context"]).toBeGreaterThanOrEqual(2 * pages.none);
         }
       }
     }, 120_000);

@@ -133,7 +133,9 @@ function Pages({
     // short.
     const timer = setTimeout(() => {
       const doc = buildTypstDocument(worksheet, {
-        keyFormat: showAnswers ? "full" : "none",
+        // Showing answers previews the Worksheet's own Answer Key format,
+        // exactly as it will print; hiding them previews the student copy.
+        keyFormat: showAnswers ? undefined : "none",
       });
       platform
         .renderPreview(doc, { latestWins: true })

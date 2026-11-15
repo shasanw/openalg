@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Segmented } from "@/components/shell/PrintConfigDialog";
 import { MAX_CHOICES, MIN_CHOICES } from "@/engine/mc";
 import type { Generator, ParamValues } from "@/engine/types";
-import type { ResponseFormat } from "@/engine/worksheet";
+import type { AnswerKeyFormat, ResponseFormat } from "@/engine/worksheet";
 
 const CHOICE_COUNTS = Array.from(
   { length: MAX_CHOICES - MIN_CHOICES + 1 },
@@ -28,6 +28,8 @@ export function Inspector({
   onDirectionsChange,
   responseFormat,
   onResponseFormatChange,
+  answerKeyFormat,
+  onAnswerKeyFormatChange,
   count,
   onCountChange,
   onGenerate,
@@ -43,6 +45,9 @@ export function Inspector({
   /** Whole-sheet free response / multiple choice; null when no worksheet is open. */
   responseFormat: ResponseFormat | null;
   onResponseFormatChange: (next: ResponseFormat) => void;
+  /** The Worksheet's Answer Key format; null when no worksheet is open. */
+  answerKeyFormat: AnswerKeyFormat | null;
+  onAnswerKeyFormatChange: (next: AnswerKeyFormat) => void;
   count: number;
   onCountChange: (n: number) => void;
   onGenerate: () => void;
@@ -85,6 +90,16 @@ export function Inspector({
             <ResponseFormatControls
               value={responseFormat}
               onChange={onResponseFormatChange}
+            />
+          </>
+        )}
+
+        {answerKeyFormat !== null && (
+          <>
+            <Separator className="my-4" />
+            <AnswerKeyControls
+              value={answerKeyFormat}
+              onChange={onAnswerKeyFormatChange}
             />
           </>
         )}
@@ -157,6 +172,39 @@ function ResponseFormatControls({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+const ANSWER_KEY_HINTS: Record<AnswerKeyFormat, string> = {
+  full: "Every answer, on its own page after the problems.",
+  odds: "Answers to odd-numbered problems only.",
+  "in-context": "A copy of the worksheet with each answer under its problem.",
+  none: "No answer key is printed.",
+};
+
+/** Which Answer Key prints after the Problems: full, odds only, in context, none. */
+function AnswerKeyControls({
+  value,
+  onChange,
+}: {
+  value: AnswerKeyFormat;
+  onChange: (next: AnswerKeyFormat) => void;
+}) {
+  return (
+    <div className="space-y-1.5 text-sm">
+      <div className="text-muted-foreground font-medium">Answer key</div>
+      <Segmented
+        value={value}
+        onChange={onChange}
+        options={[
+          { value: "full", label: "Full" },
+          { value: "odds", label: "Odds" },
+          { value: "in-context", label: "In context" },
+          { value: "none", label: "None" },
+        ]}
+      />
+      <p className="text-muted-foreground text-xs">{ANSWER_KEY_HINTS[value]}</p>
     </div>
   );
 }
