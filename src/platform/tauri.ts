@@ -63,6 +63,24 @@ export const tauriPlatform: Platform = {
     await invoke("library_delete", { id });
   },
 
+  // Library Backup is web-only; the desktop shell is being removed (#25).
+  async backupLibrary() {
+    throw new Error("Library Backup is not supported in the desktop app.");
+  },
+
+  async restoreLibrary() {
+    throw new Error("Library Backup is not supported in the desktop app.");
+  },
+
+  // Desktop Library files live on disk and are never evicted.
+  async storagePersistence() {
+    return "persistent";
+  },
+
+  async requestPersistentStorage() {
+    return "persistent";
+  },
+
   async exportPdf(doc, suggestedName) {
     return await invoke<boolean>("export_pdf", {
       source: doc.source,

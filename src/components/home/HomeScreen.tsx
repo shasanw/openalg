@@ -2,11 +2,25 @@
 // (blank worksheet / test + topic templates) on top, recent documents below.
 // Recents come from the managed worksheet library (auto-saved documents).
 
-import { FolderOpen, Plus, Search, Settings, Sigma, Trash2 } from "lucide-react";
+import {
+  ArchiveRestore,
+  Download,
+  FolderOpen,
+  MonitorDown,
+  Plus,
+  Search,
+  Settings,
+  ShieldCheck,
+  Sigma,
+  TriangleAlert,
+  Trash2,
+} from "lucide-react";
 import { GENERATORS, getGenerator } from "@/engine/registry";
-import type { LibraryEntry } from "@/platform/types";
+import type { LibraryEntry, StoragePersistence } from "@/platform/types";
+import type { InstallPrompt } from "@/lib/useInstallPrompt";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LogoMark } from "@/components/LogoMark";
 import type { Theme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +52,10 @@ export function HomeScreen({
   onDeleteRecent,
   theme,
   onThemeChange,
+  onBackupLibrary,
+  onRestoreLibrary,
+  storage,
+  install,
 }: {
   onNewWorksheet: () => void;
   onOpenTemplate: (generatorId: string) => void;
@@ -47,13 +65,16 @@ export function HomeScreen({
   onDeleteRecent: (id: string) => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
+  onBackupLibrary: () => void;
+  onRestoreLibrary: () => void;
+  /** Whether the browser keeps the Library safe from eviction; null while unknown. */
+  storage: StoragePersistence | null;
+  install: InstallPrompt;
 }) {
   return (
     <div className="bg-background h-screen overflow-y-auto">
       <header className="bg-background/80 sticky top-0 z-10 flex h-14 items-center gap-3 border-b px-6 backdrop-blur">
-        <span className="from-primary/85 to-primary grid size-7 place-content-center rounded-lg bg-gradient-to-br text-white shadow-sm">
-          <Sigma className="size-4" />
-        </span>
+        <LogoMark className="shadow-sm" />
         <span className="text-lg font-bold tracking-tight">OpenAlg</span>
         <span className="text-muted-foreground text-xs font-medium">
           Algebra 2 · Precalculus
@@ -66,6 +87,17 @@ export function HomeScreen({
             placeholder="Search your worksheets…"
           />
         </div>
+        {install.canInstall && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => void install.install()}
+            title="Install OpenAlg as an app so your Library is kept safe"
+          >
+            <MonitorDown /> Install app
+          </Button>
+        )}
         <ThemeToggle theme={theme} onThemeChange={onThemeChange} className="size-9" />
         <Button variant="outline" size="icon" className="size-9" title="Settings">
           <Settings />
@@ -104,13 +136,32 @@ export function HomeScreen({
         </div>
 
         {/* Recent */}
-        <div className="mt-9 mb-4 flex items-center justify-between">
+        <div className="mt-9 mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-muted-foreground text-xs font-bold tracking-wide uppercase">
             Recent
           </h2>
-          <Button variant="ghost" size="sm" onClick={onOpen}>
-            <FolderOpen /> Open a file…
-          </Button>
+          <div className="flex flex-wrap items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={onOpen}>
+              <FolderOpen /> Open a file…
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBackupLibrary}
+              disabled={recents.length === 0}
+              title="Download one file holding every Worksheet in your Library"
+            >
+              <Download /> Back up Library
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRestoreLibrary}
+              title="Rebuild your Library from a Library Backup file"
+            >
+              <ArchiveRestore /> Restore…
+            </Button>
+          </div>
         </div>
         {recents.length === 0 ? (
           <div className="border-border bg-card flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-14 text-center">
@@ -134,8 +185,46 @@ export function HomeScreen({
             ))}
           </div>
         )}
+        {recents.length > 0 && <StorageNote storage={storage} install={install} />}
       </main>
     </div>
+  );
+}
+
+/**
+ * Unobtrusive Library safety status: a quiet line when the browser keeps the
+ * Library persistently, otherwise a note suggesting installing and backups.
+ */
+function StorageNote({
+  storage,
+  install,
+}: {
+  storage: StoragePersistence | null;
+  install: InstallPrompt;
+}) {
+  if (storage === null) return null;
+  if (storage === "persistent" || install.installed) {
+    return (
+      <p className="text-muted-foreground mt-4 flex items-center gap-1.5 text-[12px]">
+        <ShieldCheck className="size-3.5" />
+        Your Library is stored persistently in this browser.
+      </p>
+    );
+  }
+  const howToInstall = install.showAppleHint
+    ? " On iPad, tap Share, then Add to Home Screen."
+    : install.canInstall
+      ? " Use Install app above."
+      : "";
+  return (
+    <p className="text-muted-foreground mt-4 flex items-start gap-1.5 text-[12px] leading-relaxed">
+      <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+      <span>
+        This browser may clear your Library if storage runs low or site data is
+        cleared. Install OpenAlg as an app and back up your Library now and then
+        to keep your Worksheets safe.{howToInstall}
+      </span>
+    </p>
   );
 }
 

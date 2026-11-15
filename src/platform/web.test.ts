@@ -280,3 +280,204 @@ describe("web desktop-only hooks", () => {
     expect(() => unsubscribe()).not.toThrow();
   });
 });
+
+describe("web Library Backup", () => {
+  /** Capture what the next download writes. */
+  function captureDownload() {
+    const out = { name: "", blob: undefined as Blob | undefined };
+    URL.createObjectURL = vi.fn((b: Blob) => {
+      out.blob = b;
+      return "blob:test";
+    });
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      out.name = this.download;
+    });
+    return out;
+  }
+
+  /** Stub the hidden file input with `file` (null = cancel); returns the accept list. */
+  function stubPicker(file: File | null) {
+    let accept = "";
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      accept = this.accept;
+      if (file) {
+        Object.defineProperty(this, "files", { value: [file] });
+        this.dispatchEvent(new Event("change"));
+      } else {
+        this.dispatchEvent(new Event("cancel"));
+      }
+    });
+    return () => accept;
+  }
+
+  async function backupText(platform: ReturnType<typeof freshPlatform>["platform"]) {
+    const dl = captureDownload();
+    const result = await platform.backupLibrary();
+    return { result, name: dl.name, text: await blobText(dl.blob!) };
+  }
+
+  it("backup, then restore into an empty Library, gives back every Worksheet identically", async () => {
+    const { platform, setNow } = freshPlatform();
+    const sheets: Record<string, Worksheet> = {
+      a: sampleWorksheet("Alpha", 4, 1),
+      b: sampleWorksheet("Beta", 7, 2),
+      c: sampleWorksheet("Gamma", 1, 3),
+    };
+    let t = 100;
+    for (const [id, ws] of Object.entries(sheets)) {
+      setNow(t += 100);
+      await platform.autosaveWorksheet(id, ws);
+    }
+    const listBefore = await platform.listLibrary();
+
+    const { result, name, text } = await backupText(platform);
+    expect(result).toEqual({ saved: 3, skipped: 0 });
+    expect(name).toMatch(/^OpenAlg Library Backup \d{4}-\d{2}-\d{2}\.oalgbackup$/);
+    const envelope = JSON.parse(text);
+    expect(envelope).toMatchObject({ kind: "openalg-library-backup", version: 1 });
+    expect(envelope.worksheets).toHaveLength(3);
+
+    // "Clear site data": a brand-new, empty database.
+    const fresh = freshPlatform().platform;
+    const accept = stubPicker(new File([text], name));
+    expect(await fresh.restoreLibrary()).toEqual({
+      restored: 3,
+      overwritten: 0,
+      skipped: 0,
+      failed: [],
+    });
+    expect(accept()).toContain(".oalgbackup");
+    expect(accept()).toContain(".json");
+    expect(await fresh.listLibrary()).toEqual(listBefore);
+    for (const [id, ws] of Object.entries(sheets)) {
+      const restored = await fresh.loadLibrary(id);
+      expect(restored).toEqual(ws);
+      expect(serializeWorksheet(restored!)).toBe(serializeWorksheet(ws));
+    }
+  });
+
+  it("restores the valid entries and reports an invalid one", async () => {
+    const { platform } = freshPlatform();
+    await platform.autosaveWorksheet("good1", sampleWorksheet("One"));
+    await platform.autosaveWorksheet("good2", sampleWorksheet("Two"));
+    const envelope = JSON.parse((await backupText(platform)).text);
+    envelope.worksheets.splice(1, 0, {
+      id: "broken",
+      updatedAt: 5,
+      worksheet: { title: "not really a worksheet" },
+    });
+
+    const fresh = freshPlatform().platform;
+    stubPicker(new File([JSON.stringify(envelope)], "b.oalgbackup"));
+    const summary = await fresh.restoreLibrary();
+    expect(summary).toMatchObject({ restored: 2, overwritten: 0, skipped: 0 });
+    expect(summary!.failed).toHaveLength(1);
+    expect(summary!.failed[0]).toMatchObject({ index: 1, id: "broken" });
+    expect(summary!.failed[0].reason).toMatch(/Not a valid worksheet file/);
+    expect((await fresh.listLibrary()).map((e) => e.id).sort()).toEqual(["good1", "good2"]);
+  });
+
+  it("an id already in the Library is overwritten only by a newer backup copy", async () => {
+    const { platform, setNow } = freshPlatform();
+    setNow(1000);
+    await platform.autosaveWorksheet("older-here", sampleWorksheet("Backup A"));
+    await platform.autosaveWorksheet("newer-here", sampleWorksheet("Backup B"));
+    const { text } = await backupText(platform);
+
+    setNow(500);
+    await platform.autosaveWorksheet("older-here", sampleWorksheet("Library A"));
+    setNow(2000);
+    await platform.autosaveWorksheet("newer-here", sampleWorksheet("Library B"));
+
+    stubPicker(new File([text], "b.oalgbackup"));
+    expect(await platform.restoreLibrary()).toEqual({
+      restored: 0,
+      overwritten: 1,
+      skipped: 1,
+      failed: [],
+    });
+    expect((await platform.loadLibrary("older-here"))!.title).toBe("Backup A");
+    expect((await platform.loadLibrary("newer-here"))!.title).toBe("Library B");
+  });
+
+  it("backup leaves out unreadable records and counts them", async () => {
+    const { platform, factory } = freshPlatform();
+    await platform.autosaveWorksheet("good", sampleWorksheet());
+    await new Promise<void>((resolve, reject) => {
+      const req = factory.open("openalg", 1);
+      req.onsuccess = () => {
+        const tx = req.result.transaction("worksheets", "readwrite");
+        tx.objectStore("worksheets").put({ id: "bad", json: "{nope", updatedAt: 5 });
+        tx.oncomplete = () => {
+          req.result.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    const { result, text } = await backupText(platform);
+    expect(result).toEqual({ saved: 1, skipped: 1 });
+    expect(JSON.parse(text).worksheets.map((w: { id: string }) => w.id)).toEqual(["good"]);
+  });
+
+  it("restoring a file that isn't a Library Backup fails clearly and changes nothing", async () => {
+    const { platform } = freshPlatform();
+    await platform.autosaveWorksheet("a", sampleWorksheet());
+    const before = await platform.listLibrary();
+
+    // A single Worksheet File is not a Library Backup.
+    stubPicker(new File([serializeWorksheet(sampleWorksheet())], "x.oalg"));
+    await expect(platform.restoreLibrary()).rejects.toThrow(/Not a Library Backup file/);
+
+    stubPicker(new File(["hello"], "x.oalgbackup"));
+    await expect(platform.restoreLibrary()).rejects.toThrow(/Not a Library Backup file/);
+
+    stubPicker(
+      new File([JSON.stringify({ kind: "openalg-library-backup", version: 99, worksheets: [] })], "x"),
+    );
+    await expect(platform.restoreLibrary()).rejects.toThrow(/unsupported version/);
+
+    expect(await platform.listLibrary()).toEqual(before);
+  });
+
+  it("restore resolves null when the picker is cancelled", async () => {
+    const { platform } = freshPlatform();
+    stubPicker(null);
+    expect(await platform.restoreLibrary()).toBeNull();
+  });
+});
+
+describe("web persistent storage", () => {
+  it("reports and requests persistence through the storage manager", async () => {
+    let granted = false;
+    const storage = {
+      persisted: vi.fn(async () => granted),
+      persist: vi.fn(async () => (granted = true)),
+    };
+    const platform = createWebPlatform({ indexedDB: new IDBFactory(), storage });
+    expect(await platform.storagePersistence()).toBe("best-effort");
+    expect(await platform.requestPersistentStorage()).toBe("persistent");
+    expect(await platform.storagePersistence()).toBe("persistent");
+  });
+
+  it("a refused request stays best-effort", async () => {
+    const storage = { persisted: async () => false, persist: async () => false };
+    const platform = createWebPlatform({ indexedDB: new IDBFactory(), storage });
+    expect(await platform.requestPersistentStorage()).toBe("best-effort");
+  });
+
+  it("is unsupported when the browser has no storage manager", async () => {
+    const platform = createWebPlatform({
+      indexedDB: new IDBFactory(),
+      storage: {} as never,
+    });
+    expect(await platform.storagePersistence()).toBe("unsupported");
+    expect(await platform.requestPersistentStorage()).toBe("unsupported");
+  });
+});
