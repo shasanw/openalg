@@ -3,7 +3,7 @@
 // The selected row is the highest-contrast fill on screen. Arrow keys move
 // between rows; Alt+Arrow moves the Section itself.
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
 import { getGenerator } from "@/engine/registry";
 import { sectionLetter, sectionRanges, type ProblemRange, type Worksheet } from "@/engine/worksheet";
@@ -40,6 +40,12 @@ export function SectionOutline({
   const rows = useRef<(HTMLButtonElement | null)[]>([]);
   const n = worksheet.sections.length;
 
+  // Keep the selected Section in view (e.g. one just added at the end), clear
+  // of the sticky Add Section row (rows carry a bottom scroll margin).
+  useEffect(() => {
+    rows.current[selected]?.scrollIntoView?.({ block: "nearest" });
+  }, [selected, n]);
+
   function focusRow(i: number) {
     // After a move the rows re-render; focus once the DOM has the new order.
     requestAnimationFrame(() => rows.current[i]?.focus());
@@ -65,7 +71,8 @@ export function SectionOutline({
         </span>
       </div>
 
-      <ol className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <ol>
         {n === 0 && (
           <li className="text-muted-foreground px-2 py-3 leading-snug">
             No Sections yet. Each Section is a run of Problems from one Topic.
@@ -87,7 +94,7 @@ export function SectionOutline({
                 onClick={() => onSelect(i)}
                 onKeyDown={(e) => onKeyDown(e, i)}
                 className={cn(
-                  "mb-1 flex w-full gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors",
+                  "mb-1 flex w-full scroll-mb-16 gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors",
                   on
                     ? "border-selected-border bg-selected text-selected-foreground"
                     : "hover:bg-hover border-transparent",
@@ -121,11 +128,20 @@ export function SectionOutline({
         })}
       </ol>
 
-      <div className="border-t p-2">
-        <Button className="w-full" onClick={onAdd} aria-keyshortcuts="Meta+K Control+K">
+      {/* Right under the last Section, where the new one will appear. Sticky,
+          so on a list long enough to scroll it pins to the bottom edge
+          instead of scrolling out of view. */}
+      <div className="bg-panel before:from-panel sticky bottom-0 -mx-2 -mb-2 px-2 pb-2 before:pointer-events-none before:absolute before:inset-x-0 before:-top-4 before:h-4 before:bg-gradient-to-t before:to-transparent">
+        <Button
+          variant="quiet"
+          className="w-full justify-start px-2.5"
+          onClick={onAdd}
+          aria-keyshortcuts="Meta+K Control+K"
+        >
           <Plus /> Add Section
           <Kbd className="ml-auto">{MOD_KEY}K</Kbd>
         </Button>
+      </div>
       </div>
     </aside>
   );
