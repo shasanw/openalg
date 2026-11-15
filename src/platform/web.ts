@@ -11,7 +11,18 @@ import {
   serializeWorksheet,
   deserializeWorksheet,
 } from "../engine/persist";
-import type { LibraryEntry, Platform } from "./types";
+import {
+  buildLibraryBackup,
+  parseLibraryBackup,
+  LIBRARY_BACKUP_EXTENSION,
+  type LibraryBackupEntry,
+} from "../engine/libraryBackup";
+import type {
+  LibraryEntry,
+  LibraryRestoreSummary,
+  Platform,
+  StoragePersistence,
+} from "./types";
 
 const DB_NAME = "openalg";
 const DB_VERSION = 1;
@@ -31,6 +42,8 @@ export interface WebPlatformOptions {
   dbName?: string;
   /** Clock for `updatedAt`; defaults to `Date.now`. */
   now?: () => number;
+  /** Storage manager for persistence checks; defaults to `navigator.storage`. */
+  storage?: Pick<StorageManager, "persist" | "persisted">;
 }
 
 function requestToPromise<T>(req: IDBRequest<T>): Promise<T> {
@@ -140,6 +153,13 @@ function readFileText(file: File): Promise<string> {
   });
 }
 
+/** "OpenAlg Library Backup 2026-11-14.oalgbackup" (local date). */
+function backupFilename(at: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+  return `OpenAlg Library Backup ${day}${LIBRARY_BACKUP_EXTENSION}`;
+}
+
 const notYetSupported = (what: string) =>
   new Error(`${what} is not yet supported in the web build.`);
 
@@ -227,6 +247,88 @@ export function createWebPlatform(options: WebPlatformOptions = {}): Platform {
       const tx = (await db()).transaction(STORE, "readwrite");
       tx.objectStore(STORE).delete(id);
       await transactionDone(tx);
+    },
+
+    async backupLibrary() {
+      const tx = (await db()).transaction(STORE, "readonly");
+      const records = await requestToPromise<LibraryRecord[]>(
+        tx.objectStore(STORE).getAll(),
+      );
+      const entries: LibraryBackupEntry[] = [];
+      let skipped = 0;
+      for (const r of records) {
+        try {
+          entries.push({ id: r.id, updatedAt: r.updatedAt, worksheet: deserializeWorksheet(r.json) });
+        } catch {
+          skipped++; // unreadable record: it can't be restored anyway
+        }
+      }
+      entries.sort((a, b) => b.updatedAt - a.updatedAt);
+      const at = new Date(now());
+      downloadText(buildLibraryBackup(entries, at), backupFilename(at));
+      return { saved: entries.length, skipped };
+    },
+
+    async restoreLibrary() {
+      const file = await pickFile(`${LIBRARY_BACKUP_EXTENSION},.json,application/json`);
+      if (!file) return null;
+      // Throws for a file that isn't a Library Backup; per-entry problems come
+      // back in `failed` and don't stop the rest.
+      const { entries, failed } = parseLibraryBackup(await readFileText(file));
+
+      const database = await db();
+      const existing = new Map<string, number>();
+      {
+        const tx = database.transaction(STORE, "readonly");
+        const records = await requestToPromise<LibraryRecord[]>(
+          tx.objectStore(STORE).getAll(),
+        );
+        for (const r of records) existing.set(r.id, r.updatedAt);
+      }
+
+      // Rule: a new id is restored; an id already in the Library is replaced
+      // only by a strictly newer backup copy, so restoring never loses edits
+      // made since the backup. The backup's updatedAt is kept as-is.
+      const summary: LibraryRestoreSummary = { restored: 0, overwritten: 0, skipped: 0, failed };
+      const writes: LibraryRecord[] = [];
+      for (const e of entries) {
+        const current = existing.get(e.id);
+        if (current !== undefined && current >= e.updatedAt) {
+          summary.skipped++;
+          continue;
+        }
+        if (current === undefined) summary.restored++;
+        else summary.overwritten++;
+        existing.set(e.id, e.updatedAt);
+        writes.push({ id: e.id, json: serializeWorksheet(e.worksheet), updatedAt: e.updatedAt });
+      }
+      if (writes.length > 0) {
+        const tx = database.transaction(STORE, "readwrite");
+        const store = tx.objectStore(STORE);
+        for (const w of writes) store.put(w);
+        await transactionDone(tx);
+      }
+      return summary;
+    },
+
+    async storagePersistence(): Promise<StoragePersistence> {
+      const storage = options.storage ?? globalThis.navigator?.storage;
+      if (typeof storage?.persisted !== "function") return "unsupported";
+      try {
+        return (await storage.persisted()) ? "persistent" : "best-effort";
+      } catch {
+        return "unsupported";
+      }
+    },
+
+    async requestPersistentStorage(): Promise<StoragePersistence> {
+      const storage = options.storage ?? globalThis.navigator?.storage;
+      if (typeof storage?.persist !== "function") return "unsupported";
+      try {
+        return (await storage.persist()) ? "persistent" : "best-effort";
+      } catch {
+        return "best-effort";
+      }
     },
 
     async exportPdf() {
