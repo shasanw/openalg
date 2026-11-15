@@ -2,8 +2,9 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { createWebPlatform } from "./web";
 import { serializeWorksheet } from "../engine/persist";
-import { buildWorksheet, type Worksheet } from "../engine/worksheet";
+import { buildSection, buildWorksheet, type Worksheet } from "../engine/worksheet";
 import { QUADRATIC_FACTORING_ID } from "../engine/generators/quadraticFactoring";
+import { QUADRATIC_FORMULA_ID } from "../engine/generators/quadraticFormula";
 
 function sampleWorksheet(title = "My Sheet", count = 8, baseSeed = 42): Worksheet {
   return buildWorksheet({
@@ -37,6 +38,40 @@ function blobText(blob: Blob): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsText(blob);
   });
+}
+
+/** Write a raw record straight into the Library store. */
+function putRaw(factory: IDBFactory, record: { id: string; json: string; updatedAt: number }) {
+  return new Promise<void>((resolve, reject) => {
+    const req = factory.open("openalg", 1);
+    req.onsuccess = () => {
+      const tx = req.result.transaction("worksheets", "readwrite");
+      tx.objectStore("worksheets").put(record);
+      tx.oncomplete = () => {
+        req.result.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/** The version 1 (desktop-era) JSON for a single-Section Worksheet. */
+function asV1Json(ws: Worksheet, { print = true } = {}): string {
+  const [s] = ws.sections;
+  const v1: Record<string, unknown> = {
+    version: 1,
+    title: ws.title,
+    generatorId: s.generatorId,
+    params: s.params,
+    directions: s.directions,
+    baseSeed: s.baseSeed,
+    count: s.count,
+    problems: s.problems,
+  };
+  if (print) v1.print = ws.print;
+  return JSON.stringify(v1, null, 2);
 }
 
 afterEach(() => {
@@ -90,6 +125,40 @@ describe("web Library", () => {
     });
   });
 
+  it("lists a multi-Section Worksheet by its first Topic and total Problems", async () => {
+    const { platform } = freshPlatform();
+    const ws = sampleWorksheet("Mixed", 4);
+    const second = buildSection({
+      generatorId: QUADRATIC_FORMULA_ID,
+      baseSeed: 3,
+      count: 2,
+      directions: "Use the quadratic formula.",
+    });
+    const mixed: Worksheet = { ...ws, sections: [...ws.sections, second] };
+    await platform.autosaveWorksheet("m", mixed);
+    expect((await platform.listLibrary())[0]).toMatchObject({
+      title: "Mixed",
+      generatorId: QUADRATIC_FACTORING_ID,
+      count: 6,
+    });
+    expect(await platform.loadLibrary("m")).toEqual(mixed);
+  });
+
+  it("lists and loads a version 1 record (upgraded to one Section)", async () => {
+    const { platform, factory } = freshPlatform();
+    const ws = sampleWorksheet("Old", 5);
+    await platform.autosaveWorksheet("seed-db", sampleWorksheet());
+    await putRaw(factory, { id: "v1", json: asV1Json(ws), updatedAt: 9999 });
+    expect((await platform.listLibrary())[0]).toEqual({
+      id: "v1",
+      title: "Old",
+      generatorId: QUADRATIC_FACTORING_ID,
+      count: 5,
+      updatedAt: 9999,
+    });
+    expect(await platform.loadLibrary("v1")).toEqual(ws);
+  });
+
   it("an empty Library lists nothing", async () => {
     const { platform } = freshPlatform();
     expect(await platform.listLibrary()).toEqual([]);
@@ -104,19 +173,7 @@ describe("web Library", () => {
     const { platform, factory } = freshPlatform();
     await platform.autosaveWorksheet("good", sampleWorksheet());
     // Corrupt a record directly in the store.
-    await new Promise<void>((resolve, reject) => {
-      const req = factory.open("openalg", 1);
-      req.onsuccess = () => {
-        const tx = req.result.transaction("worksheets", "readwrite");
-        tx.objectStore("worksheets").put({ id: "bad", json: "{not json", updatedAt: 5 });
-        tx.oncomplete = () => {
-          req.result.close();
-          resolve();
-        };
-        tx.onerror = () => reject(tx.error);
-      };
-      req.onerror = () => reject(req.error);
-    });
+    await putRaw(factory, { id: "bad", json: "{not json", updatedAt: 5 });
     expect(await platform.loadLibrary("bad")).toBeNull();
     expect((await platform.listLibrary()).map((e) => e.id)).toEqual(["good"]);
   });
@@ -192,13 +249,11 @@ describe("web Worksheet Files", () => {
     expect(accept()).toContain(".json");
   });
 
-  it("openWorksheet imports a legacy desktop .json file (normalized)", async () => {
+  it("openWorksheet imports a legacy desktop .json file (v1, upgraded and normalized)", async () => {
     const { platform } = freshPlatform();
     const ws = sampleWorksheet();
-    // Desktop-era files predate the print block; normalize backfills it.
-    const legacy: Record<string, unknown> = JSON.parse(serializeWorksheet(ws));
-    delete legacy.print;
-    stubPicker(new File([JSON.stringify(legacy)], "old.json"));
+    // Desktop-era files are version 1 and may predate the print block.
+    stubPicker(new File([asV1Json(ws, { print: false })], "old.json"));
     expect(await platform.openWorksheet()).toEqual(ws);
   });
 

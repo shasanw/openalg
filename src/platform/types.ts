@@ -11,8 +11,9 @@ import type { TypstDocument } from "../engine/typst";
 export interface LibraryEntry {
   id: string;
   title: string;
+  /** The first Section's Topic. */
   generatorId: string;
-  /** Number of problems on the sheet. */
+  /** Number of Problems on the sheet, across all Sections. */
   count: number;
   /** Last-edited time, ms since the Unix epoch (newest first). */
   updatedAt: number;

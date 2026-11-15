@@ -7,12 +7,35 @@ import {
   rerollProblem,
   removeProblem,
   reorderProblem,
+  regenerateSection,
+  setSectionDirections,
+  buildSection,
+  allProblems,
+  problemCount,
   DEFAULT_PRINT_CONFIG,
   type Worksheet,
 } from "./worksheet";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
+import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
+
+/** A hand-built two-Topic, two-Section Worksheet (the UI builds one Section today). */
+function twoSectionSheet(): Worksheet {
+  const ws = buildWorksheet({
+    generatorId: QUADRATIC_FACTORING_ID,
+    baseSeed: 1,
+    count: 3,
+    directions: "Solve by factoring.",
+  });
+  const second = buildSection({
+    generatorId: QUADRATIC_FORMULA_ID,
+    baseSeed: 2,
+    count: 2,
+    directions: "Solve each equation.",
+  });
+  return { ...ws, sections: [...ws.sections, second] };
+}
 
 describe("buildWorksheet", () => {
   it("produces exactly `count` problems", () => {
@@ -21,7 +44,9 @@ describe("buildWorksheet", () => {
       baseSeed: 1,
       count: 12,
     });
-    expect(ws.problems).toHaveLength(12);
+    expect(ws.sections).toHaveLength(1);
+    expect(ws.sections[0].problems).toHaveLength(12);
+    expect(ws.version).toBe(2);
   });
 
   it("produces an empty sheet for count 0 (a blank worksheet)", () => {
@@ -31,7 +56,7 @@ describe("buildWorksheet", () => {
       count: 0,
       title: "Untitled worksheet",
     });
-    expect(ws.problems).toEqual([]);
+    expect(ws.sections[0].problems).toEqual([]);
     expect(ws.title).toBe("Untitled worksheet");
   });
 
@@ -59,7 +84,7 @@ describe("buildWorksheet", () => {
       baseSeed: 1,
       count: 1,
     });
-    expect(ws.directions).toBe("Solve each equation by factoring.");
+    expect(ws.sections[0].directions).toBe("Solve each equation by factoring.");
     expect(ws.title.length).toBeGreaterThan(0);
   });
 
@@ -73,7 +98,7 @@ describe("buildWorksheet", () => {
           baseSeed,
           count: 12,
         });
-        const prompts = new Set(ws.problems.map((p) => p.prompt));
+        const prompts = new Set(ws.sections[0].problems.map((p) => p.prompt));
         expect(prompts.size).toBe(12);
       }),
     );
@@ -88,8 +113,8 @@ describe("buildWorksheet", () => {
       baseSeed: 5,
       count: 10,
     });
-    expect(ws.problems).toHaveLength(10);
-    const distinct = new Set(ws.problems.map((p) => p.prompt));
+    expect(ws.sections[0].problems).toHaveLength(10);
+    const distinct = new Set(ws.sections[0].problems.map((p) => p.prompt));
     expect(distinct.size).toBeLessThanOrEqual(3);
     expect(distinct.size).toBeGreaterThan(0);
   });
@@ -109,11 +134,62 @@ describe("regenerateAll", () => {
       count: 8,
     });
     const fresh = regenerateAll(ws, 200);
-    expect(fresh.generatorId).toBe(ws.generatorId);
-    expect(fresh.count).toBe(ws.count);
-    expect(fresh.directions).toBe(ws.directions);
+    const [a, b] = [ws.sections[0], fresh.sections[0]];
+    expect(b.generatorId).toBe(a.generatorId);
+    expect(b.count).toBe(a.count);
+    expect(b.directions).toBe(a.directions);
+    expect(b.baseSeed).toBe(200);
     // overwhelmingly likely the problem set differs
-    expect(fresh.problems).not.toEqual(ws.problems);
+    expect(b.problems).not.toEqual(a.problems);
+  });
+
+  it("regenerates every Section of a multi-Section Worksheet, keeping each Recipe", () => {
+    const ws = twoSectionSheet();
+    const fresh = regenerateAll(ws, 7);
+    expect(fresh.sections).toHaveLength(2);
+    fresh.sections.forEach((s, i) => {
+      expect(s.generatorId).toBe(ws.sections[i].generatorId);
+      expect(s.params).toEqual(ws.sections[i].params);
+      expect(s.directions).toBe(ws.sections[i].directions);
+      expect(s.count).toBe(ws.sections[i].count);
+      expect(s.problems).not.toEqual(ws.sections[i].problems);
+    });
+    expect(fresh.sections[0].baseSeed).not.toBe(fresh.sections[1].baseSeed);
+  });
+});
+
+describe("regenerateSection", () => {
+  it("regenerates only the targeted Section", () => {
+    const ws = twoSectionSheet();
+    const fresh = regenerateSection(ws, 1, 555);
+    expect(fresh.sections[0]).toBe(ws.sections[0]);
+    expect(fresh.sections[1].baseSeed).toBe(555);
+    expect(fresh.sections[1].directions).toBe(ws.sections[1].directions);
+    expect(fresh.sections[1].problems).not.toEqual(ws.sections[1].problems);
+  });
+
+  it("is a no-op for an out-of-range Section", () => {
+    const ws = twoSectionSheet();
+    expect(regenerateSection(ws, 5, 1)).toBe(ws);
+  });
+});
+
+describe("Sections", () => {
+  it("allProblems and problemCount span every Section in order", () => {
+    const ws = twoSectionSheet();
+    expect(problemCount(ws)).toBe(5);
+    expect(allProblems(ws)).toEqual([
+      ...ws.sections[0].problems,
+      ...ws.sections[1].problems,
+    ]);
+  });
+
+  it("setSectionDirections changes only that Section's Directions", () => {
+    const ws = twoSectionSheet();
+    const next = setSectionDirections(ws, 1, "Factor completely.");
+    expect(next.sections[1].directions).toBe("Factor completely.");
+    expect(next.sections[0]).toBe(ws.sections[0]);
+    expect(setSectionDirections(ws, 9, "x")).toBe(ws);
   });
 });
 
@@ -125,24 +201,44 @@ describe("per-problem curation", () => {
       count: 5,
     });
 
+  it("leaves every other Section untouched", () => {
+    const ws = twoSectionSheet();
+    const rerolled = rerollProblem(ws, 1, 0, 4242);
+    expect(rerolled.sections[0]).toBe(ws.sections[0]);
+    expect(rerolled.sections[1].problems[0].seed).toBe(4242);
+    const removed = removeProblem(ws, 1, 1);
+    expect(removed.sections[0]).toBe(ws.sections[0]);
+    expect(removed.sections[1].count).toBe(1);
+    const reordered = reorderProblem(ws, 0, 0, 2);
+    expect(reordered.sections[1]).toBe(ws.sections[1]);
+    expect(reordered.sections[0].problems[2]).toEqual(ws.sections[0].problems[0]);
+  });
+
+  it("is a no-op for an out-of-range Section", () => {
+    const ws = sheet();
+    expect(rerollProblem(ws, 3, 0, 1)).toBe(ws);
+    expect(removeProblem(ws, -1, 0)).toBe(ws);
+    expect(reorderProblem(ws, 1, 0, 1)).toBe(ws);
+  });
+
   describe("rerollProblem", () => {
     it("changes only the targeted problem", () => {
       const ws = sheet();
-      const next = rerollProblem(ws, 2, 999);
-      expect(next.problems[2]).not.toEqual(ws.problems[2]);
+      const next = rerollProblem(ws, 0, 2, 999);
+      expect(next.sections[0].problems[2]).not.toEqual(ws.sections[0].problems[2]);
       // every other problem is byte-identical
       [0, 1, 3, 4].forEach((i) =>
-        expect(next.problems[i]).toEqual(ws.problems[i]),
+        expect(next.sections[0].problems[i]).toEqual(ws.sections[0].problems[i]),
       );
-      expect(next.count).toBe(5);
+      expect(next.sections[0].count).toBe(5);
     });
 
     it("re-rolls from the problem's own recipe (same params, new seed)", () => {
       const ws = sheet();
-      const next = rerollProblem(ws, 0, 12345);
-      expect(next.problems[0].generatorId).toBe(ws.problems[0].generatorId);
-      expect(next.problems[0].params).toEqual(ws.problems[0].params);
-      expect(next.problems[0].seed).toBe(12345);
+      const next = rerollProblem(ws, 0, 0, 12345);
+      expect(next.sections[0].problems[0].generatorId).toBe(ws.sections[0].problems[0].generatorId);
+      expect(next.sections[0].problems[0].params).toEqual(ws.sections[0].problems[0].params);
+      expect(next.sections[0].problems[0].seed).toBe(12345);
     });
 
     it("stays correct by construction for any seed", () => {
@@ -151,85 +247,85 @@ describe("per-problem curation", () => {
       // Here we assert the recipe contract that upholds it (kind + own seed).
       fc.assert(
         fc.property(fc.integer({ min: 0, max: 0xffffffff }), (seed) => {
-          const next = rerollProblem(sheet(), 1, seed);
-          expect(next.problems[1].kind).toBe("generated");
-          expect(next.problems[1].seed).toBe(seed);
+          const next = rerollProblem(sheet(), 0, 1, seed);
+          expect(next.sections[0].problems[1].kind).toBe("generated");
+          expect(next.sections[0].problems[1].seed).toBe(seed);
         }),
       );
     });
 
     it("is a no-op for an out-of-range index", () => {
       const ws = sheet();
-      expect(rerollProblem(ws, 99, 1)).toEqual(ws);
+      expect(rerollProblem(ws, 0, 99, 1)).toEqual(ws);
     });
   });
 
   describe("removeProblem", () => {
     it("drops the problem and keeps count consistent", () => {
       const ws = sheet();
-      const removed = ws.problems[2];
-      const next = removeProblem(ws, 2);
-      expect(next.problems).toHaveLength(4);
-      expect(next.count).toBe(4);
-      expect(next.problems).not.toContainEqual(removed);
+      const removed = ws.sections[0].problems[2];
+      const next = removeProblem(ws, 0, 2);
+      expect(next.sections[0].problems).toHaveLength(4);
+      expect(next.sections[0].count).toBe(4);
+      expect(next.sections[0].problems).not.toContainEqual(removed);
       // surrounding problems are preserved and in order
-      expect(next.problems).toEqual([
-        ws.problems[0],
-        ws.problems[1],
-        ws.problems[3],
-        ws.problems[4],
+      expect(next.sections[0].problems).toEqual([
+        ws.sections[0].problems[0],
+        ws.sections[0].problems[1],
+        ws.sections[0].problems[3],
+        ws.sections[0].problems[4],
       ]);
     });
 
     it("is a no-op for an out-of-range index", () => {
       const ws = sheet();
-      expect(removeProblem(ws, -1)).toEqual(ws);
-      expect(removeProblem(ws, 5)).toEqual(ws);
+      expect(removeProblem(ws, 0, -1)).toEqual(ws);
+      expect(removeProblem(ws, 0, 5)).toEqual(ws);
     });
   });
 
   describe("reorderProblem", () => {
     it("moves a problem to a later slot, shifting the rest to fill the gap", () => {
       const ws = sheet();
-      const next = reorderProblem(ws, 1, 3);
+      const next = reorderProblem(ws, 0, 1, 3);
       // problem 1 lands at index 3; the items between shift left by one
-      expect(next.problems).toEqual([
-        ws.problems[0],
-        ws.problems[2],
-        ws.problems[3],
-        ws.problems[1],
-        ws.problems[4],
+      expect(next.sections[0].problems).toEqual([
+        ws.sections[0].problems[0],
+        ws.sections[0].problems[2],
+        ws.sections[0].problems[3],
+        ws.sections[0].problems[1],
+        ws.sections[0].problems[4],
       ]);
     });
 
     it("moves a problem to an earlier slot", () => {
       const ws = sheet();
-      const next = reorderProblem(ws, 3, 0);
-      expect(next.problems).toEqual([
-        ws.problems[3],
-        ws.problems[0],
-        ws.problems[1],
-        ws.problems[2],
-        ws.problems[4],
+      const next = reorderProblem(ws, 0, 3, 0);
+      expect(next.sections[0].problems).toEqual([
+        ws.sections[0].problems[3],
+        ws.sections[0].problems[0],
+        ws.sections[0].problems[1],
+        ws.sections[0].problems[2],
+        ws.sections[0].problems[4],
       ]);
     });
 
     it("preserves the multiset of problems and the count", () => {
       const ws = sheet();
-      const next = reorderProblem(ws, 0, 4);
-      expect(next.count).toBe(5);
+      const next = reorderProblem(ws, 0, 0, 4);
+      expect(next.sections[0].count).toBe(5);
       const bySeed = (a: { seed: number }, b: { seed: number }) =>
         a.seed - b.seed;
-      expect([...next.problems].sort(bySeed)).toEqual(
-        [...ws.problems].sort(bySeed),
+      expect([...next.sections[0].problems].sort(bySeed)).toEqual(
+        [...ws.sections[0].problems].sort(bySeed),
       );
     });
 
     it("is a no-op for same-slot or out-of-range moves", () => {
       const ws = sheet();
-      expect(reorderProblem(ws, 2, 2)).toEqual(ws);
-      expect(reorderProblem(ws, -1, 2)).toEqual(ws);
-      expect(reorderProblem(ws, 2, 5)).toEqual(ws);
+      expect(reorderProblem(ws, 0, 2, 2)).toEqual(ws);
+      expect(reorderProblem(ws, 0, -1, 2)).toEqual(ws);
+      expect(reorderProblem(ws, 0, 2, 5)).toEqual(ws);
     });
   });
 
@@ -256,14 +352,9 @@ describe("per-problem curation", () => {
     it("normalizeWorksheet backfills print on pre-#7 saved files", () => {
       // A file saved before issue #7 has no `print` block.
       const legacy = {
-        version: 1,
+        version: 2,
         title: "Old sheet",
-        generatorId: QUADRATIC_FACTORING_ID,
-        params: {},
-        directions: "Solve.",
-        baseSeed: 1,
-        count: 1,
-        problems: [],
+        sections: [],
       } as unknown as Worksheet;
       expect(normalizeWorksheet(legacy).print).toEqual(DEFAULT_PRINT_CONFIG);
     });

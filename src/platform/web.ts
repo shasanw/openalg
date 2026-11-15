@@ -67,7 +67,8 @@ function openDatabase(factory: IDBFactory, name: string): Promise<IDBDatabase> {
 /**
  * Library metadata read straight from the stored JSON, mirroring the desktop
  * listing: unparseable records yield null and are skipped, missing fields fall
- * back to defaults.
+ * back to defaults. `generatorId` is the first Section's Topic and `count` is
+ * the total Problems across Sections.
  */
 function toEntry(record: LibraryRecord): LibraryEntry | null {
   let data: unknown;
@@ -78,11 +79,21 @@ function toEntry(record: LibraryRecord): LibraryEntry | null {
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
   const obj = data as Record<string, unknown>;
+  // Version 2 keeps Topics and Problems on Sections; a version 1 record is one
+  // Section's worth of fields at the top level.
+  const sections = (Array.isArray(obj.sections) ? obj.sections : [obj]).filter(
+    (s): s is Record<string, unknown> =>
+      typeof s === "object" && s !== null && !Array.isArray(s),
+  );
+  const first = sections[0];
   return {
     id: record.id,
     title: typeof obj.title === "string" ? obj.title : "Untitled worksheet",
-    generatorId: typeof obj.generatorId === "string" ? obj.generatorId : "",
-    count: Array.isArray(obj.problems) ? obj.problems.length : 0,
+    generatorId: typeof first?.generatorId === "string" ? first.generatorId : "",
+    count: sections.reduce(
+      (n, s) => n + (Array.isArray(s.problems) ? s.problems.length : 0),
+      0,
+    ),
     updatedAt: record.updatedAt,
   };
 }

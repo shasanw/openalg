@@ -4,15 +4,22 @@
 // only move bytes, never parse them.
 //
 // A saved file holds BOTH the baked problems (prompt/answer, so a reopen renders
-// identically forever, regardless of later engine changes) AND the recipe
-// (generatorId/params/seed per problem, plus the sheet's baseSeed/count, so it
+// identically forever, regardless of later engine changes) AND the Recipe
+// (generatorId/params/seed per problem, plus each Section's baseSeed/count, so it
 // can be regenerated with fresh seeds). See the PRD "save both" decision.
+//
+// Format versions:
+// - 1: one Topic per Worksheet, with generatorId/params/directions/baseSeed/
+//   count/problems at the top level (desktop-era files). Read only: upgraded on
+//   load to a single-Section version 2 Worksheet.
+// - 2: `sections[]`, each with its own Topic, Topic Options, Directions and
+//   Problems. The only version we write.
 
-import { normalizeWorksheet, type Worksheet } from "./worksheet";
+import { normalizeWorksheet, type Section, type Worksheet } from "./worksheet";
 import type { Problem } from "./types";
 
-/** The only format version we write; load rejects anything else. */
-const CURRENT_VERSION = 1;
+/** The only format version we write. */
+const CURRENT_VERSION = 2;
 
 /**
  * Serialize a worksheet to the JSON we write to disk. Pretty-printed so saved
@@ -56,35 +63,68 @@ function isParams(v: unknown): v is Record<string, boolean | number | string> {
 }
 
 /**
- * Structural validation of a parsed object. We check the recipe and baked fields
- * the rest of the app depends on; `print` is intentionally NOT required here
- * because `normalizeWorksheet` backfills it for older files.
+ * Structural validation of a parsed object, upgrading version 1 files to the
+ * current shape. We check the Recipe and baked fields the rest of the app
+ * depends on; `print` is intentionally NOT required here because
+ * `normalizeWorksheet` backfills it for older files.
  */
 function validateWorksheet(data: unknown): Worksheet {
   if (!isObject(data)) fail("expected a JSON object");
-
+  if (data.version === 1) return upgradeV1(data);
   if (data.version !== CURRENT_VERSION) {
     fail(
-      `unsupported version ${JSON.stringify(data.version)} (expected ${CURRENT_VERSION})`,
+      `unsupported version ${JSON.stringify(data.version)} (expected 1 or ${CURRENT_VERSION})`,
     );
   }
-  if (typeof data.generatorId !== "string" || data.generatorId === "") {
-    fail("missing generatorId");
-  }
   if (typeof data.title !== "string") fail("missing title");
-  if (typeof data.directions !== "string") fail("missing directions");
-  if (typeof data.baseSeed !== "number") fail("missing baseSeed");
-  if (typeof data.count !== "number") fail("missing count");
-  if (!isParams(data.params)) fail("invalid params");
-  if (!Array.isArray(data.problems)) fail("missing problems array");
-
-  data.problems.forEach((p, i) => validateProblem(p, i));
+  if (!Array.isArray(data.sections) || data.sections.length === 0) {
+    fail("missing sections");
+  }
+  data.sections.forEach((s, i) => validateSection(s, `section ${i}`));
 
   // Cast is sound now that every consumed field is checked; print is backfilled
   // downstream by normalizeWorksheet.
   return data as unknown as Worksheet;
 }
 
+/**
+ * A version 1 file is one Topic: its Recipe fields sit at the top level. Lift
+ * them into a single Section so it prints exactly as it did before.
+ */
+function upgradeV1(data: Record<string, unknown>): Worksheet {
+  if (typeof data.title !== "string") fail("missing title");
+  validateSection(data, "worksheet");
+  const section: Section = {
+    generatorId: data.generatorId,
+    params: data.params,
+    directions: data.directions,
+    baseSeed: data.baseSeed,
+    count: data.count,
+    problems: data.problems,
+  };
+  return {
+    version: CURRENT_VERSION,
+    title: data.title,
+    sections: [section],
+    print: data.print,
+  } as Worksheet;
+}
+
+function validateSection(
+  s: unknown,
+  where: string,
+): asserts s is Record<string, unknown> & Section {
+  if (!isObject(s)) fail(`${where} is not an object`);
+  if (typeof s.generatorId !== "string" || s.generatorId === "") {
+    fail(`${where} missing generatorId`);
+  }
+  if (typeof s.directions !== "string") fail(`${where} missing directions`);
+  if (typeof s.baseSeed !== "number") fail(`${where} missing baseSeed`);
+  if (typeof s.count !== "number") fail(`${where} missing count`);
+  if (!isParams(s.params)) fail(`${where} has invalid params`);
+  if (!Array.isArray(s.problems)) fail(`${where} missing problems array`);
+  s.problems.forEach((p, i) => validateProblem(p, i));
+}
 
 function validateProblem(p: unknown, index: number): asserts p is Problem {
   if (!isObject(p)) fail(`problem ${index} is not an object`);

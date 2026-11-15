@@ -4,6 +4,7 @@ import { resolveParams, type ParamValues } from "@/engine/types";
 import {
   buildWorksheet,
   regenerateAll,
+  setSectionDirections,
   type PrintConfig,
   type Worksheet,
 } from "@/engine/worksheet";
@@ -223,15 +224,25 @@ function App() {
   }
 
   /**
+   * Point the Topic picker and Topic Options at the Worksheet's first Section.
+   * The UI builds single-Section Worksheets only, so that Section is the whole
+   * sheet.
+   */
+  function loadSectionControls(ws: Worksheet) {
+    const section = ws.sections[0];
+    setGeneratorId(section.generatorId);
+    setParams(section.params);
+    setCount(section.count || DEFAULT_COUNT);
+  }
+
+  /**
    * Load a worksheet object into the workspace as a fresh document (new library
    * id). Shared by file import, recents-less opens, and OS "open with".
    */
   function adoptWorksheet(ws: Worksheet) {
     setDocId(newDocId());
     setWorksheet(ws);
-    setGeneratorId(ws.generatorId);
-    setParams(ws.params);
-    setCount(ws.count || DEFAULT_COUNT);
+    loadSectionControls(ws);
     setShowAnswers(false);
     setView("doc");
   }
@@ -250,9 +261,7 @@ function App() {
       }
       setDocId(id);
       setWorksheet(ws);
-      setGeneratorId(ws.generatorId);
-      setParams(ws.params);
-      setCount(ws.count || DEFAULT_COUNT);
+      loadSectionControls(ws);
       setShowAnswers(false);
       setView("doc");
     } catch (e) {
@@ -315,7 +324,7 @@ function App() {
   const setTitle = (title: string) =>
     setWorksheet((ws) => (ws ? { ...ws, title } : ws));
   const setDirections = (directions: string) =>
-    setWorksheet((ws) => (ws ? { ...ws, directions } : ws));
+    setWorksheet((ws) => (ws ? setSectionDirections(ws, 0, directions) : ws));
   const setPrint = (print: PrintConfig) =>
     setWorksheet((ws) => (ws ? { ...ws, print } : ws));
 
@@ -442,7 +451,7 @@ function App() {
           generator={generator}
           params={params}
           onParamsChange={setParams}
-          directions={worksheet?.directions ?? null}
+          directions={worksheet?.sections[0]?.directions ?? null}
           onDirectionsChange={setDirections}
           count={count}
           onCountChange={setCount}

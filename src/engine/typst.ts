@@ -8,7 +8,7 @@
 // substitutes the placeholders. This keeps the single LaTeX representation while
 // letting Typst own page layout, columns, and pagination.
 
-import type { PrintConfig, Worksheet } from "./worksheet";
+import { allProblems, type PrintConfig, type Worksheet } from "./worksheet";
 
 export interface TypstDocument {
   /** Typst source containing `@@M<i>@@` placeholders. */
@@ -89,9 +89,28 @@ export function buildTypstDocument(
   const cell = (n: number, latex: string): string =>
     `  grid.cell[#box(width: 1.6em)[${n}\\)] ${placeholder(latex)}],`;
 
-  const problemCells = ws.problems
-    .map((p, i) => cell(i + 1, p.prompt))
-    .join("\n");
+  // Problems are numbered continuously across Sections; each Section prints its
+  // own Directions above its own grid.
+  let number = 0;
+  const sectionBlocks = ws.sections
+    .map((section) => {
+      const cells = section.problems
+        .map((p) => cell(++number, p.prompt))
+        .join("\n");
+      return `#emph[${escapeTypstText(section.directions)}]
+
+#v(0.8em)
+
+#grid(
+  columns: (1fr, 1fr),
+  column-gutter: 1.5em,
+  row-gutter: ${spacing},
+  align: top,
+${cells}
+)
+`;
+    })
+    .join("\n#v(1.2em)\n\n");
 
   // Header: editable title (sized to its content so it never wraps early), with
   // an optional Name / Date / Period blank filling the rest of the line. When
@@ -120,21 +139,11 @@ ${header}
 #line(length: 100%, stroke: 0.8pt)
 #v(0.6em)
 
-#emph[${escapeTypstText(ws.directions)}]
-
-#v(0.8em)
-
-#grid(
-  columns: (1fr, 1fr),
-  column-gutter: 1.5em,
-  row-gutter: ${spacing},
-  align: top,
-${problemCells}
-)
-`;
+${sectionBlocks}`;
 
   if (keyFormat === "full") {
-    const answerCells = ws.problems
+    // One continuous Answer Key, numbered to match the Problems.
+    const answerCells = allProblems(ws)
       .map((p, i) => cell(i + 1, p.answer))
       .join("\n");
     source += `

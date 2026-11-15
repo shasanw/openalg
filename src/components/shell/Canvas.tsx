@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { buildTypstDocument } from "@/engine/typst";
-import type { Worksheet } from "@/engine/worksheet";
+import { problemCount, type Worksheet } from "@/engine/worksheet";
 import { platform } from "@/platform";
 import { Label } from "@/components/ui/label";
 
@@ -48,7 +48,7 @@ export function Canvas({
         className="no-scrollbar bg-background relative min-h-0 flex-1 overflow-auto"
         style={DOT_SURFACE}
       >
-        {worksheet && worksheet.problems.length > 0 ? (
+        {worksheet && problemCount(worksheet) > 0 ? (
           <Pages worksheet={worksheet} showAnswers={showAnswers} />
         ) : (
           <div className="text-muted-foreground flex h-full items-center justify-center px-8 text-center text-sm">

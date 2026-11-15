@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { buildTypstDocument, escapeTypstText } from "./typst";
-import { buildWorksheet, DEFAULT_PRINT_CONFIG, type PrintConfig } from "./worksheet";
+import {
+  buildSection,
+  buildWorksheet,
+  DEFAULT_PRINT_CONFIG,
+  type PrintConfig,
+  type Worksheet,
+} from "./worksheet";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
+import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
 
 function ws(count: number, print?: Partial<PrintConfig>) {
   return buildWorksheet({
@@ -41,11 +48,58 @@ describe("buildTypstDocument", () => {
     const w = ws(2);
     const doc = buildTypstDocument(w);
     expect(doc.source).toContain(escapeTypstText(w.title));
-    expect(doc.source).toContain(escapeTypstText(w.directions));
+    expect(doc.source).toContain(escapeTypstText(w.sections[0].directions));
   });
 
   it("is deterministic", () => {
     expect(buildTypstDocument(ws(4))).toEqual(buildTypstDocument(ws(4)));
+  });
+});
+
+describe("buildTypstDocument Sections", () => {
+  /** Hand-built: 3 factoring Problems, then 2 quadratic-formula Problems. */
+  function twoSections(): Worksheet {
+    const ws = buildWorksheet({
+      generatorId: QUADRATIC_FACTORING_ID,
+      baseSeed: 1,
+      count: 3,
+      directions: "Solve each equation by factoring.",
+    });
+    const second = buildSection({
+      generatorId: QUADRATIC_FORMULA_ID,
+      baseSeed: 2,
+      count: 2,
+      directions: "Solve using the quadratic formula.",
+    });
+    return { ...ws, sections: [...ws.sections, second] };
+  }
+
+  it("prints each Section's Directions above its own Problems", () => {
+    const ws = twoSections();
+    const { source } = buildTypstDocument(ws, { keyFormat: "none" });
+    const first = source.indexOf("#emph[Solve each equation by factoring.]");
+    const second = source.indexOf("#emph[Solve using the quadratic formula.]");
+    expect(first).toBeGreaterThan(-1);
+    expect(second).toBeGreaterThan(first);
+    // Problems 1-3 sit between the two Directions; 4-5 come after the second.
+    const label = (n: number) => source.indexOf(`[${n}\\)]`);
+    [1, 2, 3].forEach((n) => {
+      expect(label(n)).toBeGreaterThan(first);
+      expect(label(n)).toBeLessThan(second);
+    });
+    [4, 5].forEach((n) => expect(label(n)).toBeGreaterThan(second));
+  });
+
+  it("numbers Problems continuously across Sections, in the Answer Key too", () => {
+    const ws = twoSections();
+    const doc = buildTypstDocument(ws, { keyFormat: "full" });
+    const labels = [...doc.source.matchAll(/\[(\d+)\\\)\]/g)].map((m) => Number(m[1]));
+    expect(labels).toEqual([1, 2, 3, 4, 5, 1, 2, 3, 4, 5]);
+    const problems = ws.sections.flatMap((s) => s.problems);
+    expect(doc.math).toEqual([
+      ...problems.map((p) => p.prompt),
+      ...problems.map((p) => p.answer),
+    ]);
   });
 });
 
