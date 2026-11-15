@@ -4,8 +4,10 @@ import { resolveParams, type ParamValues } from "@/engine/types";
 import {
   buildWorksheet,
   regenerateAll,
+  setResponseFormat as withResponseFormat,
   setSectionDirections,
   type PrintConfig,
+  type ResponseFormat,
   type Worksheet,
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
@@ -376,8 +378,10 @@ function App() {
         params: resolved,
         baseSeed: randomSeed(),
         count,
-        // Keep the document's print/layout settings across a topic switch.
+        // Keep the document's print/layout settings and Response Format across
+        // a topic switch.
         print: worksheet?.print,
+        responseFormat: worksheet?.responseFormat,
       }),
     );
   }
@@ -390,8 +394,10 @@ function App() {
         baseSeed: randomSeed(),
         count,
         // Regenerating problems must not reset the teacher's layout choices
-        // (spacing, paper, margins, …) — carry the current config forward.
+        // (spacing, paper, margins, …) or free response / multiple choice —
+        // carry the current config forward.
         print: worksheet?.print,
+        responseFormat: worksheet?.responseFormat,
       }),
     );
   }
@@ -409,6 +415,8 @@ function App() {
     setWorksheet((ws) => (ws ? setSectionDirections(ws, 0, directions) : ws));
   const setPrint = (print: PrintConfig) =>
     setWorksheet((ws) => (ws ? { ...ws, print } : ws));
+  const setResponseFormat = (responseFormat: ResponseFormat) =>
+    setWorksheet((ws) => (ws ? withResponseFormat(ws, responseFormat) : ws));
 
   /** Export a portable copy to a user-chosen .json file (auto-save is separate). */
   async function save() {
@@ -539,6 +547,8 @@ function App() {
           onParamsChange={setParams}
           directions={worksheet?.sections[0]?.directions ?? null}
           onDirectionsChange={setDirections}
+          responseFormat={worksheet?.responseFormat ?? null}
+          onResponseFormatChange={setResponseFormat}
           count={count}
           onCountChange={setCount}
           onGenerate={generate}

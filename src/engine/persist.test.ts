@@ -6,6 +6,7 @@ import {
   buildWorksheet,
   regenerateAll,
   DEFAULT_PRINT_CONFIG,
+  DEFAULT_RESPONSE_FORMAT,
   type Worksheet,
 } from "./worksheet";
 import { buildTypstDocument } from "./typst";
@@ -221,5 +222,54 @@ describe("version 1 upgrade", () => {
     const v1b = JSON.parse(asV1File(sampleWorksheet()));
     v1b.problems[0].answer = 3;
     expect(() => deserializeWorksheet(JSON.stringify(v1b))).toThrow(/answer/);
+  });
+});
+
+describe("Response Format (multiple choice)", () => {
+  const mcSheet = (): Worksheet => ({
+    ...sampleWorksheet(),
+    responseFormat: { mode: "multiple-choice", choices: 3 },
+  });
+
+  it("round-trips a multiple-choice Worksheet byte-identically", () => {
+    const json = serializeWorksheet(mcSheet());
+    expect(serializeWorksheet(deserializeWorksheet(json))).toBe(json);
+    expect(deserializeWorksheet(json).responseFormat).toEqual({
+      mode: "multiple-choice",
+      choices: 3,
+    });
+  });
+
+  it("a reopened multiple-choice Worksheet prints the same choices and key", () => {
+    const ws = mcSheet();
+    const loaded = deserializeWorksheet(serializeWorksheet(ws));
+    expect(buildTypstDocument(loaded, { keyFormat: "full" })).toEqual(
+      buildTypstDocument(ws, { keyFormat: "full" }),
+    );
+  });
+
+  it("loads a file saved before #5 as free response", () => {
+    const { responseFormat: _drop, ...legacy } = sampleWorksheet();
+    const loaded = deserializeWorksheet(JSON.stringify(legacy));
+    expect(loaded.responseFormat).toEqual(DEFAULT_RESPONSE_FORMAT);
+    expect(loaded.responseFormat.mode).toBe("free-response");
+  });
+
+  it("v1 files load as free response", () => {
+    expect(
+      deserializeWorksheet(asV1File(sampleWorksheet())).responseFormat,
+    ).toEqual(DEFAULT_RESPONSE_FORMAT);
+  });
+
+  it("clamps an out-of-range choice count", () => {
+    const ws = { ...mcSheet(), responseFormat: { mode: "multiple-choice", choices: 9 } };
+    expect(deserializeWorksheet(JSON.stringify(ws)).responseFormat.choices).toBe(5);
+  });
+
+  it("rejects a malformed responseFormat", () => {
+    const bad = { ...mcSheet(), responseFormat: { mode: "essay", choices: 4 } };
+    expect(() => deserializeWorksheet(JSON.stringify(bad))).toThrow(/responseFormat/);
+    const bad2 = { ...mcSheet(), responseFormat: { mode: "multiple-choice" } };
+    expect(() => deserializeWorksheet(JSON.stringify(bad2))).toThrow(/choices/);
   });
 });

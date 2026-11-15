@@ -188,3 +188,15 @@ describe("quadratic-formula: answer rendering", () => {
     );
   });
 });
+
+describe("quadratic-formula: dropped the ± distractor", () => {
+  it("offers only the + branch for surd answers", () => {
+    fc.assert(
+      fc.property(anySeed, fc.constantFrom<RootType>("irrational", "imaginary"), (seed, rootType) => {
+        const p = generator.generate({ rootType }, seed);
+        expect(p.answer).toContain("\\pm");
+        expect(p.distractorHints.some((d) => !d.includes("\\pm") && !d.includes(","))).toBe(true);
+      }),
+    );
+  });
+});

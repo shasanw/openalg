@@ -222,7 +222,9 @@ export function answerToLatex(root: ExactRoot): string {
 }
 
 /** Mistake-based distractors for the MC assembler: each models a classic
- * quadratic-formula error. Distinct, and never equal to the correct answer. */
+ * quadratic-formula error (sign of b, dropped the ±, dividing by 2 or a instead
+ * of 2a, i.e. forgetting the leading coefficient, and a sign error in the
+ * discriminant). Distinct, and never equal to the correct answer. */
 export function distractors(k: FormulaConstruction): string[] {
   const { a, b, c, D } = k;
   const correct = answerToLatex(k.root);
@@ -232,15 +234,25 @@ export function distractors(k: FormulaConstruction): string[] {
     makeRoot(-b, b * b + 4 * a * c, 2 * a), // sign error in the discriminant
     makeRoot(-b, D, a), // divided by a instead of 2a
   ];
+  const texts = candidates.map(answerToLatex);
+  texts.splice(1, 0, plusOnlyAnswer(k.root)); // dropped the ±
   const seen = new Set<string>([correct]);
   const out: string[] = [];
-  for (const root of candidates) {
-    const tex = answerToLatex(root);
+  for (const tex of texts) {
     if (seen.has(tex)) continue;
     seen.add(tex);
     out.push(tex);
   }
   return out;
+}
+
+/** The "dropped the ±" mistake: only the + branch of the formula. */
+function plusOnlyAnswer(root: ExactRoot): string {
+  const { p, q, s, r } = root;
+  if (s === 1) return `x = ${fractionToLatex(p + q, r)}`;
+  const rad = radicalTerm(q, s);
+  const numer = p === 0 ? rad : `${p} + ${rad}`;
+  return `x = ${r === 1 ? numer : `\\frac{${numer}}{${r}}`}`;
 }
 
 export const generator: Generator = {

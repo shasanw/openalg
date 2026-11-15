@@ -61,22 +61,79 @@ export function construct(params: ParamValues, rng: Rng): FactoringConstruction 
   return { b, c, roots: [r1, r2] };
 }
 
-/** Mistake-based distractors for the MC assembler (slice #4). Distinct, and
- * never equal to the correct answer. */
+/**
+ * Other ways to split c into a factor pair (p, q) with p * q = c whose sum is
+ * NOT -b: the "picked the wrong factor pair" mistake. Ordered by how close the
+ * pair is to the right one, so the most tempting wrong pair comes first.
+ */
+function wrongFactorPairs(k: FactoringConstruction): [number, number][] {
+  const [r1, r2] = k.roots;
+  const c = k.c;
+  if (c === 0) return [];
+  const pairs: [number, number][] = [];
+  const m = Math.abs(c);
+  for (let d = 1; d * d <= m; d++) {
+    if (m % d !== 0) continue;
+    const e = m / d;
+    // Roots with the right product; try both sign patterns that give c.
+    const options: [number, number][] =
+      c > 0
+        ? [
+            [d, e],
+            [-d, -e],
+          ]
+        : [
+            [d, -e],
+            [-d, e],
+          ];
+    for (const [x, y] of options) {
+      // Skip the right pair, and its negation (that is the sign error,
+      // offered separately).
+      if (Math.abs(x + y) === Math.abs(r1 + r2)) continue;
+      pairs.push([x, y]);
+    }
+  }
+  const target = r1 + r2;
+  return pairs.sort(
+    (a, b) =>
+      Math.abs(a[0] + a[1] - target) - Math.abs(b[0] + b[1] - target) ||
+      a[0] - b[0],
+  );
+}
+
+/**
+ * Mistake-based Distractors for the MC assembler, most diagnostic first:
+ * - read the roots straight off the factors without flipping the signs:
+ *   (x - 3)(x + 2) = 0 answered as x = -3, 2 instead of x = -2, 3
+ * - flipped only one of the two signs
+ * - picked a factor pair of c with the wrong sum
+ * - kept only one solution (dropped the other, like dropping a ±)
+ * - wrote the coefficients b and c as the answer
+ * The generator is monic (a = 1), so "forgot to divide by the leading
+ * coefficient" cannot happen here; the quadratic-formula Topic covers it.
+ * Distinct, and never equal to the correct answer.
+ */
 export function distractors(k: FactoringConstruction): string[] {
   const [r1, r2] = k.roots;
   const correct = rootsToLatex([r1, r2]);
-  const candidates = [
+  const [pair1, pair2] = wrongFactorPairs(k);
+  // Interleaved by mistake type, so a sheet with few choices still mixes
+  // different mistakes instead of offering only sign variants.
+  const candidates: number[][] = [
     [-r1, -r2], // forgot to flip signs when reading the factors
+    ...(pair1 ? [pair1] : []), // wrong factor pair of c
     [-r1, r2], // flipped one sign
+    [Math.max(r1, r2)], // kept only one solution
     [r1, -r2], // flipped the other sign
+    ...(pair2 ? [pair2] : []), // another wrong factor pair
+    [Math.min(r1, r2)], // kept only the other solution
     [k.b, k.c], // read the coefficients as the answer
   ];
-  const seen = new Set<string>();
+  const seen = new Set<string>([correct]);
   const out: string[] = [];
   for (const roots of candidates) {
     const tex = rootsToLatex(roots);
-    if (tex === correct || seen.has(tex)) continue;
+    if (seen.has(tex)) continue;
     seen.add(tex);
     out.push(tex);
   }

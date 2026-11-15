@@ -1,12 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { buildTypstDocument, escapeTypstText } from "./typst";
 import {
+  allProblems,
   buildSection,
   buildWorksheet,
   DEFAULT_PRINT_CONFIG,
+  setResponseFormat,
   type PrintConfig,
   type Worksheet,
 } from "./worksheet";
+import {
+  assemble,
+  choiceLetter,
+  choiceSeed,
+  MAX_CHOICES,
+  MIN_CHOICES,
+} from "./mc";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
 import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
 
@@ -179,5 +188,72 @@ describe("escapeTypstText", () => {
     expect(escapeTypstText("a #b [c] *d* @e")).toBe(
       "a \\#b \\[c\\] \\*d\\* \\@e",
     );
+  });
+});
+
+describe("buildTypstDocument multiple choice", () => {
+  function mcSheet(count: number, choices: number): Worksheet {
+    return setResponseFormat(ws(count), { mode: "multiple-choice", choices });
+  }
+
+  it("prints each Problem's prompt followed by its lettered choices", () => {
+    for (let choices = MIN_CHOICES; choices <= MAX_CHOICES; choices++) {
+      const sheet = mcSheet(3, choices);
+      const doc = buildTypstDocument(sheet, { keyFormat: "none" });
+      const problems = allProblems(sheet);
+      const expected = problems.flatMap((p) => [
+        p.prompt,
+        ...assemble(p, { choices, seed: choiceSeed(p) }).choices,
+      ]);
+      expect(doc.math).toEqual(expected);
+      const letters = [...doc.source.matchAll(/\[\(([A-E])\)\]/g)].map((m) => m[1]);
+      const one = [..."ABCDE"].slice(0, choices);
+      expect(letters).toEqual([...one, ...one, ...one]);
+    }
+  });
+
+  it("the Answer Key gives the correct letter and the Answer", () => {
+    const sheet = mcSheet(6, 4);
+    const doc = buildTypstDocument(sheet, { keyFormat: "full" });
+    const key = doc.source.slice(doc.source.indexOf("Answer Key"));
+    const keyLetters = [...key.matchAll(/#strong\[\(([A-E])\)\] @@M(\d+)@@/g)];
+    const problems = allProblems(sheet);
+    expect(keyLetters).toHaveLength(problems.length);
+    keyLetters.forEach((m, i) => {
+      const p = problems[i];
+      const { choices, correctIndex } = assemble(p, { choices: 4, seed: choiceSeed(p) });
+      expect(m[1]).toBe(choiceLetter(correctIndex));
+      expect(doc.math[Number(m[2])]).toBe(p.answer);
+      expect(choices[correctIndex]).toBe(p.answer);
+    });
+  });
+
+  it("the lettered choice the key names is the Answer on the sheet", () => {
+    const sheet = mcSheet(8, 5);
+    const doc = buildTypstDocument(sheet, { keyFormat: "full" });
+    const problems = allProblems(sheet);
+    // Sheet math: per problem, prompt then 5 choices.
+    const keyStart = doc.source.indexOf("Answer Key");
+    const key = [...doc.source.slice(keyStart).matchAll(/#strong\[\(([A-E])\)\]/g)];
+    problems.forEach((p, i) => {
+      const letterIndex = key[i][1].charCodeAt(0) - 65;
+      expect(doc.math[i * 6 + 1 + letterIndex]).toBe(p.answer);
+    });
+  });
+
+  it("every placeholder has a math entry and vice versa", () => {
+    const doc = buildTypstDocument(mcSheet(5, 4), { keyFormat: "full" });
+    const found = [...doc.source.matchAll(/@@M(\d+)@@/g)].map((m) => Number(m[1]));
+    expect(found.sort((a, b) => a - b)).toEqual(doc.math.map((_, i) => i));
+  });
+
+  it("free response prints no choices", () => {
+    const doc = buildTypstDocument(ws(4), { keyFormat: "full" });
+    expect(doc.source).not.toMatch(/\[\([A-E]\)\]/);
+    expect(doc.math).toHaveLength(8);
+  });
+
+  it("is deterministic", () => {
+    expect(buildTypstDocument(mcSheet(5, 3))).toEqual(buildTypstDocument(mcSheet(5, 3)));
   });
 });

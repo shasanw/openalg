@@ -13,6 +13,9 @@ import {
   allProblems,
   problemCount,
   DEFAULT_PRINT_CONFIG,
+  DEFAULT_RESPONSE_FORMAT,
+  isMultipleChoice,
+  setResponseFormat,
   type Worksheet,
 } from "./worksheet";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
@@ -368,5 +371,48 @@ describe("per-problem curation", () => {
       });
       expect(normalizeWorksheet(ws).print.orientation).toBe("landscape");
     });
+  });
+});
+
+describe("Response Format", () => {
+  const base = () =>
+    buildWorksheet({ generatorId: QUADRATIC_FACTORING_ID, baseSeed: 1, count: 3 });
+
+  it("new Worksheets are free response with a default choice count", () => {
+    expect(base().responseFormat).toEqual(DEFAULT_RESPONSE_FORMAT);
+    expect(isMultipleChoice(base())).toBe(false);
+  });
+
+  it("setResponseFormat toggles the whole sheet and clamps choices to 2 to 5", () => {
+    const mc = setResponseFormat(base(), { mode: "multiple-choice", choices: 3 });
+    expect(isMultipleChoice(mc)).toBe(true);
+    expect(mc.responseFormat.choices).toBe(3);
+    expect(setResponseFormat(mc, { mode: "multiple-choice", choices: 1 }).responseFormat.choices).toBe(2);
+    expect(setResponseFormat(mc, { mode: "multiple-choice", choices: 8 }).responseFormat.choices).toBe(5);
+    // The Problems themselves are untouched.
+    expect(mc.sections).toEqual(base().sections);
+  });
+
+  it("buildWorksheet carries a given Response Format", () => {
+    const rf = { mode: "multiple-choice" as const, choices: 5 };
+    const ws = buildWorksheet({
+      generatorId: QUADRATIC_FACTORING_ID,
+      baseSeed: 1,
+      count: 1,
+      responseFormat: rf,
+    });
+    expect(ws.responseFormat).toEqual(rf);
+  });
+
+  it("regenerating keeps the Response Format", () => {
+    const mc = setResponseFormat(base(), { mode: "multiple-choice", choices: 3 });
+    expect(regenerateAll(mc, 99).responseFormat).toEqual(mc.responseFormat);
+  });
+
+  it("normalizeWorksheet backfills a missing Response Format", () => {
+    const { responseFormat: _drop, ...legacy } = base();
+    expect(normalizeWorksheet(legacy as Worksheet).responseFormat).toEqual(
+      DEFAULT_RESPONSE_FORMAT,
+    );
   });
 });

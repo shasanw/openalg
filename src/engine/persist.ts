@@ -13,7 +13,9 @@
 //   count/problems at the top level (desktop-era files). Read only: upgraded on
 //   load to a single-Section version 2 Worksheet.
 // - 2: `sections[]`, each with its own Topic, Topic Options, Directions and
-//   Problems. The only version we write.
+//   Problems. The only version we write. Later additions are optional fields
+//   backfilled by normalizeWorksheet, so they need no version bump:
+//   `responseFormat` (#5, free response vs multiple choice).
 
 import { normalizeWorksheet, type Section, type Worksheet } from "./worksheet";
 import type { Problem } from "./types";
@@ -81,6 +83,7 @@ function validateWorksheet(data: unknown): Worksheet {
     fail("missing sections");
   }
   data.sections.forEach((s, i) => validateSection(s, `section ${i}`));
+  if (data.responseFormat !== undefined) validateResponseFormat(data.responseFormat);
 
   // Cast is sound now that every consumed field is checked; print is backfilled
   // downstream by normalizeWorksheet.
@@ -108,6 +111,19 @@ function upgradeV1(data: Record<string, unknown>): Worksheet {
     sections: [section],
     print: data.print,
   } as Worksheet;
+}
+
+/**
+ * `responseFormat` (#5) is optional: files saved before it load as free
+ * response via normalizeWorksheet. When present it must be well formed; an
+ * out-of-range choice count is clamped rather than rejected.
+ */
+function validateResponseFormat(r: unknown): void {
+  if (!isObject(r)) fail("responseFormat is not an object");
+  if (r.mode !== "free-response" && r.mode !== "multiple-choice") {
+    fail("responseFormat has an invalid mode");
+  }
+  if (typeof r.choices !== "number") fail("responseFormat missing choices");
 }
 
 function validateSection(

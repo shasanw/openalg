@@ -30,6 +30,10 @@ _Avoid_: Solution
 A wrong answer offered in a multiple-choice Problem, modelled on a mistake students commonly make.
 _Avoid_: Wrong option, decoy
 
+**Response Format**:
+Whether a Worksheet's Problems are answered free response or multiple choice (with 2 to 5 choices each). Set for the whole Worksheet, not per Section.
+_Avoid_: Mode, question type
+
 **Custom Problem**:
 A Problem a teacher wrote by hand rather than one produced from a Topic.
 
