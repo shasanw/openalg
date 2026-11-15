@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GENERATORS, getGenerator } from "@/engine/registry";
 import { resolveParams, type ParamValues } from "@/engine/types";
 import {
@@ -9,8 +9,13 @@ import {
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
 import { platform } from "@/platform";
-import type { LibraryEntry } from "@/platform/types";
+import type {
+  LibraryEntry,
+  LibraryRestoreSummary,
+  StoragePersistence,
+} from "@/platform/types";
 import { useTheme } from "@/lib/useTheme";
+import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import { useToast } from "@/components/ui/toast";
 import { HomeScreen } from "@/components/home/HomeScreen";
 import { TopBar, type DocMode } from "@/components/shell/TopBar";
@@ -18,6 +23,23 @@ import { Navigator } from "@/components/shell/Navigator";
 import { Canvas } from "@/components/shell/Canvas";
 import { Inspector } from "@/components/shell/Inspector";
 import { PrintConfigDialog } from "@/components/shell/PrintConfigDialog";
+
+function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+/** One-line summary of a Library restore for the toast. */
+function restoreDescription(s: LibraryRestoreSummary): string {
+  const parts: string[] = [];
+  if (s.overwritten > 0) parts.push(`${s.overwritten} replaced by a newer backup copy`);
+  if (s.skipped > 0) parts.push(`${s.skipped} kept because your Library copy is newer`);
+  if (s.failed.length > 0) {
+    const which = s.failed.map((f) => f.id ?? `entry ${f.index + 1}`).join(", ");
+    const n = s.failed.length;
+    parts.push(`${n} ${n === 1 ? "entry" : "entries"} couldn't be read (${which})`);
+  }
+  return parts.length > 0 ? `${parts.join("; ")}.` : "Every Worksheet in the backup was added.";
+}
 
 function randomSeed(): number {
   // A fresh seed per user action. Generators never call Math.random themselves;
@@ -120,6 +142,15 @@ function App() {
   const [recents, setRecents] = useState<LibraryEntry[]>([]);
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const install = useInstallPrompt();
+  // Whether the browser keeps the Library from eviction (#26); null = unknown.
+  const [storage, setStorage] = useState<StoragePersistence | null>(null);
+  // Persistent storage is requested once per session, after the first save.
+  const persistRequested = useRef(false);
+
+  useEffect(() => {
+    platform.storagePersistence().then(setStorage).catch(() => setStorage(null));
+  }, []);
 
   // Auto-save: whenever the open document changes, debounce a silent write to
   // its library file. This is the primary persistence path — the user never has
@@ -131,7 +162,18 @@ function App() {
     const timer = setTimeout(() => {
       platform
         .autosaveWorksheet(docId, worksheet)
-        .then(() => setAutosave("saved"))
+        .then(() => {
+          setAutosave("saved");
+          // Browsers grant persistence more readily once the site holds real
+          // data, so ask right after the first Worksheet is saved.
+          if (!persistRequested.current) {
+            persistRequested.current = true;
+            platform
+              .requestPersistentStorage()
+              .then(setStorage)
+              .catch((e) => console.error(e));
+          }
+        })
         .catch((e) => {
           console.error(e);
           setAutosave("error");
@@ -273,6 +315,46 @@ function App() {
     }
   }
 
+  /** Download a Library Backup holding every Worksheet in the Library. */
+  async function backupLibrary() {
+    try {
+      const { saved, skipped } = await platform.backupLibrary();
+      toast({
+        variant: "success",
+        title: "Library Backup downloaded",
+        description:
+          `${plural(saved, "Worksheet")} backed up.` +
+          (skipped > 0 ? ` Left out ${plural(skipped, "damaged Worksheet")} that couldn't be read.` : ""),
+      });
+    } catch (e) {
+      console.error(e);
+      toast({ variant: "error", title: "Couldn't back up the Library" });
+    }
+  }
+
+  /** Rebuild the Library from a Library Backup file the teacher picks. */
+  async function restoreLibrary() {
+    let summary: LibraryRestoreSummary | null;
+    try {
+      summary = await platform.restoreLibrary();
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: "error",
+        title: "Couldn't restore that file",
+        description: e instanceof Error ? e.message : undefined,
+      });
+      return;
+    }
+    if (!summary) return;
+    platform.listLibrary().then(setRecents).catch((e) => console.error(e));
+    toast({
+      variant: summary.failed.length > 0 ? "error" : "success",
+      title: `Restored ${plural(summary.restored + summary.overwritten, "Worksheet")}`,
+      description: restoreDescription(summary),
+    });
+  }
+
   /** Switch topic within the workspace and immediately show a fresh sheet. */
   function selectTopic(id: string) {
     const g = getGenerator(id)!;
@@ -404,6 +486,10 @@ function App() {
         onDeleteRecent={deleteRecent}
         theme={theme}
         onThemeChange={setTheme}
+        onBackupLibrary={backupLibrary}
+        onRestoreLibrary={restoreLibrary}
+        storage={storage}
+        install={install}
       />
     );
   }

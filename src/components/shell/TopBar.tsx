@@ -11,9 +11,9 @@ import {
   Printer,
   Save,
   Settings,
-  Sigma,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LogoMark } from "@/components/LogoMark";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { AutosaveState } from "@/App";
@@ -97,9 +97,7 @@ export function TopBar({
         className="hover:bg-accent flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors"
         title="Home"
       >
-        <span className="from-primary/85 to-primary grid size-7 place-content-center rounded-lg bg-gradient-to-br text-white shadow-sm">
-          <Sigma className="size-4" />
-        </span>
+        <LogoMark className="shadow-sm" />
         <span className="text-[17px] font-bold tracking-tight">OpenAlg</span>
       </button>
 
