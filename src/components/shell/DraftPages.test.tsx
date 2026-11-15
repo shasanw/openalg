@@ -10,6 +10,9 @@ import {
   type Worksheet,
 } from "@/engine/worksheet";
 import type { Problem } from "@/engine/types";
+import { getGenerator } from "@/engine/registry";
+import { GRAPHING_QUADRATICS_ID } from "@/engine/generators/graphingQuadratics";
+import { QUADRATIC_INEQUALITIES_ID } from "@/engine/generators/quadraticInequalities";
 import { DraftPages, hasUndrawableContent, sheetInches } from "./DraftPages";
 
 function sheet(opts: Partial<Worksheet> = {}): Worksheet {
@@ -109,9 +112,16 @@ describe("DraftPages", () => {
 
   it("puts a neutral placeholder where a Problem has content it can't draw", () => {
     const ws = sheet();
-    const graphed = { ...ws.sections[0].problems[0], graph: { kind: "parabola" } } as Problem;
+    const graphing = getGenerator(GRAPHING_QUADRATICS_ID)!.generate({}, 1);
+    const inequality = getGenerator(QUADRATIC_INEQUALITIES_ID)!.generate({}, 1);
+    const graphed = { ...ws.sections[0].problems[0], graph: graphing.graph } as Problem;
     expect(hasUndrawableContent(graphed)).toBe(true);
     expect(hasUndrawableContent(ws.sections[0].problems[1])).toBe(false);
+    // A number line only in the key: nothing extra on the student copy.
+    expect(inequality.graph).toBeUndefined();
+    expect(inequality.answerGraph).toBeDefined();
+    expect(hasUndrawableContent(inequality)).toBe(false);
+    expect(hasUndrawableContent(inequality, true)).toBe(true);
     const withGraph: Worksheet = {
       ...ws,
       sections: [{ ...ws.sections[0], problems: [graphed, ...ws.sections[0].problems.slice(1)] }, ws.sections[1]],

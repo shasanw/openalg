@@ -44,8 +44,10 @@ const SPACING_EM: Record<PrintConfig["spacing"], number> = { tight: 1.2, normal:
 /** The key ink, matching the Typst layout's. */
 const KEY_COLOR = "#c62828";
 
-/** Fields every Problem has; anything else (e.g. a graph) the draft can't draw. */
+/** Fields the draft draws, or knows how to handle; anything else gets a placeholder. */
 const DRAWABLE_FIELDS = new Set([
+  "graph",
+  "answerGraph",
   "kind",
   "generatorId",
   "params",
@@ -56,8 +58,14 @@ const DRAWABLE_FIELDS = new Set([
   "distractorHints",
 ]);
 
-/** True when the Problem carries content beyond LaTeX text, such as a graph. */
-export function hasUndrawableContent(problem: Problem): boolean {
+/**
+ * True when this copy of the Problem prints something beyond LaTeX text: its
+ * graph (a blank grid or number line on the student copy), its answer graph
+ * on an in-context key, or any field the draft doesn't know.
+ */
+export function hasUndrawableContent(problem: Problem, answers = false): boolean {
+  if (problem.graph != null) return true;
+  if (answers && problem.answerGraph != null) return true;
   return Object.entries(problem).some(([k, v]) => !DRAWABLE_FIELDS.has(k) && v != null);
 }
 
@@ -271,7 +279,7 @@ function ProblemBody({ ctx, problem, answers }: { ctx: DraftContext; problem: Pr
   const prompt = (
     <>
       <TeX tex={problem.prompt} />
-      {hasUndrawableContent(problem) && (
+      {hasUndrawableContent(problem, answers) && (
         <div
           data-draft-placeholder
           className="mt-[0.4em] flex aspect-[4/3] w-full max-w-[14em] items-center justify-center rounded-[0.3em] border border-dashed border-neutral-300 bg-neutral-50 font-sans text-[0.75em] text-neutral-400"
