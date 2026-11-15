@@ -4,6 +4,7 @@ import {
   allProblems,
   buildSection,
   buildWorksheet,
+  ANSWER_KEY_FORMATS,
   DEFAULT_PRINT_CONFIG,
   setResponseFormat,
   type PrintConfig,
@@ -262,5 +263,148 @@ describe("buildTypstDocument multiple choice", () => {
 
   it("is deterministic", () => {
     expect(buildTypstDocument(mcSheet(5, 3))).toEqual(buildTypstDocument(mcSheet(5, 3)));
+  });
+});
+
+describe("Answer Key formats", () => {
+  /** 3 factoring Problems, then 2 quadratic-formula Problems (numbered 1 to 5). */
+  function twoSections(): Worksheet {
+    const first = buildWorksheet({
+      generatorId: QUADRATIC_FACTORING_ID,
+      baseSeed: 1,
+      count: 3,
+      directions: "Solve each equation by factoring.",
+    });
+    const second = buildSection({
+      generatorId: QUADRATIC_FORMULA_ID,
+      baseSeed: 2,
+      count: 2,
+      directions: "Solve using the quadratic formula.",
+    });
+    return { ...first, sections: [...first.sections, second] };
+  }
+  const mc = (w: Worksheet, choices = 4) =>
+    setResponseFormat(w, { mode: "multiple-choice", choices });
+  const keyOf = (source: string) => source.slice(source.indexOf("#pagebreak()"));
+  const labels = (s: string) => [...s.matchAll(/\[(\d+)\\\)\]/g)].map((m) => Number(m[1]));
+
+  it("prints the Worksheet's own format unless an option overrides it", () => {
+    const sheet = { ...twoSections(), answerKeyFormat: "none" as const };
+    expect(buildTypstDocument(sheet).source).not.toContain("Answer Key");
+    expect(buildTypstDocument(sheet, { keyFormat: "full" }).source).toContain("Answer Key");
+    const odds = { ...twoSections(), answerKeyFormat: "odds" as const };
+    expect(buildTypstDocument(odds)).toEqual(buildTypstDocument(odds, { keyFormat: "odds" }));
+  });
+
+  it("every format and Response Format keeps placeholders and math in step", () => {
+    for (const sheet of [twoSections(), mc(twoSections(), 3)]) {
+      for (const keyFormat of ANSWER_KEY_FORMATS) {
+        const doc = buildTypstDocument(sheet, { keyFormat });
+        const found = [...doc.source.matchAll(/@@M(\d+)@@/g)].map((m) => Number(m[1]));
+        expect(found.sort((a, b) => a - b)).toEqual(doc.math.map((_, i) => i));
+      }
+    }
+  });
+
+  it("none prints no key pages at all", () => {
+    for (const sheet of [twoSections(), mc(twoSections())]) {
+      const doc = buildTypstDocument(sheet, { keyFormat: "none" });
+      expect(doc.source).not.toContain("#pagebreak()");
+      expect(doc.source).not.toContain("Answer Key");
+      expect(doc.source).not.toContain("Answer:");
+      expect(labels(doc.source)).toEqual([1, 2, 3, 4, 5]);
+    }
+  });
+
+  it("full lists every Answer, numbered continuously across Sections", () => {
+    const sheet = twoSections();
+    const doc = buildTypstDocument(sheet, { keyFormat: "full" });
+    expect(labels(keyOf(doc.source))).toEqual([1, 2, 3, 4, 5]);
+    expect(doc.math.slice(5)).toEqual(allProblems(sheet).map((p) => p.answer));
+  });
+
+  it("odds lists only odd-numbered Problems, counting across Sections", () => {
+    const sheet = twoSections();
+    const doc = buildTypstDocument(sheet, { keyFormat: "odds" });
+    const key = keyOf(doc.source);
+    expect(key).toContain("odd-numbered problems");
+    expect(labels(key)).toEqual([1, 3, 5]);
+    const problems = allProblems(sheet);
+    // Problem 5 is the second Section's second Problem.
+    expect(doc.math.slice(5)).toEqual([problems[0], problems[2], problems[4]].map((p) => p.answer));
+  });
+
+  it("odds in multiple choice gives each odd Problem's correct letter and Answer", () => {
+    const sheet = mc(twoSections(), 5);
+    const doc = buildTypstDocument(sheet, { keyFormat: "odds" });
+    const key = keyOf(doc.source);
+    const entries = [...key.matchAll(/\[(\d+)\\\)\] #strong\[\(([A-E])\)\] @@M(\d+)@@/g)];
+    const problems = allProblems(sheet);
+    expect(entries.map((m) => Number(m[1]))).toEqual([1, 3, 5]);
+    for (const [, n, letter, mi] of entries) {
+      const p = problems[Number(n) - 1];
+      const { correctIndex } = assemble(p, { choices: 5, seed: choiceSeed(p) });
+      expect(letter).toBe(choiceLetter(correctIndex));
+      expect(doc.math[Number(mi)]).toBe(p.answer);
+    }
+  });
+
+  describe("in-context", () => {
+    it("is a labelled copy of the Worksheet on fresh pages, numbered from 1", () => {
+      const sheet = twoSections();
+      const doc = buildTypstDocument(sheet, { keyFormat: "in-context" });
+      const key = keyOf(doc.source);
+      expect(key).toContain("#counter(page).update(1)");
+      expect(key).toContain(escapeTypstText(sheet.title));
+      expect(key).toContain("#emph[Solve each equation by factoring.]");
+      expect(key).toContain("#emph[Solve using the quadratic formula.]");
+      expect(key).toMatch(/fill: keycolor\)\[Answer Key\]/);
+      // The key copy has no Name / Date / Period blanks to fill in.
+      expect(key).not.toContain("Name #blank");
+      expect(labels(doc.source)).toEqual([1, 2, 3, 4, 5, 1, 2, 3, 4, 5]);
+    });
+
+    it("prints each free-response Answer directly under its own Problem", () => {
+      const sheet = twoSections();
+      const doc = buildTypstDocument(sheet, { keyFormat: "in-context" });
+      const cells = [...keyOf(doc.source).matchAll(/grid\.cell\[#box\(width: 1\.6em\)\[(\d+)\\\)\] @@M(\d+)@@[\s\S]*?Answer:\] @@M(\d+)@@/g)];
+      const problems = allProblems(sheet);
+      expect(cells).toHaveLength(problems.length);
+      for (const [, n, prompt, answer] of cells) {
+        const p = problems[Number(n) - 1];
+        expect(doc.math[Number(prompt)]).toBe(p.prompt);
+        expect(doc.math[Number(answer)]).toBe(p.answer);
+      }
+    });
+
+    it("circles the correct letter in multiple choice and names it", () => {
+      for (let choices = MIN_CHOICES; choices <= MAX_CHOICES; choices++) {
+        const sheet = mc(twoSections(), choices);
+        const doc = buildTypstDocument(sheet, { keyFormat: "in-context" });
+        const key = keyOf(doc.source);
+        const circled = [...key.matchAll(/radius: 50%[^\n]*?#strong\[([A-E])\]\]\]\] #text\(fill: keycolor\)\[@@M(\d+)@@\]/g)];
+        const named = [...key.matchAll(/Answer: \(([A-E])\)/g)].map((m) => m[1]);
+        const problems = allProblems(sheet);
+        expect(circled).toHaveLength(problems.length);
+        problems.forEach((p, i) => {
+          const { correctIndex } = assemble(p, { choices, seed: choiceSeed(p) });
+          const letter = choiceLetter(correctIndex);
+          expect(circled[i][1]).toBe(letter);
+          expect(doc.math[Number(circled[i][2])]).toBe(p.answer);
+          expect(named[i]).toBe(letter);
+        });
+        // Every other choice keeps its plain "(X)" letter, as on the student copy.
+        const student = doc.source.slice(0, doc.source.indexOf("#pagebreak()"));
+        const plain = (src: string) => [...src.matchAll(/\[\(([A-E])\)\]/g)].length;
+        expect(plain(key)).toBe(plain(student) - problems.length);
+      }
+    });
+
+    it("leaves the student copy unmarked", () => {
+      const doc = buildTypstDocument(mc(twoSections()), { keyFormat: "in-context" });
+      const student = doc.source.slice(0, doc.source.indexOf("#pagebreak()"));
+      expect(student).not.toContain("radius: 50%");
+      expect(student).not.toContain("Answer:");
+    });
   });
 });

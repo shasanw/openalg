@@ -58,6 +58,31 @@ export const DEFAULT_RESPONSE_FORMAT: ResponseFormat = {
   choices: DEFAULT_CHOICES,
 };
 
+/**
+ * Which Answer Key the Worksheet prints after its Problems:
+ * - "full": every Answer, numbered to match the Problems;
+ * - "odds": only odd-numbered Problems (numbering runs across Sections);
+ * - "in-context": a second copy of the Worksheet with each Answer printed
+ *   under its Problem (for multiple choice, the correct letter circled);
+ * - "none": no key pages at all.
+ * A whole-Worksheet content choice (not a Print Setting), shared by every
+ * Version so each Version's key is rendered in the same format.
+ */
+export type AnswerKeyFormat = "full" | "odds" | "in-context" | "none";
+
+export const ANSWER_KEY_FORMATS: readonly AnswerKeyFormat[] = [
+  "full",
+  "odds",
+  "in-context",
+  "none",
+];
+
+export const DEFAULT_ANSWER_KEY_FORMAT: AnswerKeyFormat = "full";
+
+export function isAnswerKeyFormat(v: unknown): v is AnswerKeyFormat {
+  return (ANSWER_KEY_FORMATS as readonly unknown[]).includes(v);
+}
+
 /** True when the Worksheet prints lettered choices under each Problem. */
 export function isMultipleChoice(ws: Worksheet): boolean {
   return ws.responseFormat.mode === "multiple-choice";
@@ -89,6 +114,11 @@ export interface Worksheet {
    * normalizeWorksheet.
    */
   responseFormat: ResponseFormat;
+  /**
+   * The Answer Key format. Optional in files saved before #6; see
+   * normalizeWorksheet (defaults to "full", the only key older files printed).
+   */
+  answerKeyFormat: AnswerKeyFormat;
 }
 
 export interface SectionOptions {
@@ -103,6 +133,7 @@ export interface BuildOptions extends SectionOptions {
   title?: string;
   print?: PrintConfig;
   responseFormat?: ResponseFormat;
+  answerKeyFormat?: AnswerKeyFormat;
 }
 
 /** Build one Section from its Recipe. */
@@ -155,6 +186,7 @@ export function buildWorksheet(opts: BuildOptions): Worksheet {
     sections: [section],
     print: opts.print ?? { ...DEFAULT_PRINT_CONFIG },
     responseFormat: opts.responseFormat ?? { ...DEFAULT_RESPONSE_FORMAT },
+    answerKeyFormat: opts.answerKeyFormat ?? DEFAULT_ANSWER_KEY_FORMAT,
   };
 }
 
@@ -231,9 +263,10 @@ export function setSectionDirections(
 
 /**
  * Backfill defaults onto a worksheet loaded from disk. Files saved before
- * issue #7 have no `print` block, and files saved before #5 have no
- * `responseFormat`; give them the defaults (free response) so the rest of the
- * app can assume both are always present.
+ * issue #7 have no `print` block, files saved before #5 have no
+ * `responseFormat`, and files saved before #6 have no `answerKeyFormat`; give
+ * them the defaults (free response, full key) so the rest of the app can assume
+ * all three are always present.
  */
 export function normalizeWorksheet(ws: Worksheet): Worksheet {
   const response = { ...DEFAULT_RESPONSE_FORMAT, ...ws.responseFormat };
@@ -241,6 +274,9 @@ export function normalizeWorksheet(ws: Worksheet): Worksheet {
     ...ws,
     print: { ...DEFAULT_PRINT_CONFIG, ...ws.print },
     responseFormat: { ...response, choices: clampChoices(response.choices) },
+    answerKeyFormat: isAnswerKeyFormat(ws.answerKeyFormat)
+      ? ws.answerKeyFormat
+      : DEFAULT_ANSWER_KEY_FORMAT,
   };
 }
 

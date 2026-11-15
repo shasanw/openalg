@@ -4,11 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { Inspector } from "./Inspector";
 import { generator } from "@/engine/generators/quadraticFactoring";
 import { resolveParams } from "@/engine/types";
-import type { ResponseFormat } from "@/engine/worksheet";
+import type { AnswerKeyFormat, ResponseFormat } from "@/engine/worksheet";
 
 function renderInspector(
   responseFormat: ResponseFormat | null,
   onResponseFormatChange = vi.fn(),
+  answerKeyFormat: AnswerKeyFormat | null = responseFormat ? "full" : null,
+  onAnswerKeyFormatChange = vi.fn(),
 ) {
   render(
     <Inspector
@@ -19,6 +21,8 @@ function renderInspector(
       onDirectionsChange={() => {}}
       responseFormat={responseFormat}
       onResponseFormatChange={onResponseFormatChange}
+      answerKeyFormat={answerKeyFormat}
+      onAnswerKeyFormatChange={onAnswerKeyFormatChange}
       count={10}
       onCountChange={() => {}}
       onGenerate={() => {}}
@@ -51,5 +55,32 @@ describe("Inspector answer format", () => {
   it("hides the control when no worksheet is open", () => {
     renderInspector(null);
     expect(screen.queryByText("Answer format")).toBeNull();
+  });
+});
+
+describe("Inspector answer key", () => {
+  it("offers full, odds, in context and none", async () => {
+    const onChange = vi.fn();
+    renderInspector({ mode: "free-response", choices: 4 }, vi.fn(), "full", onChange);
+    expect(screen.getByText("Answer key")).toBeTruthy();
+    for (const [name, format] of [
+      ["Odds", "odds"],
+      ["In context", "in-context"],
+      ["None", "none"],
+      ["Full", "full"],
+    ] as const) {
+      await userEvent.click(screen.getByRole("button", { name }));
+      expect(onChange).toHaveBeenLastCalledWith(format);
+    }
+  });
+
+  it("describes the chosen format", () => {
+    renderInspector({ mode: "multiple-choice", choices: 4 }, vi.fn(), "odds");
+    expect(screen.getByText("Answers to odd-numbered problems only.")).toBeTruthy();
+  });
+
+  it("hides the control when no worksheet is open", () => {
+    renderInspector(null);
+    expect(screen.queryByText("Answer key")).toBeNull();
   });
 });

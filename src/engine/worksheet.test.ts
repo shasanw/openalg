@@ -14,6 +14,7 @@ import {
   problemCount,
   DEFAULT_PRINT_CONFIG,
   DEFAULT_RESPONSE_FORMAT,
+  DEFAULT_ANSWER_KEY_FORMAT,
   isMultipleChoice,
   setResponseFormat,
   type Worksheet,
@@ -414,5 +415,35 @@ describe("Response Format", () => {
     expect(normalizeWorksheet(legacy as Worksheet).responseFormat).toEqual(
       DEFAULT_RESPONSE_FORMAT,
     );
+  });
+});
+
+describe("Answer Key format", () => {
+  const base = () =>
+    buildWorksheet({ generatorId: QUADRATIC_FACTORING_ID, baseSeed: 1, count: 3 });
+
+  it("new Worksheets print a full key", () => {
+    expect(DEFAULT_ANSWER_KEY_FORMAT).toBe("full");
+    expect(base().answerKeyFormat).toBe("full");
+  });
+
+  it("buildWorksheet carries a given format, and regenerating keeps it", () => {
+    const ws = buildWorksheet({
+      generatorId: QUADRATIC_FACTORING_ID,
+      baseSeed: 1,
+      count: 3,
+      answerKeyFormat: "in-context",
+    });
+    expect(ws.answerKeyFormat).toBe("in-context");
+    expect(regenerateAll(ws, 99).answerKeyFormat).toBe("in-context");
+  });
+
+  it("normalizeWorksheet backfills a missing or unknown format as full", () => {
+    const { answerKeyFormat: _drop, ...legacy } = base();
+    expect(normalizeWorksheet(legacy as Worksheet).answerKeyFormat).toBe("full");
+    const odd = { ...base(), answerKeyFormat: "evens" } as unknown as Worksheet;
+    expect(normalizeWorksheet(odd).answerKeyFormat).toBe("full");
+    const kept = { ...base(), answerKeyFormat: "odds" as const };
+    expect(normalizeWorksheet(kept).answerKeyFormat).toBe("odds");
   });
 });

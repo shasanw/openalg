@@ -15,9 +15,16 @@
 // - 2: `sections[]`, each with its own Topic, Topic Options, Directions and
 //   Problems. The only version we write. Later additions are optional fields
 //   backfilled by normalizeWorksheet, so they need no version bump:
-//   `responseFormat` (#5, free response vs multiple choice).
+//   `responseFormat` (#5, free response vs multiple choice) and
+//   `answerKeyFormat` (#6, full / odds / in-context / none; absent means full).
 
-import { normalizeWorksheet, type Section, type Worksheet } from "./worksheet";
+import {
+  ANSWER_KEY_FORMATS,
+  isAnswerKeyFormat,
+  normalizeWorksheet,
+  type Section,
+  type Worksheet,
+} from "./worksheet";
 import type { Problem } from "./types";
 
 /** The only format version we write. */
@@ -84,6 +91,11 @@ function validateWorksheet(data: unknown): Worksheet {
   }
   data.sections.forEach((s, i) => validateSection(s, `section ${i}`));
   if (data.responseFormat !== undefined) validateResponseFormat(data.responseFormat);
+  if (data.answerKeyFormat !== undefined && !isAnswerKeyFormat(data.answerKeyFormat)) {
+    fail(
+      `answerKeyFormat must be one of ${ANSWER_KEY_FORMATS.join(", ")}`,
+    );
+  }
 
   // Cast is sound now that every consumed field is checked; print is backfilled
   // downstream by normalizeWorksheet.

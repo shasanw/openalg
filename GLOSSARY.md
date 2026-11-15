@@ -63,7 +63,7 @@ Replace every Problem on a Worksheet with a fresh set from the same Recipe.
 _Avoid_: Re-roll (for the whole Worksheet), reset
 
 **Answer Key**:
-The printed list of a Worksheet's Answers, in one of several formats (full, odd-numbered only, in context, or none).
+The printed list of a Worksheet's Answers, in one of several formats (full, odd-numbered only, in context, or none). The format is a choice on the Worksheet itself, not a Print Setting, and every Version prints its own key in that same format. An in-context key is a copy of the Worksheet with each Answer printed under its Problem (for multiple choice, the correct letter circled).
 _Avoid_: Solutions, key sheet
 
 **Version**:
