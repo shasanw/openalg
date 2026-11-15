@@ -142,6 +142,8 @@ function surdAnswer(root: ExactRoot): string {
 /** Render any exact root form, dispatching on the radicand (used for both the
  * answer and the mistake-based distractors, whose class may differ). */
 export function answerToLatex(root: ExactRoot): string {
+  // A zero discriminant (q === 0) is one repeated real root, not "± 0√0".
+  if (root.q === 0) return rationalAnswer({ ...root, s: 1 });
   return root.s === 1 ? rationalAnswer(root) : surdAnswer(root);
 }
 

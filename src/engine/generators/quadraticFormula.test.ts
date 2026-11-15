@@ -200,3 +200,18 @@ describe("quadratic-formula: dropped the ± distractor", () => {
     );
   });
 });
+
+describe("quadratic-formula: zero-discriminant distractors", () => {
+  it("never render a degenerate radical like 0\\sqrt{0}", () => {
+    for (const rootType of ["rational", "irrational", "imaginary"]) {
+      for (const allowLeadingCoefficient of [true, false]) {
+        for (let seed = 1; seed <= 3000; seed++) {
+          const p = generator.generate({ rootType, allowLeadingCoefficient }, seed);
+          for (const d of p.distractorHints) {
+            expect(d).not.toMatch(/\\pm 0|\\sqrt\{0\}/);
+          }
+        }
+      }
+    }
+  });
+});
