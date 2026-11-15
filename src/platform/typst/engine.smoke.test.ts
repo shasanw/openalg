@@ -9,7 +9,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createTypstEngine, fillMath, typstString, type TypstEngine } from "./engine";
 import { FONT_FILES, MITEX_PACKAGE_FILE } from "./assetFiles";
 import { buildTypstDocument } from "../../engine/typst";
-import { buildWorksheet } from "../../engine/worksheet";
+import { buildWorksheet, setResponseFormat } from "../../engine/worksheet";
+import { GENERATORS } from "../../engine/registry";
+import type { ParamValues } from "../../engine/types";
 import { QUADRATIC_FORMULA_ID } from "../../engine/generators/quadraticFormula";
 
 const require = createRequire(import.meta.url);
@@ -121,4 +123,29 @@ describe("fillMath", () => {
   it("escapes newlines in Typst strings", () => {
     expect(typstString("a\nb")).toBe('"a\\nb"');
   });
+
+});
+
+// Every Topic, under every single-option variation, in both Response Formats,
+// must compile through the real compiler: this is what catches LaTeX that
+// KaTeX accepts but mitex cannot convert.
+describe("every Topic compiles", () => {
+  for (const g of GENERATORS) {
+    const variants: ParamValues[] = [{}];
+    for (const f of g.schema) {
+      if (f.type === "enum") for (const o of f.options) variants.push({ [f.key]: o.value });
+      if (f.type === "boolean") variants.push({ [f.key]: !f.default });
+      if (f.type === "int") variants.push({ [f.key]: f.min }, { [f.key]: f.max });
+    }
+    it(`${g.id}: ${variants.length} option variants, free response and multiple choice`, async () => {
+      for (const [i, params] of variants.entries()) {
+        const fr = buildWorksheet({ generatorId: g.id, params, baseSeed: 1000 + i, count: 20 });
+        const mc = setResponseFormat(fr, { mode: "multiple-choice", choices: 5 });
+        for (const ws of [fr, mc]) {
+          const pages = await engine.svgPages(buildTypstDocument(ws, { keyFormat: "full" }));
+          expect(pages.length).toBeGreaterThan(0);
+        }
+      }
+    }, 120_000);
+  }
 });
