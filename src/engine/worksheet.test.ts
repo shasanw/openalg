@@ -17,8 +17,21 @@ import {
   DEFAULT_ANSWER_KEY_FORMAT,
   isMultipleChoice,
   setResponseFormat,
+  emptyWorksheet,
+  addSection,
+  removeSection,
+  moveSection,
+  duplicateSection,
+  setSectionParams,
+  setSectionCount,
+  clampSectionCount,
+  sectionRanges,
+  sectionLetter,
+  MAX_SECTION_PROBLEMS,
+  MIN_SECTION_PROBLEMS,
   type Worksheet,
 } from "./worksheet";
+import { PARABOLA_PROPERTIES_ID } from "./generators/parabolaProperties";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
 import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
 
@@ -445,5 +458,163 @@ describe("Answer Key format", () => {
     expect(normalizeWorksheet(odd).answerKeyFormat).toBe("full");
     const kept = { ...base(), answerKeyFormat: "odds" as const };
     expect(normalizeWorksheet(kept).answerKeyFormat).toBe("odds");
+  });
+});
+
+describe("Section editing", () => {
+  const section = (generatorId: string, baseSeed: number, count: number) =>
+    buildSection({ generatorId, baseSeed, count });
+
+  /** Three Sections: factoring (3), formula (2), parabola properties (4). */
+  function threeSectionSheet(): Worksheet {
+    let ws = emptyWorksheet({ title: "Unit test" });
+    ws = addSection(ws, section(QUADRATIC_FACTORING_ID, 1, 3));
+    ws = addSection(ws, section(QUADRATIC_FORMULA_ID, 2, 2));
+    ws = addSection(ws, section(PARABOLA_PROPERTIES_ID, 3, 4));
+    return ws;
+  }
+  const topics = (ws: Worksheet) => ws.sections.map((s) => s.generatorId);
+
+  it("emptyWorksheet has no Sections and the default settings", () => {
+    const ws = emptyWorksheet();
+    expect(ws.sections).toEqual([]);
+    expect(ws.title).toBe("Untitled worksheet");
+    expect(ws.print).toEqual(DEFAULT_PRINT_CONFIG);
+    expect(ws.responseFormat).toEqual(DEFAULT_RESPONSE_FORMAT);
+    expect(ws.answerKeyFormat).toBe(DEFAULT_ANSWER_KEY_FORMAT);
+    expect(problemCount(ws)).toBe(0);
+  });
+
+  it("addSection appends by default and inserts at a clamped index", () => {
+    const ws = threeSectionSheet();
+    expect(topics(ws)).toEqual([QUADRATIC_FACTORING_ID, QUADRATIC_FORMULA_ID, PARABOLA_PROPERTIES_ID]);
+    const front = addSection(ws, section(QUADRATIC_FORMULA_ID, 9, 1), -5);
+    expect(front.sections[0].baseSeed).toBe(9);
+    const back = addSection(ws, section(QUADRATIC_FORMULA_ID, 9, 1), 99);
+    expect(back.sections.at(-1)!.baseSeed).toBe(9);
+    // The input is never mutated.
+    expect(ws.sections).toHaveLength(3);
+  });
+
+  it("removeSection drops only that Section; out of range is a no-op", () => {
+    const ws = threeSectionSheet();
+    const next = removeSection(ws, 1);
+    expect(topics(next)).toEqual([QUADRATIC_FACTORING_ID, PARABOLA_PROPERTIES_ID]);
+    expect(next.sections[0]).toBe(ws.sections[0]);
+    expect(removeSection(ws, 3)).toBe(ws);
+    expect(removeSection(ws, -1)).toBe(ws);
+  });
+
+  it("moveSection reorders, keeping each Section's Problems intact", () => {
+    const ws = threeSectionSheet();
+    const down = moveSection(ws, 0, 2);
+    expect(topics(down)).toEqual([QUADRATIC_FORMULA_ID, PARABOLA_PROPERTIES_ID, QUADRATIC_FACTORING_ID]);
+    expect(down.sections[2]).toBe(ws.sections[0]);
+    const up = moveSection(ws, 2, 1);
+    expect(topics(up)).toEqual([QUADRATIC_FACTORING_ID, PARABOLA_PROPERTIES_ID, QUADRATIC_FORMULA_ID]);
+    expect(moveSection(ws, 1, 1)).toBe(ws);
+    expect(moveSection(ws, 0, 3)).toBe(ws);
+    expect(moveSection(ws, -1, 0)).toBe(ws);
+  });
+
+  it("duplicateSection inserts a copy after the source with fresh Problems", () => {
+    let ws = threeSectionSheet();
+    ws = setSectionDirections(ws, 1, "Use the quadratic formula.");
+    ws = setSectionParams(ws, 1, { ...ws.sections[1].params, allowLeadingCoefficient: true });
+    const next = duplicateSection(ws, 1, 777);
+    expect(next.sections).toHaveLength(4);
+    const [src, copy] = [next.sections[1], next.sections[2]];
+    expect(copy.generatorId).toBe(src.generatorId);
+    expect(copy.params).toEqual(src.params);
+    expect(copy.directions).toBe("Use the quadratic formula.");
+    expect(copy.count).toBe(src.count);
+    expect(copy.baseSeed).toBe(777);
+    expect(copy.problems.map((p) => p.prompt)).not.toEqual(src.problems.map((p) => p.prompt));
+    expect(next.sections[3]).toBe(ws.sections[2]);
+    expect(duplicateSection(ws, 5, 1)).toBe(ws);
+  });
+
+  it("setSectionParams rebuilds only that Section from its Recipe", () => {
+    let ws = threeSectionSheet();
+    ws = setSectionDirections(ws, 0, "Factor.");
+    const params = { ...ws.sections[0].params, maxRoot: 3 };
+    const next = setSectionParams(ws, 0, params);
+    const s = next.sections[0];
+    expect(s.params).toEqual(params);
+    expect(s.baseSeed).toBe(ws.sections[0].baseSeed);
+    expect(s.directions).toBe("Factor.");
+    expect(s.problems).toHaveLength(3);
+    for (const p of s.problems) expect(p.params).toMatchObject(params);
+    expect(next.sections[1]).toBe(ws.sections[1]);
+    expect(next.sections[2]).toBe(ws.sections[2]);
+  });
+
+  it("setSectionCount clamps to the limits and keeps the first Problems", () => {
+    const ws = threeSectionSheet();
+    const grown = setSectionCount(ws, 2, 6);
+    expect(grown.sections[2].problems).toHaveLength(6);
+    expect(grown.sections[2].count).toBe(6);
+    expect(grown.sections[2].problems.slice(0, 4)).toEqual(ws.sections[2].problems);
+    expect(setSectionCount(ws, 2, 0).sections[2].count).toBe(MIN_SECTION_PROBLEMS);
+    expect(setSectionCount(ws, 2, 999).sections[2].count).toBe(MAX_SECTION_PROBLEMS);
+    expect(setSectionCount(ws, 2, 4)).toBe(ws);
+    expect(setSectionCount(ws, 9, 4)).toBe(ws);
+  });
+
+  it("clampSectionCount rounds and handles junk input", () => {
+    expect(clampSectionCount(2.6)).toBe(3);
+    expect(clampSectionCount(Number.NaN)).toBe(MIN_SECTION_PROBLEMS);
+    expect(clampSectionCount(-4)).toBe(MIN_SECTION_PROBLEMS);
+  });
+
+  it("sectionRanges number Problems continuously across Sections", () => {
+    const ws = threeSectionSheet();
+    expect(sectionRanges(ws)).toEqual([
+      { first: 1, last: 3 },
+      { first: 4, last: 5 },
+      { first: 6, last: 9 },
+    ]);
+    expect(sectionRanges(moveSection(ws, 2, 0))).toEqual([
+      { first: 1, last: 4 },
+      { first: 5, last: 7 },
+      { first: 8, last: 9 },
+    ]);
+    expect(sectionRanges(emptyWorksheet())).toEqual([]);
+  });
+
+  it("sectionRanges stay continuous after any sequence of edits", () => {
+    const op = fc.oneof(
+      fc.record({ kind: fc.constant("add" as const), count: fc.integer({ min: 1, max: 8 }) }),
+      fc.record({ kind: fc.constant("remove" as const), i: fc.nat(5) }),
+      fc.record({ kind: fc.constant("move" as const), i: fc.nat(5), j: fc.nat(5) }),
+      fc.record({ kind: fc.constant("dup" as const), i: fc.nat(5) }),
+      fc.record({ kind: fc.constant("count" as const), i: fc.nat(5), count: fc.integer({ min: -3, max: 12 }) }),
+    );
+    fc.assert(
+      fc.property(fc.array(op, { maxLength: 12 }), (ops) => {
+        let ws = emptyWorksheet();
+        let seed = 1;
+        for (const o of ops) {
+          if (o.kind === "add") ws = addSection(ws, section(QUADRATIC_FACTORING_ID, seed++, o.count));
+          if (o.kind === "remove") ws = removeSection(ws, o.i);
+          if (o.kind === "move") ws = moveSection(ws, o.i, o.j);
+          if (o.kind === "dup") ws = duplicateSection(ws, o.i, seed++);
+          if (o.kind === "count") ws = setSectionCount(ws, o.i, o.count);
+        }
+        const ranges = sectionRanges(ws);
+        let expected = 1;
+        ranges.forEach((r, i) => {
+          expect(r.first).toBe(expected);
+          expect(r.last - r.first + 1).toBe(ws.sections[i].problems.length);
+          expected = r.last + 1;
+        });
+        expect(expected - 1).toBe(problemCount(ws));
+      }),
+      { numRuns: 60 },
+    );
+  });
+
+  it("sectionLetter labels Sections A to Z, then AA", () => {
+    expect([0, 1, 25, 26, 27].map(sectionLetter)).toEqual(["A", "B", "Z", "AA", "AB"]);
   });
 });

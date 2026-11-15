@@ -90,7 +90,9 @@ function validateWorksheet(data: unknown): Worksheet {
     );
   }
   if (typeof data.title !== "string") fail("missing title");
-  if (!Array.isArray(data.sections) || data.sections.length === 0) {
+  // An empty list is valid: a new Worksheet has no Sections until the teacher
+  // adds one, and the Library autosaves it in that state too.
+  if (!Array.isArray(data.sections)) {
     fail("missing sections");
   }
   data.sections.forEach((s, i) => validateSection(s, `section ${i}`));

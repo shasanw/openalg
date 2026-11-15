@@ -229,7 +229,7 @@ export function buildSection(opts: SectionOptions): Section {
   };
 }
 
-/** Build a single-Section Worksheet (the only kind the UI creates today). */
+/** Build a single-Section Worksheet (a Topic template on the home screen). */
 export function buildWorksheet(opts: BuildOptions): Worksheet {
   const section = buildSection(opts);
   return {
@@ -312,6 +312,153 @@ export function setSectionDirections(
   directions: string,
 ): Worksheet {
   return withSection(ws, sectionIndex, (s) => ({ ...s, directions }));
+}
+
+// --- Section editing ---------------------------------------------------------
+//
+// The editor builds multi-Section Worksheets (a test is just a Worksheet with
+// several Sections). Every helper returns a new Worksheet and treats an
+// out-of-range index as a no-op, so the UI can call them without bounds checks.
+
+/** Fewest and most Problems a teacher can ask a Section for. */
+export const MIN_SECTION_PROBLEMS = 1;
+export const MAX_SECTION_PROBLEMS = 50;
+
+/** Problems a newly added Section starts with. */
+export const DEFAULT_SECTION_PROBLEMS = 10;
+
+/** Clamp a requested Problem count to the Section limits (whole numbers only). */
+export function clampSectionCount(count: number): number {
+  if (!Number.isFinite(count)) return MIN_SECTION_PROBLEMS;
+  return Math.min(MAX_SECTION_PROBLEMS, Math.max(MIN_SECTION_PROBLEMS, Math.round(count)));
+}
+
+export interface EmptyWorksheetOptions {
+  title?: string;
+  print?: PrintConfig;
+  responseFormat?: ResponseFormat;
+  answerKeyFormat?: AnswerKeyFormat;
+}
+
+/** A Worksheet with no Sections yet: what "New Worksheet" starts from. */
+export function emptyWorksheet(opts: EmptyWorksheetOptions = {}): Worksheet {
+  return {
+    version: 2,
+    title: opts.title ?? "Untitled worksheet",
+    sections: [],
+    print: opts.print ?? { ...DEFAULT_PRINT_CONFIG },
+    responseFormat: opts.responseFormat ?? { ...DEFAULT_RESPONSE_FORMAT },
+    answerKeyFormat: opts.answerKeyFormat ?? DEFAULT_ANSWER_KEY_FORMAT,
+  };
+}
+
+/**
+ * Insert a Section at `at` (default: the end). `at` is clamped into range, so
+ * any index is safe.
+ */
+export function addSection(ws: Worksheet, section: Section, at?: number): Worksheet {
+  const index = at === undefined ? ws.sections.length : Math.max(0, Math.min(ws.sections.length, at));
+  const sections = ws.sections.slice();
+  sections.splice(index, 0, section);
+  return { ...ws, sections };
+}
+
+/** Remove the Section at `index`. */
+export function removeSection(ws: Worksheet, index: number): Worksheet {
+  if (!ws.sections[index]) return ws;
+  return { ...ws, sections: ws.sections.filter((_, i) => i !== index) };
+}
+
+/**
+ * Move the Section at `from` to the slot at `to`, shifting the rest to fill the
+ * gap. Out-of-range indices, or `from === to`, leave the Worksheet unchanged.
+ */
+export function moveSection(ws: Worksheet, from: number, to: number): Worksheet {
+  const n = ws.sections.length;
+  if (from === to || from < 0 || from >= n || to < 0 || to >= n) return ws;
+  const sections = ws.sections.slice();
+  const [moved] = sections.splice(from, 1);
+  sections.splice(to, 0, moved);
+  return { ...ws, sections };
+}
+
+/**
+ * Duplicate the Section at `index`, inserting the copy right after it. The copy
+ * keeps the Topic, Topic Options, Problem count and Directions but gets fresh
+ * Problems from `newBaseSeed`, since two identical runs of Problems are rarely
+ * what a teacher wants.
+ */
+export function duplicateSection(ws: Worksheet, index: number, newBaseSeed: number): Worksheet {
+  const source = ws.sections[index];
+  if (!source) return ws;
+  return addSection(ws, regenerateSectionFrom(source, newBaseSeed), index + 1);
+}
+
+/**
+ * Change a Section's Topic Options. The Section is rebuilt from its Recipe with
+ * the new options (same base seed and count), keeping its Directions.
+ */
+export function setSectionParams(ws: Worksheet, index: number, params: ParamValues): Worksheet {
+  return withSection(ws, index, (s) =>
+    buildSection({
+      generatorId: s.generatorId,
+      params,
+      baseSeed: s.baseSeed,
+      count: s.count,
+      directions: s.directions,
+    }),
+  );
+}
+
+/**
+ * Change how many Problems a Section has, clamped to the Section limits. The
+ * Section is rebuilt from its Recipe with the same base seed, so an
+ * un-curated Section keeps its first Problems and only gains or loses some at
+ * the end.
+ */
+export function setSectionCount(ws: Worksheet, index: number, count: number): Worksheet {
+  const next = clampSectionCount(count);
+  return withSection(ws, index, (s) =>
+    next === s.count && s.problems.length === next
+      ? s
+      : buildSection({
+          generatorId: s.generatorId,
+          params: s.params,
+          baseSeed: s.baseSeed,
+          count: next,
+          directions: s.directions,
+        }),
+  );
+}
+
+/** The printed Problem numbers a Section covers, first and last (1-based). */
+export interface ProblemRange {
+  first: number;
+  last: number;
+}
+
+/**
+ * Each Section's printed Problem range. Numbering runs continuously across
+ * Sections, so ranges always join up; an empty Section has `last < first`.
+ */
+export function sectionRanges(ws: Worksheet): ProblemRange[] {
+  let n = 0;
+  return ws.sections.map((s) => {
+    const first = n + 1;
+    n += s.problems.length;
+    return { first, last: n };
+  });
+}
+
+/** The letter a Section is labelled with in the editor: A, B, ..., Z, AA, AB... */
+export function sectionLetter(index: number): string {
+  let n = index;
+  let out = "";
+  do {
+    out = String.fromCharCode(65 + (n % 26)) + out;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return out;
 }
 
 /**

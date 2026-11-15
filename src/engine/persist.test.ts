@@ -151,11 +151,16 @@ describe("deserializeWorksheet validation", () => {
     }
   });
 
-  it("rejects a version 2 worksheet with no Sections", () => {
+  it("rejects a version 2 worksheet with no sections list", () => {
     const { sections: _omit, ...rest } = sampleWorksheet();
     expect(() => deserializeWorksheet(JSON.stringify(rest))).toThrow(/sections/);
+  });
+
+  it("round-trips a new Worksheet that has no Sections yet", () => {
     const empty = { ...sampleWorksheet(), sections: [] };
-    expect(() => deserializeWorksheet(JSON.stringify(empty))).toThrow(/sections/);
+    const loaded = deserializeWorksheet(serializeWorksheet(empty));
+    expect(loaded.sections).toEqual([]);
+    expect(loaded.title).toBe(empty.title);
   });
 
   it("rejects a Section missing required fields", () => {
