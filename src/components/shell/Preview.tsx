@@ -69,18 +69,23 @@ export function Preview({
         />
         <div className="flex items-center gap-1">
           {versions > 1 && !empty && (
-            <Segmented
-              size="sm"
-              label="Previewed Version"
-              value={shownVersion}
-              onChange={setPreviewVersion}
-              options={Array.from({ length: versions }, (_, i) => ({
-                value: i,
-                label: versionLetter(i),
-                ariaLabel: `Version ${versionLetter(i)}`,
-              }))}
-              className="mr-2"
-            />
+            // Labelled so the A, B, C here never read as Section letters.
+            <div className="mr-2 flex items-center gap-1.5">
+              <span aria-hidden className="text-muted-foreground text-[12px]">
+                Version
+              </span>
+              <Segmented
+                size="sm"
+                label="Previewed Version"
+                value={shownVersion}
+                onChange={setPreviewVersion}
+                options={Array.from({ length: versions }, (_, i) => ({
+                  value: i,
+                  label: versionLetter(i),
+                  ariaLabel: `Version ${versionLetter(i)}`,
+                }))}
+              />
+            </div>
           )}
           <div role="group" aria-label="Zoom" className="flex items-center">
             <Button
