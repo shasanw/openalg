@@ -25,3 +25,5 @@ dist-ssr
 
 # Output of scripts/check-typst-browser.mjs
 check-results
+.vercel
+.env*

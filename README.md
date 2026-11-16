@@ -66,6 +66,22 @@ pnpm build && pnpm check:typst   # browser check: Preview, Print, PDF and ADR 00
 
 `pnpm serve:dist` is a local server set up exactly like that.
 
+### Vercel
+
+The app is hosted on Vercel (project `openalg`, settings in `vercel.json`, which sets the headers above):
+
+- **Previews**: every pull request and branch gets a preview deployment from the Vercel Git integration.
+- **Staging**: every push to `main` builds a deployment at `openalg-git-main-shasan00s-projects.vercel.app`. Previews and staging sit behind Vercel's deployment protection.
+- **Production** (`openalg.vercel.app`): only a release tag deploys it. Pushing a `v*` tag runs `.github/workflows/production.yml`, which builds the tagged commit and promotes it. The project's "auto-assign custom production domains" setting is off, so merges to `main` never go live by themselves.
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+The workflow needs the repository secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`. To run the browser check against a deployment, use `VERCEL_AUTOMATION_BYPASS_SECRET=... pnpm check:typst --url=https://...`.
+
+Vercel compresses on the fly and doesn't use the build's `.br` files, so the compiler WASM arrives as about 10.3 MB brotli instead of 7.2 MB. The project is on the Hobby plan, which is non-commercial: move to Pro before selling any licence (ADR 0003).
+
 ## Supported browsers
 
 Current Chrome, Edge, Safari and Firefox on laptops and Chromebooks, plus Safari on iPad. Phones are not supported.
