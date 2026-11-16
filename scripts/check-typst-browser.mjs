@@ -5,6 +5,10 @@
 //   pnpm build && pnpm check:typst            # Chromium + WebKit
 //   pnpm check:typst --browsers=chromium      # one engine
 //   pnpm check:typst --skip-throttled         # skip the slow 10 Mbps run
+//   pnpm check:typst --url=https://...        # a deployed site instead of dist/
+//
+// With --url, set VERCEL_AUTOMATION_BYPASS_SECRET to get past Vercel's
+// deployment protection on preview and staging URLs.
 //
 // What it does, per engine:
 //  1. Cold visit (fresh profile): opens the app, opens the quadratic-formula
@@ -37,7 +41,12 @@ const args = Object.fromEntries(
 );
 const engines = String(args.browsers ?? "chromium,webkit").split(",");
 const port = Number(args.port ?? 4199);
-const base = `http://localhost:${port}/`;
+const remote = typeof args.url === "string" ? args.url.replace(/\/?$/, "/") : null;
+const base = remote ?? `http://localhost:${port}/`;
+const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const extraHTTPHeaders = remote && bypass
+  ? { "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "samesitenone" }
+  : undefined;
 const outDir = new URL("../check-results/", import.meta.url).pathname;
 mkdirSync(outDir, { recursive: true });
 
@@ -53,12 +62,12 @@ const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 const p95 = (xs) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.ceil(xs.length * 0.95) - 1)];
 
 // Start the production-like server (brotli, immutable caching) ourselves and
-// stop exactly that process at the end.
-const server = spawn(process.execPath, [new URL("./serve-dist.mjs", import.meta.url).pathname], {
+// stop exactly that process at the end. Not needed with --url.
+const server = remote ? null : spawn(process.execPath, [new URL("./serve-dist.mjs", import.meta.url).pathname], {
   env: { ...process.env, PORT: String(port) },
   stdio: ["ignore", "pipe", "inherit"],
 });
-await new Promise((resolve, reject) => {
+if (server) await new Promise((resolve, reject) => {
   server.stdout.on("data", (d) => String(d).includes("serving") && resolve());
   server.on("exit", (code) => reject(new Error(`server exited ${code}`)));
 });
@@ -150,7 +159,7 @@ async function runEngine(name, browserType) {
 
   // --- Cold, throttled (Chromium only: CDP network emulation) ---
   if (name === "chromium" && !args["skip-throttled"]) {
-    const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+    const ctx = await browser.newContext({ extraHTTPHeaders, viewport: { width: 1400, height: 900 } });
     watchOrigin(ctx, offOrigin);
     const page = await ctx.newPage();
     const cdp = await ctx.newCDPSession(page);
@@ -244,7 +253,7 @@ async function runEngine(name, browserType) {
   // --- Compiler loaded before the first Worksheet opens (the usual case:
   // the download overlaps choosing a Topic) ---
   {
-    const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+    const ctx = await browser.newContext({ extraHTTPHeaders, viewport: { width: 1400, height: 900 } });
     const page = await ctx.newPage();
     await page.goto(base);
     await page.waitForFunction(() => performance.getEntriesByName("openalg:typst-ready").length > 0, null, { timeout: 60_000 });
@@ -258,7 +267,7 @@ async function runEngine(name, browserType) {
   }
 
   // --- Cold, unthrottled localhost ---
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
+  const ctx = await browser.newContext({ extraHTTPHeaders, viewport: { width: 1400, height: 900 }, acceptDownloads: true });
   watchOrigin(ctx, offOrigin);
   await ctx.addInitScript(PRINT_STUB);
   const page = await ctx.newPage();
@@ -427,7 +436,7 @@ try {
     results.push(await runEngine(name, name === "webkit" ? webkit : chromium));
   }
 } finally {
-  server.kill();
+  server?.kill();
 }
 
 console.log("\n== Budgets (ADR 0002) ==");
