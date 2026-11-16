@@ -77,13 +77,13 @@ async function printWorksheet(ws: Worksheet): Promise<void> {
     .map((svg) => `<div class="page">${svg}</div>`)
     .join("")}</body></html>`;
 
-  // A full-window overlay iframe gives the print preview the full viewport.
-  // It's briefly visible before the dialog covers it, then removed once
+  // Offscreen and zero-size: print layout comes from `@page`, not the iframe's
+  // box, so the app stays visible behind the dialog. It's removed once
   // printing finishes.
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.cssText =
-    "position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:2147483647;background:#fff;";
+    "position:fixed;left:-10000px;top:0;width:0;height:0;border:0;";
   iframe.srcdoc = html;
   iframe.onload = () => {
     const win = iframe.contentWindow;
