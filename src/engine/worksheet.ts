@@ -7,7 +7,7 @@
 
 import { clampChoices, DEFAULT_CHOICES } from "./mc";
 import { deriveSeed } from "./rng";
-import { getGenerator } from "./registry";
+import { GENERATORS, getGenerator } from "./registry";
 import type { ParamValues, Problem } from "./types";
 
 /**
@@ -341,11 +341,26 @@ export interface EmptyWorksheetOptions {
   versions?: VersionSettings;
 }
 
+/** The title a new blank Worksheet starts with. */
+export const DEFAULT_WORKSHEET_TITLE = "Untitled worksheet";
+
+/**
+ * Whether a Worksheet is effectively thrown away: it has no Problems and the
+ * teacher never named it (its title is the blank default or a Topic's own
+ * title, as a template starts with). Such a Worksheet isn't worth keeping in
+ * the Library.
+ */
+export function isThrowaway(ws: Worksheet): boolean {
+  if (problemCount(ws) > 0) return false;
+  const title = ws.title.trim();
+  return title === "" || title === DEFAULT_WORKSHEET_TITLE || GENERATORS.some((g) => g.title === title);
+}
+
 /** A Worksheet with no Sections yet: what "New Worksheet" starts from. */
 export function emptyWorksheet(opts: EmptyWorksheetOptions = {}): Worksheet {
   return {
     version: 2,
-    title: opts.title ?? "Untitled worksheet",
+    title: opts.title ?? DEFAULT_WORKSHEET_TITLE,
     sections: [],
     print: opts.print ?? { ...DEFAULT_PRINT_CONFIG },
     responseFormat: opts.responseFormat ?? { ...DEFAULT_RESPONSE_FORMAT },

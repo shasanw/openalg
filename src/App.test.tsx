@@ -34,6 +34,9 @@ vi.mock("@/platform", () => ({
           updatedAt,
         };
       }),
+    deleteLibrary: async (id: string) => {
+      library.delete(id);
+    },
     loadLibrary: async (id: string) => {
       const entry = library.get(id);
       return entry ? deserializeWorksheet(entry.json) : null;
@@ -106,5 +109,64 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Test" })).toBeNull();
     expect(screen.queryByTitle("Print & layout")).toBeNull();
     expect(screen.getByRole("tab", { name: "Print" })).toBeInTheDocument();
+  });
+});
+
+// Throwaway Worksheets: opening something and leaving without making it real
+// must not leave an entry in Recent.
+describe("App: throwaway Worksheets stay out of the Library", () => {
+  function renderApp() {
+    render(
+      <ToastProvider>
+        <App />
+      </ToastProvider>,
+    );
+  }
+  /** Wait past the autosave debounce, then go back to the home screen. */
+  async function leave() {
+    await new Promise((r) => setTimeout(r, 900));
+    await userEvent.click(screen.getByRole("button", { name: "Library" }));
+    await screen.findByRole("button", { name: /New Worksheet/ });
+  }
+
+  it("a template opened and left untouched is not saved", async () => {
+    renderApp();
+    await userEvent.click(screen.getByRole("button", { name: /Solving quadratics by factoring/ }));
+    await leave();
+    expect(library.size).toBe(0);
+  });
+
+  it("a template that the teacher changes is saved", async () => {
+    renderApp();
+    await userEvent.click(screen.getByRole("button", { name: /Solving quadratics by factoring/ }));
+    await addSection("formula");
+    await leave();
+    expect(stored()).toHaveLength(1);
+    expect(stored()[0].sections).toHaveLength(2);
+  });
+
+  it("a blank Worksheet with a Section added and then deleted is removed on leaving", async () => {
+    renderApp();
+    await userEvent.click(screen.getByRole("button", { name: /New Worksheet/ }));
+    await addSection("factoring");
+    await waitFor(() => expect(library.size).toBe(1), { timeout: 3000 });
+    await userEvent.click(screen.getByRole("button", { name: "Section A actions" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: /Delete Section/ }));
+    await leave();
+    expect(library.size).toBe(0);
+    expect(screen.queryByText(/Untitled worksheet/)).toBeNull();
+  });
+
+  it("an empty Worksheet the teacher named is kept", async () => {
+    renderApp();
+    await userEvent.click(screen.getByRole("button", { name: /New Worksheet/ }));
+    await addSection("factoring");
+    const title = screen.getByRole("textbox", { name: "Worksheet title" });
+    await userEvent.clear(title);
+    await userEvent.type(title, "Unit 4 Quiz");
+    await userEvent.click(screen.getByRole("button", { name: "Section A actions" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: /Delete Section/ }));
+    await leave();
+    expect(stored().map((w) => w.title)).toEqual(["Unit 4 Quiz"]);
   });
 });

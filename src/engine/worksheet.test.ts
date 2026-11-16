@@ -18,6 +18,7 @@ import {
   isMultipleChoice,
   setResponseFormat,
   emptyWorksheet,
+  isThrowaway,
   addSection,
   removeSection,
   moveSection,
@@ -616,5 +617,17 @@ describe("Section editing", () => {
 
   it("sectionLetter labels Sections A to Z, then AA", () => {
     expect([0, 1, 25, 26, 27].map(sectionLetter)).toEqual(["A", "B", "Z", "AA", "AB"]);
+  });
+});
+
+describe("isThrowaway", () => {
+  it("is true only for a Worksheet with no Problems and no name of its own", () => {
+    const blank = emptyWorksheet();
+    expect(isThrowaway(blank)).toBe(true);
+    expect(isThrowaway({ ...blank, title: "  " })).toBe(true);
+    expect(isThrowaway({ ...blank, title: "Solving quadratics by factoring" })).toBe(true);
+    expect(isThrowaway({ ...blank, title: "Unit 4 Quiz" })).toBe(false);
+    const withProblems = buildWorksheet({ generatorId: "quadratic-factoring", baseSeed: 1, count: 3 });
+    expect(isThrowaway(withProblems)).toBe(false);
   });
 });

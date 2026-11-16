@@ -5,6 +5,7 @@ import {
   buildWorksheet,
   DEFAULT_SECTION_PROBLEMS,
   emptyWorksheet,
+  isThrowaway,
   type Worksheet,
 } from "@/engine/worksheet";
 import { buildTypstDocument } from "@/engine/typst";
@@ -122,10 +123,15 @@ function App() {
   const [storage, setStorage] = useState<StoragePersistence | null>(null);
   // Persistent storage is requested once per session, after the first save.
   const persistRequested = useRef(false);
-  // Whether the open document has reached the Library yet. A brand-new
-  // Worksheet isn't saved until it has a Section, so opening New and going
-  // straight back home doesn't leave an empty Worksheet in the Library.
+  // Whether the open document has reached the Library yet.
   const inLibrary = useRef(false);
+  // A brand-new Worksheet (blank or from a template) as it was opened. It
+  // isn't saved until the teacher changes it, so opening one and going
+  // straight back home leaves nothing in the Library.
+  const pristine = useRef<Worksheet | null>(null);
+  // A document discarded on leaving (see leaveDocument); a debounced save
+  // still pending for it must not write it back.
+  const discarded = useRef<string | null>(null);
 
   useEffect(() => {
     platform.storagePersistence().then(setStorage).catch(() => setStorage(null));
@@ -137,10 +143,11 @@ function App() {
   // failed write is never silent.
   useEffect(() => {
     if (!worksheet || !docId) return;
-    if (worksheet.sections.length === 0 && !inLibrary.current) return;
+    if (!inLibrary.current && (worksheet === pristine.current || isThrowaway(worksheet))) return;
     inLibrary.current = true;
     setAutosave("saving");
     const timer = setTimeout(() => {
+      if (discarded.current === docId) return;
       platform
         .autosaveWorksheet(docId, worksheet)
         .then(() => {
@@ -200,8 +207,36 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Make `ws` the open document under library id `id` and enter the editor. */
-  function openDocument(ws: Worksheet, id: string, alreadyInLibrary: boolean) {
+  /**
+   * Leave the open document. One that ended up thrown away (no Problems, never
+   * named; e.g. a Section added and then deleted) is removed from the Library
+   * rather than left in Recent.
+   */
+  async function leaveDocument() {
+    if (!worksheet || !docId || !isThrowaway(worksheet)) return;
+    discarded.current = docId;
+    if (!inLibrary.current) return;
+    inLibrary.current = false;
+    try {
+      await platform.deleteLibrary(docId);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function goHome() {
+    await leaveDocument();
+    setView("home");
+  }
+
+  /**
+   * Make `ws` the open document under library id `id` and enter the editor.
+   * A new document (`isNew`) waits for its first change before it's saved.
+   */
+  function openDocument(ws: Worksheet, id: string, alreadyInLibrary: boolean, isNew = false) {
+    void leaveDocument();
+    pristine.current = isNew ? ws : null;
+    discarded.current = null;
     inLibrary.current = alreadyInLibrary;
     setAutosave("idle");
     setDocId(id);
@@ -221,6 +256,7 @@ function App() {
       }),
       newDocId(),
       false,
+      true,
     );
   }
 
@@ -229,7 +265,7 @@ function App() {
    * add the first one; it reaches the Library once it has a Section.
    */
   function newBlank() {
-    openDocument(emptyWorksheet(), newDocId(), false);
+    openDocument(emptyWorksheet(), newDocId(), false, true);
   }
 
   /**
@@ -424,7 +460,7 @@ function App() {
         <TopBar
           title={worksheet.title}
           onTitleChange={(title) => updateWorksheet((ws) => ({ ...ws, title }))}
-          onHome={() => setView("home")}
+          onHome={() => void goHome()}
           onOpen={open}
           onSaveCopy={save}
           onExport={exportPdf}
