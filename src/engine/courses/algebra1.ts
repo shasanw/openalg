@@ -14,6 +14,7 @@ export const algebra1: CourseOutline = {
         { topic: "two-step-equations" },
         { topic: "multi-step-equations" },
         { topic: "absolute-value-equations" },
+        { topic: "literal-equations" },
       ],
     },
     { name: "Inequalities", topics: [] },

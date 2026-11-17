@@ -13,6 +13,7 @@ import { generator as oneStepEquations } from "./generators/oneStepEquations";
 import { generator as twoStepEquations } from "./generators/twoStepEquations";
 import { generator as multiStepEquations } from "./generators/multiStepEquations";
 import { generator as absoluteValueEquations } from "./generators/absoluteValueEquations";
+import { generator as literalEquations } from "./generators/literalEquations";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -25,6 +26,7 @@ export const GENERATORS: readonly Generator[] = [
   twoStepEquations,
   multiStepEquations,
   absoluteValueEquations,
+  literalEquations,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
