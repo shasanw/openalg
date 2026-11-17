@@ -9,7 +9,7 @@ export const algebra1: CourseOutline = {
     { name: "Foundations", topics: [] },
     {
       name: "Equations",
-      topics: [{ topic: "one-step-equations" }],
+      topics: [{ topic: "one-step-equations" }, { topic: "two-step-equations" }],
     },
     { name: "Inequalities", topics: [] },
     { name: "Proportions and Percents", topics: [] },

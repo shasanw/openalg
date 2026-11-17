@@ -20,6 +20,7 @@ import {
   pickVariable,
   rat,
   ratValue,
+  solutionHint,
   solutionLatex,
   sub,
   varyVariableField,
@@ -204,7 +205,7 @@ export function construct(params: ParamValues, rng: Rng): OneStepConstruction {
         // 3x = 7: a whole-number coefficient, a fraction solution
         a = rat(nonzeroInt(rng, 2, C, negOk));
         let n = nonzeroInt(rng, 1, S * Math.abs(a.n), negOk);
-        if (n % a.n === 0) n += n > 0 ? 1 : -1;
+        if (n % a.n === 0) n -= n > 0 ? 1 : -1; // toward zero keeps |x| <= S
         x = rat(n, Math.abs(a.n));
       }
       b = mul(a, x);
@@ -294,7 +295,7 @@ export function distractors(k: OneStepConstruction): string[] {
   const answer = solutionLatex(k.v, k.x, k.style);
   return distinctHints(
     answer,
-    values.map((r) => (r ? solutionLatex(k.v, r, k.style) : null)),
+    values.map((r) => solutionHint(k.v, r, k.style)),
   );
 }
 

@@ -96,6 +96,17 @@ export function solutionLatex(v: string, x: Rat, style: NumberStyle = "fraction"
   return `${v} = ${numLatex(x, style)}`;
 }
 
+/**
+ * A one-value Distractor "x = r", or null when r is missing (a mis-solved
+ * equation divided by zero) or, in decimal style, would not print as a
+ * terminating decimal: a fraction among decimal choices gives itself away.
+ */
+export function solutionHint(v: string, r: Rat | null, style: NumberStyle = "fraction"): string | null {
+  if (!r) return null;
+  if (style === "decimal" && decimalString(r) === null) return null;
+  return solutionLatex(v, r, style);
+}
+
 /** "x = -7, 3": several solutions, ascending and de-duplicated. */
 export function solutionsLatex(v: string, xs: Rat[], style: NumberStyle = "fraction"): string {
   const sorted = [...xs].sort((a, b) => ratValue(a) - ratValue(b));
