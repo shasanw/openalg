@@ -17,6 +17,7 @@ export const algebra1: CourseOutline = {
         { topic: "slope" },
         { topic: "parallel-perpendicular-slopes" },
         { topic: "graphing-linear-equations" },
+        { topic: "writing-linear-equations" },
       ],
     },
     { name: "Systems of Equations and Inequalities", topics: [] },
