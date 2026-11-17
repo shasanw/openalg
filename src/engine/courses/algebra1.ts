@@ -11,7 +11,10 @@ export const algebra1: CourseOutline = {
     { name: "Inequalities", topics: [] },
     { name: "Proportions and Percents", topics: [] },
     { name: "Relations and Functions", topics: [] },
-    { name: "Linear Equations and Inequalities", topics: [] },
+    {
+      name: "Linear Equations and Inequalities",
+      topics: [{ topic: "slope" }],
+    },
     { name: "Systems of Equations and Inequalities", topics: [] },
     { name: "Exponents", topics: [] },
     { name: "Polynomials", topics: [] },
