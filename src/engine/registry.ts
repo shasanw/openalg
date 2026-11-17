@@ -9,6 +9,11 @@ import { generator as completingTheSquare } from "./generators/completingTheSqua
 import { generator as parabolaProperties } from "./generators/parabolaProperties";
 import { generator as quadraticInequalities } from "./generators/quadraticInequalities";
 import { generator as graphingQuadratics } from "./generators/graphingQuadratics";
+import { generator as oneStepEquations } from "./generators/oneStepEquations";
+import { generator as twoStepEquations } from "./generators/twoStepEquations";
+import { generator as multiStepEquations } from "./generators/multiStepEquations";
+import { generator as absoluteValueEquations } from "./generators/absoluteValueEquations";
+import { generator as literalEquations } from "./generators/literalEquations";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -17,6 +22,11 @@ export const GENERATORS: readonly Generator[] = [
   parabolaProperties,
   graphingQuadratics,
   quadraticInequalities,
+  oneStepEquations,
+  twoStepEquations,
+  multiStepEquations,
+  absoluteValueEquations,
+  literalEquations,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

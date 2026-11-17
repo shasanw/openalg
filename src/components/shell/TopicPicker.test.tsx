@@ -63,8 +63,8 @@ describe("TopicPicker", () => {
     open();
     expect(screen.getByRole("dialog", { name: "Add Section" })).toBeInTheDocument();
     expect(search()).toHaveFocus();
-    expect(units().map((u) => u.textContent)).toEqual([`All Units${GENERATORS.length}`, `Quadratics${GENERATORS.length}`]);
-    expect(screen.getByText(`${GENERATORS.length} Topics`)).toBeInTheDocument();
+    expect(units().map((u) => u.textContent)).toEqual([`All Units${ALGEBRA_2.length}`, `Quadratics${ALGEBRA_2.length}`]);
+    expect(screen.getByText(`${ALGEBRA_2.length} Topics`)).toBeInTheDocument();
   });
 
   it("hides the Course dropdown while only one Course has Topics", () => {
@@ -289,8 +289,8 @@ describe("TopicPicker", () => {
     it("reaches the Units with Tab, filters, and comes back to the search", async () => {
       const { onPick } = open({ listings: twoUnits() });
       expect(units().map((u) => u.textContent)).toEqual([
-        `All Units${GENERATORS.length + 1}`,
-        `Quadratics${GENERATORS.length}`,
+        `All Units${ALGEBRA_2.length + 1}`,
+        `Quadratics${ALGEBRA_2.length}`,
         "Polynomials1",
       ]);
       await userEvent.tab();

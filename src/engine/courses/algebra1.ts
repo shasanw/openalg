@@ -7,7 +7,16 @@ export const algebra1: CourseOutline = {
   course: "Algebra 1",
   units: [
     { name: "Foundations", topics: [] },
-    { name: "Equations", topics: [] },
+    {
+      name: "Equations",
+      topics: [
+        { topic: "one-step-equations" },
+        { topic: "two-step-equations" },
+        { topic: "multi-step-equations" },
+        { topic: "absolute-value-equations" },
+        { topic: "literal-equations" },
+      ],
+    },
     { name: "Inequalities", topics: [] },
     { name: "Proportions and Percents", topics: [] },
     { name: "Relations and Functions", topics: [] },
