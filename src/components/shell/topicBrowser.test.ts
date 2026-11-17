@@ -1,20 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { GENERATORS, getGenerator } from "@/engine/registry";
+import type { Listing } from "@/engine/courses";
+import { getGenerator } from "@/engine/registry";
 import type { Generator, ParamValues } from "@/engine/types";
 import {
   browseTopics,
-  filterTopics,
+  searchListings,
   SAMPLE_SEEDS,
   sectionsByTopic,
   topicSample,
   usedLabel,
 } from "./topicBrowser";
 
-function stub(id: string, course: string, unit: string, title: string): Generator {
+function stub(id: string, title: string): Generator {
   return {
     id,
-    course,
-    unit,
     title,
     defaultDirections: "",
     schema: [],
@@ -30,25 +29,29 @@ function stub(id: string, course: string, unit: string, title: string): Generato
   };
 }
 
-const TOPICS = [
-  stub("factor", "Algebra 2", "Quadratics", "Solving quadratics by factoring"),
-  stub("formula", "Algebra 2", "Quadratics", "Solving quadratics with the quadratic formula"),
-  stub("qform", "Algebra 2", "Polynomials", "Solving quadratic-form equations"),
-  stub("divide", "Algebra 2", "Polynomials", "Dividing polynomials"),
-  stub("limits", "Precalculus", "Limits", "Evaluating limits"),
+function listing(id: string, course: string, unit: string, title: string): Listing {
+  return { key: `${course}/${id}`, course, unit, topic: stub(id, title), options: {} };
+}
+
+const LISTINGS = [
+  listing("factor", "Algebra 2", "Quadratics", "Solving quadratics by factoring"),
+  listing("formula", "Algebra 2", "Quadratics", "Solving quadratics with the quadratic formula"),
+  listing("qform", "Algebra 2", "Polynomials", "Solving quadratic-form equations"),
+  listing("divide", "Algebra 2", "Polynomials", "Dividing polynomials"),
+  listing("limits", "Precalculus", "Limits", "Evaluating limits"),
 ];
 
-describe("filterTopics", () => {
-  it("filters the registry by Topic title or Unit, grouped by Unit", () => {
-    expect(filterTopics("quadratics").flatMap((u) => u.generators)).toHaveLength(GENERATORS.length);
-    expect(filterTopics("factor").map((u) => u.name)).toEqual(["Quadratics"]);
-    expect(filterTopics("nothing here")).toEqual([]);
+describe("searchListings", () => {
+  it("matches every word against the Topic title, Unit or Course", () => {
+    expect(searchListings("factor", LISTINGS).map((l) => l.key)).toEqual(["Algebra 2/factor"]);
+    expect(searchListings("precalculus", LISTINGS).map((l) => l.key)).toEqual(["Precalculus/limits"]);
+    expect(searchListings("nothing here", LISTINGS)).toEqual([]);
   });
 });
 
 describe("browseTopics", () => {
   const browse = (query: string, unit: string | null = null, course = "Algebra 2") =>
-    browseTopics({ topics: TOPICS, course, unit, query });
+    browseTopics({ listings: LISTINGS, course, unit, query });
 
   it("lists only the chosen Course's Units that have Topics, with counts", () => {
     const v = browse("");
@@ -72,20 +75,20 @@ describe("browseTopics", () => {
   });
 
   it("searches words in any order across title and Unit", () => {
-    expect(browse("polynomials solving").flat.map((g) => g.id)).toEqual(["qform"]);
+    expect(browse("polynomials solving").flat.map((l) => l.topic.id)).toEqual(["qform"]);
   });
 
   it("narrows to one Unit, keeping the Unit-wide search", () => {
     const v = browse("quadratic", "Polynomials");
     expect(v.unit).toBe("Polynomials");
-    expect(v.flat.map((g) => g.id)).toEqual(["qform"]);
+    expect(v.flat.map((l) => l.topic.id)).toEqual(["qform"]);
     expect(v.total).toBe(3);
   });
 
   it("falls back to All Units when the search empties the chosen Unit", () => {
     const v = browse("formula", "Polynomials");
     expect(v.unit).toBeNull();
-    expect(v.flat.map((g) => g.id)).toEqual(["formula"]);
+    expect(v.flat.map((l) => l.topic.id)).toEqual(["formula"]);
   });
 
   it("is empty when nothing matches", () => {
@@ -129,8 +132,15 @@ describe("topicSample", () => {
     expect(topicSample(getGenerator("quadratic-formula")!).graph).toBeNull();
   });
 
-  it("generates once per Topic", () => {
-    const g = stub("once", "Algebra 2", "Quadratics", "Once");
+  it("starts from the given Topic Options", () => {
+    const g = getGenerator("quadratic-factoring")!;
+    expect(topicSample(g, { maxRoot: 3 }).problems).toEqual(
+      SAMPLE_SEEDS.map((seed) => g.generate({ ...Object.fromEntries(g.schema.map((f) => [f.key, f.default])), maxRoot: 3 }, seed).prompt),
+    );
+  });
+
+  it("generates once per Topic and Topic Options", () => {
+    const g = stub("once", "Once");
     const spy = vi.spyOn(g, "generate");
     const first = topicSample(g);
     expect(topicSample(g)).toBe(first);

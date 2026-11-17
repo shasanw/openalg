@@ -69,10 +69,6 @@ export interface Problem {
 
 export interface Generator {
   id: string;
-  /** The Course the Topic belongs to (e.g. "Algebra 2", "Precalculus"). */
-  course: string;
-  /** The Unit of its Course the Topic is filed under (e.g. "Quadratics"). */
-  unit: string;
   /** Shown in the topic tree. */
   title: string;
   /** Default directions line, editable per worksheet (e.g. "Solve each…"). */

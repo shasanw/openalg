@@ -18,7 +18,8 @@ import {
   TriangleAlert,
   Trash2,
 } from "lucide-react";
-import { GENERATORS, getGenerator } from "@/engine/registry";
+import { LISTINGS, type Listing } from "@/engine/courses";
+import { getGenerator } from "@/engine/registry";
 import type { LibraryEntry, StoragePersistence } from "@/platform/types";
 import type { InstallPrompt } from "@/lib/useInstallPrompt";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,7 @@ export function HomeScreen({
   install,
 }: {
   onNewWorksheet: () => void;
-  onOpenTemplate: (generatorId: string) => void;
+  onOpenTemplate: (listing: Listing) => void;
   onOpen: () => void;
   recents: LibraryEntry[];
   onOpenRecent: (id: string) => void;
@@ -108,7 +109,8 @@ export function HomeScreen({
     }
   };
   const [tilesRef, cols] = useColumns<HTMLDivElement>();
-  const templates = GENERATORS;
+  // One tile per Topic, at its first listing in curriculum order.
+  const templates = LISTINGS.filter((l, i) => LISTINGS.findIndex((x) => x.topic.id === l.topic.id) === i);
   // One row: the blank Worksheet plus as many Topics as fit beside it.
   const shown = expanded ? templates : templates.slice(0, cols - 1);
   const hidden = templates.length - shown.length;
@@ -171,15 +173,15 @@ export function HomeScreen({
             <StartCard label="New Worksheet" sub="Add Sections as you go" onClick={onNewWorksheet}>
               <BlankThumb />
             </StartCard>
-            {shown.map((g) => (
+            {shown.map((l) => (
               <StartCard
-                key={g.id}
-                label={g.title}
-                sub={g.unit}
-                title={g.title}
-                onClick={() => onOpenTemplate(g.id)}
+                key={l.key}
+                label={l.topic.title}
+                sub={`${l.course} · ${l.unit}`}
+                title={l.topic.title}
+                onClick={() => onOpenTemplate(l)}
               >
-                <TopicThumb topic={g} />
+                <TopicThumb topic={l.topic} />
               </StartCard>
             ))}
           </div>

@@ -403,8 +403,6 @@ export function distractors(k: ParabolaConstruction, ask: Ask): string[] {
 
 export const generator: Generator = {
   id: PARABOLA_PROPERTIES_ID,
-  course: "Algebra 2",
-  unit: "Quadratics",
   title: "Properties of parabolas (vertex, axis, intercepts)",
   defaultDirections:
     "Find the vertex, axis of symmetry, and intercepts of each parabola.",

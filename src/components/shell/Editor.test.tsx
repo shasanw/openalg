@@ -82,7 +82,7 @@ describe("Editor: Topic picker", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(latest.ws.sections.map((s) => s.generatorId)).toEqual(["quadratic-formula"]);
     expect(latest.ws.sections[0].problems).toHaveLength(10);
-    expect(rowText()).toEqual([expect.stringMatching(/Problems 1–10 · Quadratics/)]);
+    expect(rowText()).toEqual([expect.stringMatching(/Problems 1–10 · Quadratic Functions/)]);
   });
 
   it("moves the highlight with the arrow keys and wraps", async () => {
@@ -116,9 +116,9 @@ describe("Editor: Section outline", () => {
   it("lists each Section with its letter, Topic, continuous range and Unit", () => {
     mount(three());
     expect(rowText()).toEqual([
-      expect.stringMatching(/^ASection A: Solving quadratics by factoringProblems 1–8 · Quadratics$/),
-      expect.stringMatching(/Problems 9–14 · Quadratics/),
-      expect.stringMatching(/Problems 15–18 · Quadratics/),
+      expect.stringMatching(/^ASection A: Solving quadratics by factoringProblems 1–8 · Quadratic Functions$/),
+      expect.stringMatching(/Problems 9–14 · Quadratic Functions/),
+      expect.stringMatching(/Problems 15–18 · Quadratic Functions/),
     ]);
     expect(outline().getByText("18 problems")).toBeInTheDocument();
     expect(rows()[0]).toHaveAttribute("aria-current", "true");

@@ -12,8 +12,7 @@
 import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "radix-ui";
 import { Search, X } from "lucide-react";
-import { GENERATORS, coursesOf } from "@/engine/registry";
-import type { Generator } from "@/engine/types";
+import { coursesOf, LISTINGS, type Listing } from "@/engine/courses";
 import { sectionLetter } from "@/engine/worksheet";
 import { Math as TeX } from "@/components/Math";
 import { Button } from "@/components/ui/button";
@@ -27,15 +26,16 @@ export function TopicPicker({
   onOpenChange,
   onPick,
   sections,
-  topics = GENERATORS,
+  listings = LISTINGS,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onPick: (generatorId: string) => void;
+  /** Called with the chosen listing; the Section starts from its Topic Options. */
+  onPick: (listing: Listing) => void;
   /** The generatorId of each Section on the Worksheet, in outline order. */
   sections: readonly string[];
-  /** The Topics to offer (the registry; tests pass their own). */
-  topics?: readonly Generator[];
+  /** The listings to offer (every Course Outline; tests pass their own). */
+  listings?: readonly Listing[];
 }) {
   const searchRef = useRef<HTMLInputElement>(null);
   return (
@@ -54,7 +54,7 @@ export function TopicPicker({
           <PickerBody
             onPick={onPick}
             sections={sections}
-            topics={topics}
+            listings={listings}
             searchRef={searchRef}
           />
         </Dialog.Content>
@@ -66,15 +66,15 @@ export function TopicPicker({
 function PickerBody({
   onPick,
   sections,
-  topics,
+  listings,
   searchRef,
 }: {
-  onPick: (generatorId: string) => void;
+  onPick: (listing: Listing) => void;
   sections: readonly string[];
-  topics: readonly Generator[];
+  listings: readonly Listing[];
   searchRef: React.RefObject<HTMLInputElement | null>;
 }) {
-  const courses = useMemo(() => coursesOf(topics), [topics]);
+  const courses = useMemo(() => coursesOf(listings), [listings]);
   const [course, setCourse] = useState(courses[0] ?? "");
   const [query, setQuery] = useState("");
   const [unit, setUnit] = useState<string | null>(null);
@@ -85,14 +85,14 @@ function PickerBody({
   const unitsRef = useRef<HTMLDivElement>(null);
 
   const view = useMemo(
-    () => browseTopics({ topics, course, unit, query }),
-    [topics, course, unit, query],
+    () => browseTopics({ listings, course, unit, query }),
+    [listings, course, unit, query],
   );
   const used = useMemo(() => sectionsByTopic(sections), [sections]);
   const { flat } = view;
   // The highlight follows a Topic, not a row number, so changing the Unit
   // keeps it when the Topic is still listed; otherwise the first Topic.
-  const found = flat.findIndex((g) => g.id === activeId);
+  const found = flat.findIndex((l) => l.key === activeId);
   const active = found >= 0 ? found : 0;
   const activeTopic = flat[active];
   const nextLetter = sectionLetter(sections.length);
@@ -118,8 +118,8 @@ function PickerBody({
       ?.scrollIntoView?.({ block: "nearest" });
   }, [unitIndex]);
 
-  function pick(g: Generator | undefined) {
-    if (g) onPick(g.id);
+  function pick(l: Listing | undefined) {
+    if (l) onPick(l);
   }
 
   function chooseUnit(name: string | null) {
@@ -139,7 +139,7 @@ function PickerBody({
     const last = flat.length - 1;
     const go = (i: number) => {
       e.preventDefault();
-      if (flat[i]) setActiveId(flat[i].id);
+      if (flat[i]) setActiveId(flat[i].key);
     };
     if (e.key === "ArrowDown") go(active >= last ? 0 : active + 1);
     else if (e.key === "ArrowUp") go(active <= 0 ? last : active - 1);
@@ -283,21 +283,21 @@ function PickerBody({
               <GroupLabel className="px-2 pt-1.5 pb-1">
                 <span id={`${listId}-${group.name}`}>{group.name}</span>
               </GroupLabel>
-              {group.generators.map((g) => {
-                const index = flat.indexOf(g);
+              {group.listings.map((l) => {
+                const index = flat.indexOf(l);
                 const on = index === active;
-                const letters = used.get(g.id);
+                const letters = used.get(l.topic.id);
                 return (
                   <div
-                    key={g.id}
+                    key={l.key}
                     id={optionId(index)}
                     role="option"
                     aria-selected={on}
                     data-index={index}
                     // Keep focus in the search box so the keyboard keeps working.
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setActiveId(g.id)}
-                    onDoubleClick={() => pick(g)}
+                    onClick={() => setActiveId(l.key)}
+                    onDoubleClick={() => pick(l)}
                     className={cn(
                       "mb-px cursor-pointer rounded-md border px-2.5 py-1.5",
                       on
@@ -305,7 +305,7 @@ function PickerBody({
                         : "hover:bg-hover border-transparent",
                     )}
                   >
-                    <div className="truncate font-medium">{g.title}</div>
+                    <div className="truncate font-medium">{l.topic.title}</div>
                     {letters && (
                       <div
                         className={cn(
@@ -324,7 +324,7 @@ function PickerBody({
         </div>
 
         {/* Preview of the highlighted Topic */}
-        <TopicPreview topic={activeTopic} />
+        <TopicPreview listing={activeTopic} />
       </div>
 
       <footer className="flex h-14 shrink-0 items-center gap-4 border-t px-4">
@@ -354,9 +354,10 @@ function PickerBody({
   );
 }
 
-function TopicPreview({ topic }: { topic: Generator | undefined }) {
-  // Cached per Topic, so moving the highlight never regenerates Problems.
-  const sample = topic ? topicSample(topic) : undefined;
+function TopicPreview({ listing }: { listing: Listing | undefined }) {
+  const topic = listing?.topic;
+  // Cached per Topic and Topic Options, so moving the highlight never regenerates Problems.
+  const sample = listing ? topicSample(listing.topic, listing.options) : undefined;
   // Fade the bottom edge while more of the preview is below it: with macOS's
   // hidden scrollbars, a cut-off line otherwise looks like a layout bug.
   const pane = useRef<HTMLElement>(null);

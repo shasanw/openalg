@@ -164,10 +164,8 @@ describe("graphing-quadratics: multiple choice", () => {
 });
 
 describe("graphing-quadratics: registration", () => {
-  it("is a Quadratics Topic in Algebra 2", () => {
+  it("is registered under its id and title", () => {
     expect(generator.id).toBe(GRAPHING_QUADRATICS_ID);
-    expect(generator.course).toBe("Algebra 2");
-    expect(generator.unit).toBe("Quadratics");
     expect(generator.title).toBe("Graphing quadratics");
   });
 

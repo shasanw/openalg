@@ -1,21 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { LISTINGS, type Listing } from "@/engine/courses";
 import { GENERATORS, getGenerator } from "@/engine/registry";
 import type { Generator } from "@/engine/types";
 import { TopicPicker } from "./TopicPicker";
 import { topicSample } from "./topicBrowser";
 
-/** A fake Precalculus Topic, so the Course tabs have a second Course. */
-const limits: Generator = {
-  ...GENERATORS[0],
-  id: "evaluating-limits",
-  course: "Precalculus",
-  unit: "Limits",
-  title: "Evaluating limits",
-};
+function listing(topic: Generator, course: string, unit: string): Listing {
+  return { key: `${course}/${topic.id}`, course, unit, topic, options: {} };
+}
 
-function open(props: { sections?: string[]; topics?: readonly Generator[] } = {}) {
+/** One Course (Algebra 2), whose Quadratics Unit lists every Topic in registration order. */
+const ALGEBRA_2 = LISTINGS.filter((l) => l.course === "Algebra 2");
+
+/** A fake Precalculus Topic, so the Course tabs have a second Course. */
+const limits = listing({ ...GENERATORS[0], id: "evaluating-limits", title: "Evaluating limits" }, "Precalculus", "Limits");
+
+/** The id of the Topic in the listing onPick was last called with. */
+const pickedId = (onPick: ReturnType<typeof vi.fn>) => (onPick.mock.lastCall?.[0] as Listing | undefined)?.topic.id;
+
+function open(props: { sections?: string[]; listings?: readonly Listing[] } = {}) {
   const onPick = vi.fn();
   const onOpenChange = vi.fn();
   render(
@@ -24,7 +29,7 @@ function open(props: { sections?: string[]; topics?: readonly Generator[] } = {}
       onOpenChange={onOpenChange}
       onPick={onPick}
       sections={props.sections ?? []}
-      topics={props.topics}
+      listings={props.listings ?? ALGEBRA_2}
     />,
   );
   return { onPick, onOpenChange };
@@ -51,7 +56,7 @@ describe("TopicPicker", () => {
   });
 
   it("shows Course tabs with two Courses and switches the Units and Topics", async () => {
-    open({ topics: [...GENERATORS, limits] });
+    open({ listings: [...ALGEBRA_2, limits] });
     const tabs = screen.getByRole("radiogroup", { name: "Course" });
     expect(within(tabs).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Algebra 2", "Precalculus"]);
     expect(topics().map((o) => o.textContent)).not.toContain("Evaluating limits");
@@ -114,29 +119,29 @@ describe("TopicPicker", () => {
     expect(search()).toHaveFocus();
     expect(onPick).not.toHaveBeenCalled();
     await userEvent.dblClick(target);
-    expect(onPick).toHaveBeenCalledWith(GENERATORS[2].id);
+    expect(pickedId(onPick)).toBe(GENERATORS[2].id);
   });
 
   it("adds with the button", async () => {
     const { onPick } = open({ sections: ["quadratic-factoring"] });
     await userEvent.click(screen.getByRole("button", { name: "Add as Section B" }));
-    expect(onPick).toHaveBeenCalledWith(GENERATORS[0].id);
+    expect(pickedId(onPick)).toBe(GENERATORS[0].id);
   });
 
   describe("keyboard only", () => {
     const twoUnits = () => [
-      ...GENERATORS,
-      { ...getGenerator("quadratic-formula")!, id: "qform-eq", unit: "Polynomials", title: "Solving quadratic-form equations" },
+      ...ALGEBRA_2,
+      listing({ ...getGenerator("quadratic-formula")!, id: "qform-eq", title: "Solving quadratic-form equations" }, "Algebra 2", "Polynomials"),
     ];
 
     it("searches, moves and adds with Enter", async () => {
       const { onPick } = open();
       await userEvent.keyboard("square{ArrowDown}{ArrowUp}{Enter}");
-      expect(onPick).toHaveBeenCalledWith("completing-the-square");
+      expect(pickedId(onPick)).toBe("completing-the-square");
     });
 
     it("reaches the Units with Tab, filters, and comes back to the search", async () => {
-      const { onPick } = open({ topics: twoUnits() });
+      const { onPick } = open({ listings: twoUnits() });
       expect(units().map((u) => u.textContent)).toEqual([
         `All Units${GENERATORS.length + 1}`,
         `Quadratics${GENERATORS.length}`,
@@ -151,11 +156,11 @@ describe("TopicPicker", () => {
       await userEvent.keyboard("{Enter}");
       expect(search()).toHaveFocus();
       await userEvent.keyboard("{Enter}");
-      expect(onPick).toHaveBeenCalledWith("qform-eq");
+      expect(pickedId(onPick)).toBe("qform-eq");
     });
 
     it("typing in the Units list goes to the search", async () => {
-      open({ topics: twoUnits() });
+      open({ listings: twoUnits() });
       await userEvent.tab();
       await userEvent.keyboard("{ArrowDown}");
       expect(units()[1]).toHaveAttribute("aria-selected", "true");
