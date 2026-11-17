@@ -61,7 +61,8 @@ export const TopicThumb = memo(function TopicThumb({ topic }: { topic: Generator
         <div className="grid grid-cols-2 gap-x-[4cqw] gap-y-[7cqw]">
           {problems.map((html, i) => (
             <div key={i} className="min-w-0">
-              <div className="flex gap-[1.5cqw] whitespace-nowrap">
+              {/* Clip a long Problem at its column so it never runs into the next one. */}
+              <div className="flex gap-[1.5cqw] overflow-hidden whitespace-nowrap">
                 <span>{i + 1})</span>
                 <span dangerouslySetInnerHTML={{ __html: html }} />
               </div>
