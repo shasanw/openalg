@@ -11,6 +11,7 @@ import { generator as quadraticInequalities } from "./generators/quadraticInequa
 import { generator as graphingQuadratics } from "./generators/graphingQuadratics";
 import { generator as slope } from "./generators/slope";
 import { generator as parallelPerpendicular } from "./generators/parallelPerpendicular";
+import { generator as graphingLinear } from "./generators/graphingLinear";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -21,6 +22,7 @@ export const GENERATORS: readonly Generator[] = [
   quadraticInequalities,
   slope,
   parallelPerpendicular,
+  graphingLinear,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

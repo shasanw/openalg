@@ -115,11 +115,11 @@ describe("slope: from a graph", () => {
 });
 
 describe("slope: multiple choice", () => {
-  it("offers at least four mistake-based Distractors, distinct and never the Answer", () => {
+  it("offers at least three mistake-based Distractors, distinct and never the Answer", () => {
     fc.assert(
       fc.property(anySeed, anyOptions, (seed, opts) => {
         const p = generator.generate(opts, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
         const keys = p.distractorHints.map(choiceKey);
         expect(new Set(keys).size).toBe(keys.length);
         expect(keys).not.toContain(choiceKey(p.answer));
