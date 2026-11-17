@@ -10,6 +10,7 @@ import { generator as parabolaProperties } from "./generators/parabolaProperties
 import { generator as quadraticInequalities } from "./generators/quadraticInequalities";
 import { generator as graphingQuadratics } from "./generators/graphingQuadratics";
 import { generator as slope } from "./generators/slope";
+import { generator as parallelPerpendicular } from "./generators/parallelPerpendicular";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -19,6 +20,7 @@ export const GENERATORS: readonly Generator[] = [
   graphingQuadratics,
   quadraticInequalities,
   slope,
+  parallelPerpendicular,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

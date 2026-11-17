@@ -13,7 +13,7 @@ export const algebra1: CourseOutline = {
     { name: "Relations and Functions", topics: [] },
     {
       name: "Linear Equations and Inequalities",
-      topics: [{ topic: "slope" }],
+      topics: [{ topic: "slope" }, { topic: "parallel-perpendicular-slopes" }],
     },
     { name: "Systems of Equations and Inequalities", topics: [] },
     { name: "Exponents", topics: [] },
