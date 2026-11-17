@@ -14,6 +14,10 @@ import { generator as twoStepEquations } from "./generators/twoStepEquations";
 import { generator as multiStepEquations } from "./generators/multiStepEquations";
 import { generator as absoluteValueEquations } from "./generators/absoluteValueEquations";
 import { generator as literalEquations } from "./generators/literalEquations";
+import { generator as slope } from "./generators/slope";
+import { generator as parallelPerpendicular } from "./generators/parallelPerpendicular";
+import { generator as graphingLinear } from "./generators/graphingLinear";
+import { generator as writingLinear } from "./generators/writingLinear";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -27,6 +31,10 @@ export const GENERATORS: readonly Generator[] = [
   multiStepEquations,
   absoluteValueEquations,
   literalEquations,
+  slope,
+  parallelPerpendicular,
+  graphingLinear,
+  writingLinear,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

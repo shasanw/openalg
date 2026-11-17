@@ -170,8 +170,9 @@ describe("TopicPicker", () => {
     });
 
     it("lists each Course's matching Units during a search, and restores the Course's Unit after", async () => {
+      // Only the quadratics Units, so the search's matches are known.
       const listings = [
-        ...ALL,
+        ...ALL.filter((l) => l.unit.startsWith("Quadratic")),
         listing({ ...GENERATORS[1], id: "qform-eq", title: "Solving quadratic-form equations" }, "Algebra 2", "Polynomials"),
       ];
       open({ listings, sections: ["qform-eq"] });

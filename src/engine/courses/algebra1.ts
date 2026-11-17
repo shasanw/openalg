@@ -20,7 +20,15 @@ export const algebra1: CourseOutline = {
     { name: "Inequalities", topics: [] },
     { name: "Proportions and Percents", topics: [] },
     { name: "Relations and Functions", topics: [] },
-    { name: "Linear Equations and Inequalities", topics: [] },
+    {
+      name: "Linear Equations and Inequalities",
+      topics: [
+        { topic: "slope" },
+        { topic: "parallel-perpendicular-slopes" },
+        { topic: "graphing-linear-equations" },
+        { topic: "writing-linear-equations" },
+      ],
+    },
     { name: "Systems of Equations and Inequalities", topics: [] },
     { name: "Exponents", topics: [] },
     { name: "Polynomials", topics: [] },

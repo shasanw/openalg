@@ -10,8 +10,8 @@
 //
 // Two kinds of graph:
 // - a coordinate plane: x/y window, grid step, axis and tick labels, and
-//   optional parabolas, points (with labels) and dashed vertical lines (an
-//   axis of symmetry);
+//   optional parabolas, straight lines (any slope, vertical included), points
+//   (with labels) and dashed vertical lines (an axis of symmetry);
 // - a number line: range, ticks, open/closed endpoints and shaded intervals
 //   or rays.
 //
@@ -32,6 +32,17 @@ export interface PlotRange {
 export type ParabolaCurve =
   | { kind: "parabola"; form: "vertex"; a: number; h: number; k: number }
   | { kind: "parabola"; form: "standard"; a: number; b: number; c: number };
+
+/**
+ * A straight line, y = m x + b or the vertical line x = c, drawn across the
+ * whole window (clipped to it, see lineSegment).
+ */
+export type LineCurve =
+  | { kind: "line"; form: "slopeIntercept"; m: number; b: number }
+  | { kind: "line"; form: "vertical"; x: number };
+
+/** Anything plot() can draw as a curve on a coordinate plane. */
+export type PlotCurve = ParabolaCurve | LineCurve;
 
 export interface PlotPoint {
   x: number;
@@ -58,7 +69,7 @@ export interface CoordinatePlaneSpec {
   labelEvery?: number;
   /** Axis names printed at the positive ends (default "x" and "y"). */
   axisLabels?: { x: string; y: string };
-  curves?: ParabolaCurve[];
+  curves?: PlotCurve[];
   lines?: VerticalLine[];
   points?: PlotPoint[];
 }
@@ -207,13 +218,18 @@ export function graphSpecProblem(spec: unknown): string | null {
       return "has invalid axisLabels";
     }
     return (
-      optionalArray("curves", (c) =>
-        isObj(c) &&
-        c.kind === "parabola" &&
-        isNum(c.a) &&
-        c.a !== 0 &&
-        ((c.form === "vertex" && isNum(c.h) && isNum(c.k)) ||
-          (c.form === "standard" && isNum(c.b) && isNum(c.c))),
+      optionalArray(
+        "curves",
+        (c) =>
+          isObj(c) &&
+          ((c.kind === "parabola" &&
+            isNum(c.a) &&
+            c.a !== 0 &&
+            ((c.form === "vertex" && isNum(c.h) && isNum(c.k)) ||
+              (c.form === "standard" && isNum(c.b) && isNum(c.c)))) ||
+            (c.kind === "line" &&
+              ((c.form === "slopeIntercept" && isNum(c.m) && isNum(c.b)) ||
+                (c.form === "vertical" && isNum(c.x))))),
       ) ??
       optionalArray("lines", (l) => isObj(l) && isNum(l.x)) ??
       optionalArray(
@@ -428,6 +444,42 @@ export function parabolaBezier(
   ];
 }
 
+/**
+ * The piece of a straight line inside the window, as its two ends in graph
+ * units (left to right, or bottom to top for a vertical line), or null when
+ * the line misses the window or only touches a corner of it.
+ */
+export function lineSegment(
+  curve: LineCurve,
+  x: PlotRange,
+  y: PlotRange,
+): [[number, number], [number, number]] | null {
+  if (curve.form === "vertical") {
+    if (curve.x < x.min || curve.x > x.max) return null;
+    return [
+      [curve.x, y.min],
+      [curve.x, y.max],
+    ];
+  }
+  const { m, b } = curve;
+  let lo = x.min;
+  let hi = x.max;
+  if (m === 0) {
+    if (b < y.min || b > y.max) return null;
+  } else {
+    // The x-values where the line is inside the window's y-range.
+    const u = (y.min - b) / m;
+    const v = (y.max - b) / m;
+    lo = Math.max(lo, Math.min(u, v));
+    hi = Math.min(hi, Math.max(u, v));
+  }
+  if (hi - lo < 1e-9) return null;
+  return [
+    [lo, m * lo + b],
+    [hi, m * hi + b],
+  ];
+}
+
 /** One layer of a drawing: its SVG elements and the glyphs its labels use. */
 class Layer {
   readonly parts: string[] = [];
@@ -534,6 +586,15 @@ function planeDrawing(spec: CoordinatePlaneSpec, ink: string): Drawing {
   frame.push(frame.letters.group("middle", xLabels), frame.letters.group("end", yLabels));
 
   for (const curve of spec.curves ?? []) {
+    if (curve.kind === "line") {
+      const seg = lineSegment(curve, spec.x, spec.y);
+      if (!seg) continue;
+      const [[x0, y0], [x1, y1]] = seg;
+      content.push(
+        `<path d='M${n(px(x0))} ${n(py(y0))}L${n(px(x1))} ${n(py(y1))}' fill='none' stroke='${ink}' stroke-width='1.2' stroke-linecap='round'/>`,
+      );
+      continue;
+    }
     const d = parabolaSpans(curve, spec.x, spec.y)
       .map((span) => {
         const [[x0, y0], [x1, y1], [x2, y2]] = parabolaBezier(curve, span);

@@ -56,7 +56,8 @@ export interface Problem {
   distractorHints: Latex[];
   /**
    * A graph printed with the prompt on the student copy (#9), e.g. a blank
-   * coordinate grid to draw on. It must never give the Answer away.
+   * coordinate grid to draw on, or a given line whose slope is asked for. It
+   * must never give the Answer away: with an `answerGraph` it is blank.
    */
   graph?: GraphSpec;
   /**
