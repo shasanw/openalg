@@ -1,10 +1,17 @@
 // The launch screen, shown when no document is open. Laid out like Google
-// Docs: a full-width "Start a new Worksheet" band holding one row of
-// templates (a blank Worksheet, then one per Topic, each with a real
-// miniature page) that expands to every Topic, and the Library's recent
+// Docs: a full-width "Start a new Worksheet" band and the Library's recent
 // Worksheets below it, filtered by the header search.
+//
+// The band shows one Course at a time, picked with Course tabs (only when
+// two or more Courses have Topics; the choice is the remembered Course the
+// Add Section picker also uses). Collapsed, it is one row: a blank Worksheet,
+// then the Course's listings of the Topics used most recently in the
+// Library, then the rest in Course Outline order. "All Topics" expands it to
+// every listing in the Course under its Unit's heading. Each template has a
+// real miniature page and starts the Worksheet with its listing's Topic
+// Options.
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -18,15 +25,18 @@ import {
   TriangleAlert,
   Trash2,
 } from "lucide-react";
-import { LISTINGS, type Listing } from "@/engine/courses";
+import { coursesOf, LISTINGS, type Listing } from "@/engine/courses";
 import { getGenerator } from "@/engine/registry";
 import type { LibraryEntry, StoragePersistence } from "@/platform/types";
 import type { InstallPrompt } from "@/lib/useInstallPrompt";
+import { rememberCourse, rememberedCourse } from "@/lib/rememberedCourse";
 import { Button } from "@/components/ui/button";
+import { Segmented } from "@/components/ui/segmented";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoMark } from "@/components/LogoMark";
 import type { Theme } from "@/lib/useTheme";
 import { BlankThumb, TopicThumb } from "./TopicThumb";
+import { recentTopics, rowTemplates, unitTemplates } from "./templates";
 
 /** Width of one Start-new tile and the gap between tiles, in px. */
 const TILE_MIN = 148;
@@ -77,6 +87,7 @@ export function HomeScreen({
   onRestoreLibrary,
   storage,
   install,
+  listings = LISTINGS,
 }: {
   onNewWorksheet: () => void;
   onOpenTemplate: (listing: Listing) => void;
@@ -91,6 +102,8 @@ export function HomeScreen({
   /** Whether the browser keeps the Library safe from eviction; null while unknown. */
   storage: StoragePersistence | null;
   install: InstallPrompt;
+  /** The listings to offer (every Course Outline; tests pass their own). */
+  listings?: readonly Listing[];
 }) {
   const [query, setQuery] = useState("");
   const [expanded, setExpandedState] = useState(() => {
@@ -109,11 +122,17 @@ export function HomeScreen({
     }
   };
   const [tilesRef, cols] = useColumns<HTMLDivElement>();
-  // One tile per Topic, at its first listing in curriculum order.
-  const templates = LISTINGS.filter((l, i) => LISTINGS.findIndex((x) => x.topic.id === l.topic.id) === i);
+  const courses = useMemo(() => coursesOf(listings), [listings]);
+  const [chosen, setChosen] = useState(() => rememberedCourse(courses) ?? courses[0] ?? "");
+  const course = courses.includes(chosen) ? chosen : (courses[0] ?? "");
+  const chooseCourse = (next: string) => {
+    setChosen(next);
+    rememberCourse(next);
+  };
+  const total = listings.filter((l) => l.course === course).length;
   // One row: the blank Worksheet plus as many Topics as fit beside it.
-  const shown = expanded ? templates : templates.slice(0, cols - 1);
-  const hidden = templates.length - shown.length;
+  const row = rowTemplates(listings, course, recentTopics(recents), cols - 1);
+  const hidden = total - row.length;
 
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const matching = recents.filter((r) => {
@@ -148,42 +167,52 @@ export function HomeScreen({
       {/* Start new: a full-width band, one row of templates unless expanded */}
       <section aria-labelledby="start-new" className="bg-panel border-b">
         <div className="mx-auto max-w-[1180px] px-6 pt-6 pb-7">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
             <h2 id="start-new" className="text-[15px] font-medium">
               Start a new Worksheet
             </h2>
+            {courses.length > 1 && (
+              <Segmented
+                label="Course"
+                value={course}
+                options={courses.map((c) => ({ value: c, label: c }))}
+                onChange={chooseCourse}
+              />
+            )}
             {hidden > 0 || expanded ? (
               <Button
                 variant="quiet"
+                className="ml-auto"
                 onClick={() => setExpanded(!expanded)}
                 aria-expanded={expanded}
                 aria-controls="start-new-tiles"
               >
-                {expanded ? "Fewer Topics" : `All Topics (${templates.length})`}
+                {expanded ? "Fewer Topics" : `All Topics (${total})`}
                 {expanded ? <ChevronUp /> : <ChevronDown />}
               </Button>
             ) : null}
           </div>
-          <div
-            id="start-new-tiles"
-            ref={tilesRef}
-            className="grid gap-x-4 gap-y-6"
-            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-          >
-            <StartCard label="New Worksheet" sub="Add Sections as you go" onClick={onNewWorksheet}>
-              <BlankThumb />
-            </StartCard>
-            {shown.map((l) => (
-              <StartCard
-                key={l.key}
-                label={l.topic.title}
-                sub={`${l.course} · ${l.unit}`}
-                title={l.topic.title}
-                onClick={() => onOpenTemplate(l)}
-              >
-                <TopicThumb topic={l.topic} />
+          <div id="start-new-tiles" ref={tilesRef} className="space-y-7">
+            <TileRow cols={cols}>
+              <StartCard label="New Worksheet" sub="Add Sections as you go" onClick={onNewWorksheet}>
+                <BlankThumb />
               </StartCard>
-            ))}
+              {!expanded &&
+                row.map((l) => <ListingCard key={l.key} listing={l} onOpen={onOpenTemplate} />)}
+            </TileRow>
+            {expanded &&
+              unitTemplates(listings, course).map((u, i) => (
+                <section key={u.name} aria-labelledby={`start-unit-${i}`}>
+                  <h3 id={`start-unit-${i}`} className="text-muted-foreground mb-3 text-[13px] font-medium">
+                    {u.name}
+                  </h3>
+                  <TileRow cols={cols}>
+                    {u.listings.map((l) => (
+                      <ListingCard key={l.key} listing={l} onOpen={onOpenTemplate} />
+                    ))}
+                  </TileRow>
+                </section>
+              ))}
           </div>
         </div>
       </section>
@@ -347,6 +376,29 @@ function RecentCard({
         <Trash2 className="size-3.5" />
       </button>
     </div>
+  );
+}
+
+/** A grid of Start-new tiles, `cols` to a row. */
+function TileRow({ cols, children }: { cols: number; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-x-4 gap-y-6" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+      {children}
+    </div>
+  );
+}
+
+/** A Topic's tile, subtitled with its Unit (the Course is the selected tab). */
+function ListingCard({ listing, onOpen }: { listing: Listing; onOpen: (listing: Listing) => void }) {
+  return (
+    <StartCard
+      label={listing.topic.title}
+      sub={listing.unit}
+      title={listing.topic.title}
+      onClick={() => onOpen(listing)}
+    >
+      <TopicThumb topic={listing.topic} />
+    </StartCard>
   );
 }
 
