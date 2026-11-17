@@ -13,6 +13,7 @@ export const algebra1: CourseOutline = {
         { topic: "one-step-equations" },
         { topic: "two-step-equations" },
         { topic: "multi-step-equations" },
+        { topic: "absolute-value-equations" },
       ],
     },
     { name: "Inequalities", topics: [] },
