@@ -7,7 +7,10 @@ export const algebra1: CourseOutline = {
   course: "Algebra 1",
   units: [
     { name: "Foundations", topics: [] },
-    { name: "Equations", topics: [] },
+    {
+      name: "Equations",
+      topics: [{ topic: "one-step-equations" }],
+    },
     { name: "Inequalities", topics: [] },
     { name: "Proportions and Percents", topics: [] },
     { name: "Relations and Functions", topics: [] },

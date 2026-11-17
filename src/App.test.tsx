@@ -131,14 +131,14 @@ describe("App: throwaway Worksheets stay out of the Library", () => {
 
   it("a template opened and left untouched is not saved", async () => {
     renderApp();
-    await userEvent.click(screen.getByRole("button", { name: /Graphing quadratics/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Solving one-step equations/ }));
     await leave();
     expect(library.size).toBe(0);
   });
 
   it("a template that the teacher changes is saved", async () => {
     renderApp();
-    await userEvent.click(screen.getByRole("button", { name: /Graphing quadratics/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Solving one-step equations/ }));
     await addSection("formula");
     await leave();
     expect(stored()).toHaveLength(1);
