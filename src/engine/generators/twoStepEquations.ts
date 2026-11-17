@@ -251,10 +251,10 @@ export function promptLatex(k: TwoStepConstruction): string {
  * - moved b with the wrong sign: (c + b)/a;
  * - divided before undoing the constant, and only c: c/a - b;
  * - lost the sign of a negative coefficient: -x;
- * - multiplied by the coefficient instead of dividing: (c - b)a (first with
- *   a fraction coefficient, where it is the classic slip);
+ * - forgot the second step altogether: c - b;
  * - subtracted the coefficient instead of dividing: (c - b) - a;
- * - forgot the second step altogether: c - b.
+ * - multiplied by the coefficient instead of dividing: (c - b)a (first with
+ *   a fraction coefficient, where it is the classic slip).
  * For x/a + b = c: a(c + b), divided instead of multiplying (c - b)/a,
  * multiplied first ac - b, -x, and forgot the a step c - b.
  * For (x + b)/a = c: ac + b, undid b before a: a(c - b), forgot the a step
@@ -269,8 +269,11 @@ export function distractors(k: TwoStepConstruction): string[] {
     case "constantFirst": {
       const rest = sub(c, b);
       const multiplied = mul(rest, a);
-      values = [div(add(c, b), a), sub(div(c, a)!, b), neg(x), multiplied, sub(rest, a), rest];
-      if (!isInt(a)) values = [multiplied, ...values];
+      // Multiplying by a whole-number coefficient gives an implausibly large
+      // value, so that slip comes last unless the coefficient is a fraction.
+      values = isInt(a)
+        ? [div(add(c, b), a), sub(div(c, a)!, b), neg(x), rest, sub(rest, a), multiplied]
+        : [multiplied, div(add(c, b), a), sub(div(c, a)!, b), neg(x), rest, sub(rest, a)];
       break;
     }
     case "divided":

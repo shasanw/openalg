@@ -64,7 +64,7 @@ describe("absolute-value-equations: answers", () => {
         if (k.outcome === "two") expect(k.c).not.toBe(0);
         const p = generator.generate(params, seed);
         expect(p.prompt).not.toMatch(/(^|[^0-9])1[a-z]/); // no 1x
-        expect(p.prompt).not.toMatch(/^-?1\|/); // no 1|...|
+        expect(p.prompt).not.toMatch(/^-?1\\lvert/); // no 1|...|
         expect(p.prompt).not.toMatch(/[+-] 0(?!\d)/);
       }),
     );
@@ -179,7 +179,7 @@ describe("absolute-value-equations: generate()", () => {
   it("bakes the recipe", () => {
     const p = generator.generate({ form: "isolated" }, 5);
     expect(p.generatorId).toBe("absolute-value-equations");
-    expect(p.prompt).toMatch(/^\|.+\| = -?\d+$/);
+    expect(p.prompt).toMatch(/^\\lvert .+ \\rvert = -?\d+$/);
     expect(p.answer).toMatch(/^x = -?\d+, -?\d+$/);
   });
 

@@ -195,7 +195,9 @@ export function promptLatex(k: AbsConstruction): string {
     { coef: rat(k.b), v: k.v },
     { coef: rat(k.c), v: "" },
   ]);
-  const bars = `|${inner}|`;
+  // \lvert and \rvert, not plain bars: mitex then spaces them as opening and
+  // closing delimiters, so 3|4x + 2| never reads as "3 divides ..."
+  const bars = `\\lvert ${inner} \\rvert`;
   const front = k.a === 1 ? "" : k.a === -1 ? "-" : String(k.a);
   const tail = k.d === 0 ? "" : ` ${k.d < 0 ? "-" : "+"} ${Math.abs(k.d)}`;
   return `${front}${bars}${tail} = ${k.e}`;
