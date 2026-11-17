@@ -1,10 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LISTINGS, type Listing } from "@/engine/courses";
 import { GENERATORS, getGenerator } from "@/engine/registry";
 import type { Generator } from "@/engine/types";
+import { COURSE_KEY } from "@/lib/rememberedCourse";
+import { stubBrokenStorage, stubMemoryStorage } from "@/test/memoryStorage";
 import { TopicPicker } from "./TopicPicker";
+
+beforeEach(stubMemoryStorage);
+afterEach(() => vi.unstubAllGlobals());
 import { topicSample } from "./topicBrowser";
 
 function listing(topic: Generator, course: string, unit: string): Listing {
@@ -40,6 +45,18 @@ const topics = () => within(screen.getByRole("listbox", { name: "Topics" })).get
 const units = () => within(screen.getByRole("listbox", { name: "Units" })).getAllByRole("option");
 const active = () => document.getElementById(search().getAttribute("aria-activedescendant")!);
 const preview = () => within(screen.getByRole("region", { name: /^Preview of / }));
+const courseSelect = () => screen.getByRole("combobox", { name: "Course" });
+/** The Topic groups' names: "Unit", or "Course Unit" during a search. */
+const groups = () =>
+  within(screen.getByRole("listbox", { name: "Topics" }))
+    .getAllByRole("group")
+    .map((g) =>
+      g
+        .getAttribute("aria-labelledby")!
+        .split(" ")
+        .map((id) => document.getElementById(id)!.textContent)
+        .join(" "),
+    );
 
 describe("TopicPicker", () => {
   it("opens with focus in the search and lists the Units with Topics", () => {
@@ -50,27 +67,156 @@ describe("TopicPicker", () => {
     expect(screen.getByText(`${GENERATORS.length} Topics`)).toBeInTheDocument();
   });
 
-  it("hides the Course tabs while only one Course has Topics", () => {
+  it("hides the Course dropdown while only one Course has Topics", () => {
     open();
-    expect(screen.queryByRole("radiogroup", { name: "Course" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Course" })).toBeNull();
   });
 
-  it("shows Course tabs with two Courses and switches the Units and Topics", async () => {
+  it("switches the Units and Topics with the Course dropdown", async () => {
     open({ listings: [...ALGEBRA_2, limits] });
-    const tabs = screen.getByRole("radiogroup", { name: "Course" });
-    expect(within(tabs).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Algebra 2", "Precalculus"]);
+    const course = courseSelect();
+    expect(within(course).getAllByRole("option").map((o) => o.textContent)).toEqual(["Algebra 2", "Precalculus"]);
+    expect(course).toHaveDisplayValue("Algebra 2");
     expect(topics().map((o) => o.textContent)).not.toContain("Evaluating limits");
-    await userEvent.click(within(tabs).getByRole("radio", { name: "Precalculus" }));
+    await userEvent.selectOptions(course, "Precalculus");
     expect(topics().map((o) => o.textContent)).toEqual(["Evaluating limits"]);
     expect(units().map((u) => u.textContent)).toEqual(["All Units1", "Limits1"]);
-    expect(search()).toHaveFocus();
-    // Arrow keys on the tabs still switch Course, with focus staying on them.
-    await userEvent.tab({ shift: true });
-    await userEvent.tab({ shift: true });
-    expect(within(tabs).getByRole("radio", { name: "Precalculus" })).toHaveFocus();
-    await userEvent.keyboard("{ArrowLeft}");
-    expect(within(tabs).getByRole("radio", { name: "Algebra 2" })).toHaveFocus();
-    expect(topics().map((o) => o.textContent)).not.toContain("Evaluating limits");
+  });
+
+  describe("Courses", () => {
+    /** Every real listing plus a fake Precalculus Course. */
+    const ALL = [...LISTINGS, limits];
+
+    it("opens on the Course of the last Section", () => {
+      open({ listings: ALL, sections: ["quadratic-factoring", "evaluating-limits"] });
+      expect(courseSelect()).toHaveDisplayValue("Precalculus");
+    });
+
+    it("opens a Topic listed in several Courses on the remembered one if it lists it", () => {
+      localStorage.setItem(COURSE_KEY, "Algebra 2");
+      open({ listings: ALL, sections: ["quadratic-factoring"] });
+      expect(courseSelect()).toHaveDisplayValue("Algebra 2");
+    });
+
+    it("else opens it on the Topic's first listing", () => {
+      localStorage.setItem(COURSE_KEY, "Precalculus");
+      open({ listings: ALL, sections: ["quadratic-factoring"] });
+      expect(courseSelect()).toHaveDisplayValue("Algebra 1");
+    });
+
+    it("opens an empty Worksheet on the remembered Course, else the first", () => {
+      localStorage.setItem(COURSE_KEY, "Precalculus");
+      open({ listings: ALL });
+      expect(courseSelect()).toHaveDisplayValue("Precalculus");
+      cleanup();
+      localStorage.setItem(COURSE_KEY, "Geometry");
+      open({ listings: ALL });
+      expect(courseSelect()).toHaveDisplayValue("Algebra 1");
+    });
+
+    it("still opens when storage is unavailable", () => {
+      stubBrokenStorage();
+      const { onPick } = open({ listings: ALL, sections: [] });
+      expect(courseSelect()).toHaveDisplayValue("Algebra 1");
+      fireEvent.keyDown(search(), { key: "Enter" });
+      expect(onPick).toHaveBeenCalled();
+    });
+
+    it("remembers the Course a Topic is added from", async () => {
+      const { onPick } = open({ listings: ALL });
+      await userEvent.selectOptions(courseSelect(), "Algebra 2");
+      await userEvent.click(search());
+      await userEvent.keyboard("{Enter}");
+      expect((onPick.mock.lastCall?.[0] as Listing).course).toBe("Algebra 2");
+      expect(localStorage.getItem(COURSE_KEY)).toBe("Algebra 2");
+    });
+
+    it("searches every Course, the chosen Course first, and reads All Courses meanwhile", async () => {
+      open({ listings: ALL });
+      await userEvent.selectOptions(courseSelect(), "Algebra 2");
+      await userEvent.click(search());
+      await userEvent.keyboard("factoring");
+      expect(courseSelect()).toHaveDisplayValue("All Courses");
+      expect(groups()).toEqual(["Algebra 2 Quadratics", "Algebra 1 Quadratic Functions"]);
+      await userEvent.keyboard("{Backspace>9/}");
+      expect(courseSelect()).toHaveDisplayValue("Algebra 2");
+      expect(groups()).toEqual(["Quadratics"]);
+      expect(within(courseSelect()).queryByRole("option", { name: "All Courses" })).toBeNull();
+    });
+
+    it("finds a Topic outside the chosen Course", async () => {
+      open({ listings: ALL });
+      await userEvent.keyboard("limts");
+      expect(topics().map((o) => o.textContent)).toEqual(["Evaluating limits"]);
+    });
+
+    it("narrows a search to Course words", async () => {
+      open({ listings: ALL });
+      await userEvent.keyboard("alg 2 factr");
+      expect(groups()).toEqual(["Algebra 2 Quadratics"]);
+    });
+
+    it("badges both rows of a Topic listed in two Courses and adds the chosen row's listing", async () => {
+      const { onPick } = open({ listings: ALL, sections: ["quadratic-factoring"] });
+      await userEvent.keyboard("factoring");
+      const rows = topics();
+      expect(rows).toHaveLength(2);
+      for (const r of rows) expect(r).toHaveTextContent("Used in Section A");
+      await userEvent.keyboard("{ArrowDown}{Enter}");
+      const picked = onPick.mock.lastCall?.[0] as Listing;
+      expect(picked).toBe(LISTINGS.find((l) => l.key === "Algebra 2/quadratic-factoring"));
+      expect(picked.options).toEqual(LISTINGS.find((l) => l.key === picked.key)!.options);
+      expect(localStorage.getItem(COURSE_KEY)).toBe("Algebra 2");
+    });
+
+    it("lists each Course's matching Units during a search, and restores the Course's Unit after", async () => {
+      const listings = [
+        ...ALL,
+        listing({ ...GENERATORS[1], id: "qform-eq", title: "Solving quadratic-form equations" }, "Algebra 2", "Polynomials"),
+      ];
+      open({ listings, sections: ["qform-eq"] });
+      expect(courseSelect()).toHaveDisplayValue("Algebra 2");
+      await userEvent.click(units()[2]);
+      expect(units()[2]).toHaveTextContent("Polynomials");
+      expect(units()[2]).toHaveAttribute("aria-selected", "true");
+
+      await userEvent.click(search());
+      await userEvent.keyboard("solving");
+      // A search starts on All Units, across every Course.
+      expect(units()[0]).toHaveAttribute("aria-selected", "true");
+      const unitNames = units().map((u) => u.getAttribute("aria-label") ?? u.textContent);
+      expect(unitNames[0]).toMatch(/^All Units/);
+      expect(unitNames.slice(1).map((n) => n!.split(",")[0])).toEqual(["Algebra 2", "Algebra 2", "Algebra 1"]);
+      expect(screen.getByRole("listbox", { name: "Units" })).toHaveTextContent(/Algebra 1Quadratic Functions/);
+      // Choosing an Algebra 1 Unit narrows the results to it.
+      await userEvent.click(units()[3]);
+      expect(topics().length).toBeGreaterThan(0);
+      expect(groups()).toEqual(["Algebra 1 Quadratic Functions"]);
+
+      await userEvent.clear(search());
+      expect(courseSelect()).toHaveDisplayValue("Algebra 2");
+      expect(units().find((u) => u.getAttribute("aria-selected") === "true")).toHaveTextContent("Polynomials");
+    });
+
+    it("clears the search when a Course is chosen mid-search", async () => {
+      open({ listings: ALL });
+      await userEvent.keyboard("limits");
+      await userEvent.selectOptions(courseSelect(), "Algebra 2");
+      expect(search()).toHaveValue("");
+      expect(courseSelect()).toHaveDisplayValue("Algebra 2");
+    });
+
+    it("tabs from the search to the Course dropdown, then the Units", async () => {
+      open({ listings: ALL });
+      expect(search()).toHaveFocus();
+      await userEvent.tab();
+      expect(courseSelect()).toHaveFocus();
+      await userEvent.tab();
+      expect(screen.getByRole("listbox", { name: "Units" })).toHaveFocus();
+      await userEvent.keyboard("{ArrowDown}{Enter}");
+      expect(search()).toHaveFocus();
+      await userEvent.keyboard("{Escape}");
+    });
   });
 
   it("badges Topics already on the Worksheet with their Section letters", () => {

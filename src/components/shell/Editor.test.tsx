@@ -76,8 +76,12 @@ describe("Editor: Topic picker", () => {
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     const search = screen.getByRole("combobox", { name: "Search Topics" });
     await userEvent.type(search, "formula");
+    // Found in both Courses that list it, the opening Course (the first) first.
     const options = topicOptions();
-    expect(options.map((o) => o.textContent)).toEqual([expect.stringContaining("quadratic formula")]);
+    expect(options.map((o) => o.textContent)).toEqual([
+      expect.stringContaining("quadratic formula"),
+      expect.stringContaining("quadratic formula"),
+    ]);
     await userEvent.keyboard("{Enter}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(latest.ws.sections.map((s) => s.generatorId)).toEqual(["quadratic-formula"]);
@@ -104,7 +108,7 @@ describe("Editor: Topic picker", () => {
   it("says when nothing matches", async () => {
     mount(emptyWorksheet());
     fireEvent.keyDown(window, { key: "k", metaKey: true });
-    await userEvent.type(screen.getByRole("combobox"), "zzz");
+    await userEvent.type(screen.getByRole("combobox", { name: "Search Topics" }), "zzz");
     expect(screen.getByText(/No Topics match/)).toBeInTheDocument();
   });
 });
