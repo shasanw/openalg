@@ -33,6 +33,7 @@ import {
   qLatex,
   slope,
   slopeInterceptLatex,
+  slopeEquation,
   slopeLatex,
   standardCoefficients,
   standardLatex,
@@ -181,7 +182,7 @@ function givenLatex(g: GivenLine): string {
   if (g.form === "standard") return standardLatex(g.line);
   if (g.form === "slopeIntercept") return slopeInterceptLatex(g.line);
   const s = lineSlope(g.line);
-  return isVertical(s) ? "\\text{a line with undefined slope}" : `\\text{a line with slope } ${slopeLatex(s)}`;
+  return isVertical(s) ? "\\text{a line with undefined slope}" : `\\text{a line with } ${slopeEquation(s)}`;
 }
 
 export function promptLatex(k: PPConstruction): string {
@@ -189,7 +190,9 @@ export function promptLatex(k: PPConstruction): string {
     return `\\text{${k.relation === "parallel" ? "Parallel" : "Perpendicular"} to } ${givenLatex(k.given)}`;
   }
   const [a, b] = k.given;
-  if (a.form === "slope") return `\\text{Slopes } ${slopeLatex(lineSlope(a.line))} \\text{ and } ${slopeLatex(lineSlope(b.line))}`;
+  if (a.form === "slope") {
+    return `${slopeEquation(lineSlope(a.line), "m_1")} \\text{ and } ${slopeEquation(lineSlope(b.line), "m_2")}`;
+  }
   return `${givenLatex(a)} \\text{ and } ${givenLatex(b)}`;
 }
 

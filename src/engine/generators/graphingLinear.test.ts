@@ -15,6 +15,7 @@ import {
   type GraphingLinearConstruction,
 } from "./graphingLinear";
 import { isVertical, lineGrid } from "./lines";
+import { satisfies } from "./lines.testUtil";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyOptions = fc.record({
@@ -23,19 +24,6 @@ const anyOptions = fc.record({
   includeSpecial: fc.boolean(),
   workSpace: fc.constantFrom("grid", "none"),
 });
-
-/** Whether (x, y) satisfies the equation printed as `tex` (any of the three forms). */
-function satisfies(tex: string, x: number, y: number): boolean {
-  // turn the LaTeX into a JS expression: \frac{a}{b} -> (a/b), implicit products -> *
-  const js = tex
-    .replace(/\\frac\{(\d+)\}\{(\d+)\}/g, "($1/$2)")
-    .replace(/(\d|\))\s*(x|y|\()/g, "$1*$2")
-    .replace(/-\s*\(/g, "-1*(")
-    .replace(/\bx\b/g, `(${x})`)
-    .replace(/\by\b/g, `(${y})`);
-  const [lhs, rhs] = js.split("=");
-  return Math.abs(Function(`return (${lhs}) - (${rhs})`)() as number) < 1e-9;
-}
 
 describe("graphing linear equations: built answer-first", () => {
   it("the printed equation passes through both chosen lattice points", () => {
@@ -54,7 +42,7 @@ describe("graphing linear equations: built answer-first", () => {
   });
 
   it("states the chosen slope and intercept as the Answer", () => {
-    expect(generator.generate({}, 1).answer).toMatch(/^\\text\{Slope: \} -?\d+;\\quad \\text\{\$y\$-intercept: \} \(0, -?\d+\)$/);
+    expect(generator.generate({}, 1).answer).toMatch(/^m = -?\d+;\\quad \\text\{\$y\$-intercept: \} \(0, -?\d+\)$/);
   });
 
   it("honours the Topic Options", () => {
@@ -166,9 +154,9 @@ describe("graphing linear equations: multiple choice", () => {
     };
     const hints = distractors(k);
     // read as through (-3, -1): -1 = 2(-3) + b gives b = 5, the same as the intercept sign slip
-    expect(hints).toContain("\\text{Slope: } 2;\\quad \\text{$y$-intercept: } (0, 5)");
+    expect(hints).toContain("m = 2;\\quad \\text{$y$-intercept: } (0, 5)");
     // the point's y taken as the intercept
-    expect(hints).toContain("\\text{Slope: } 2;\\quad \\text{$y$-intercept: } (0, 1)");
+    expect(hints).toContain("m = 2;\\quad \\text{$y$-intercept: } (0, 1)");
   });
 });
 

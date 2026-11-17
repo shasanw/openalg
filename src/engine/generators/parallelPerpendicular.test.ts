@@ -100,7 +100,7 @@ describe("parallel and perpendicular slopes: built answer-first", () => {
       /^\\text\{Parallel to \} -?\d*x [+-] \d*y = -?\d+$/,
     );
     expect(generator.generate({ given: "slope", relation: "perpendicular" }, 1).prompt).toMatch(
-      /^\\text\{Perpendicular to \} \\text\{a line with slope \} -?\d+$/,
+      /^\\text\{Perpendicular to \} \\text\{a line with \} m = -?\d+$/,
     );
   });
 

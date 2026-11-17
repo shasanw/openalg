@@ -32,7 +32,7 @@ import {
   lineGrid,
   pickSlope,
   slope,
-  slopeLatex,
+  slopeEquation,
   standardCoefficients,
   type EquationForm,
   type Line,
@@ -139,7 +139,7 @@ function pointLatex(x: string, y: string): string {
 
 /** Slope and an intercept: the y-intercept, or for a vertical line (`x`) the x-intercept. */
 export function factsLatex(s: Slope, intercept: string, vertical = isVertical(s)): string {
-  const slopePart = `\\text{Slope: } ${slopeLatex(s)}`;
+  const slopePart = slopeEquation(s);
   const interceptPart = vertical
     ? `\\text{$x$-intercept: } ${pointLatex(intercept, "0")}`
     : `\\text{$y$-intercept: } ${pointLatex("0", intercept)}`;

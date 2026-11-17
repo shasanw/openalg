@@ -67,6 +67,16 @@ export function slopeLatex(s: Slope): string {
   return isVertical(s) ? "\\text{undefined}" : fractionToLatex(s.rise, s.run);
 }
 
+/**
+ * "m = -\frac{2}{3}": a slope stated as an equation. Printed straight after
+ * \text{...}, a negative slope would typeset as "text minus number" (Typst
+ * spaces a minus that follows text as a binary operator, braces or not);
+ * after "=" it is a sign.
+ */
+export function slopeEquation(s: Slope, name = "m"): string {
+  return `${name} = ${slopeLatex(s)}`;
+}
+
 /** The slope of a perpendicular line: the negative reciprocal (vertical and horizontal swap). */
 export const perpendicular = (s: Slope): Slope => slope(-s.run, s.rise);
 

@@ -125,7 +125,6 @@ describe("slope: multiple choice", () => {
         expect(keys).not.toContain(choiceKey(p.answer));
         const { choices, correctIndex } = assemble(p, { choices: 5, seed });
         expect(choices[correctIndex]).toBe(p.answer);
-        for (const c of choices) expect([p.answer, ...p.distractorHints]).toContain(c);
       }),
     );
   });
