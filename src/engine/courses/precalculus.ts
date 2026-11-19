@@ -16,6 +16,7 @@ export const precalculus: CourseOutline = {
         { topic: "evaluating-logarithms" },
         { topic: "log-properties" },
         { topic: "exponential-equations-logs" },
+        { topic: "logarithmic-equations" },
       ],
     },
     { name: "Trigonometry", topics: [] },
