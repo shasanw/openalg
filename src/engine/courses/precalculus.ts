@@ -14,6 +14,7 @@ export const precalculus: CourseOutline = {
         { topic: "exponential-common-base" },
         { topic: "log-exponential-form" },
         { topic: "evaluating-logarithms" },
+        { topic: "log-properties" },
       ],
     },
     { name: "Trigonometry", topics: [] },
