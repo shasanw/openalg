@@ -21,6 +21,12 @@ import { generator as writingLinear } from "./generators/writingLinear";
 import { generator as systemsGraphing } from "./generators/systemsGraphing";
 import { generator as systemsElimination } from "./generators/systemsElimination";
 import { generator as systemsSubstitution } from "./generators/systemsSubstitution";
+import { generator as graphingInequalities } from "./generators/graphingInequalities";
+import { generator as oneStepInequalities } from "./generators/oneStepInequalities";
+import { generator as twoStepInequalities } from "./generators/twoStepInequalities";
+import { generator as multiStepInequalities } from "./generators/multiStepInequalities";
+import { generator as compoundInequalities } from "./generators/compoundInequalities";
+import { generator as absoluteValueInequalities } from "./generators/absoluteValueInequalities";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -41,6 +47,12 @@ export const GENERATORS: readonly Generator[] = [
   systemsGraphing,
   systemsElimination,
   systemsSubstitution,
+  graphingInequalities,
+  oneStepInequalities,
+  twoStepInequalities,
+  multiStepInequalities,
+  compoundInequalities,
+  absoluteValueInequalities,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

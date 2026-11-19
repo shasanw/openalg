@@ -17,7 +17,17 @@ export const algebra1: CourseOutline = {
         { topic: "literal-equations" },
       ],
     },
-    { name: "Inequalities", topics: [] },
+    {
+      name: "Inequalities",
+      topics: [
+        { topic: "graphing-inequalities" },
+        { topic: "one-step-inequalities" },
+        { topic: "two-step-inequalities" },
+        { topic: "multi-step-inequalities" },
+        { topic: "compound-inequalities" },
+        { topic: "absolute-value-inequalities" },
+      ],
+    },
     { name: "Proportions and Percents", topics: [] },
     { name: "Relations and Functions", topics: [] },
     {
