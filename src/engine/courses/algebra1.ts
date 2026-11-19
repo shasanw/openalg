@@ -29,7 +29,14 @@ export const algebra1: CourseOutline = {
         { topic: "writing-linear-equations" },
       ],
     },
-    { name: "Systems of Equations and Inequalities", topics: [] },
+    {
+      name: "Systems of Equations and Inequalities",
+      topics: [
+        { topic: "systems-graphing" },
+        { topic: "systems-substitution" },
+        { topic: "systems-elimination" },
+      ],
+    },
     { name: "Exponents", topics: [] },
     { name: "Polynomials", topics: [] },
     { name: "Factoring", topics: [] },

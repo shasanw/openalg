@@ -64,7 +64,12 @@ describe("Course Outlines", () => {
 
   it("hides Units with nothing listed", () => {
     const names = groupByUnit(LISTINGS.filter((l) => l.course === "Algebra 1")).map((u) => u.name);
-    expect(names).toEqual(["Equations", "Linear Equations and Inequalities", "Quadratic Functions"]);
+    expect(names).toEqual([
+      "Equations",
+      "Linear Equations and Inequalities",
+      "Systems of Equations and Inequalities",
+      "Quadratic Functions",
+    ]);
   });
 
   it("finds a Topic's listing, preferring the given Course", () => {
