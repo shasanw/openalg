@@ -33,6 +33,12 @@ import { generator as geometricSequences } from "./generators/geometricSequences
 import { generator as sequenceMeans } from "./generators/sequenceMeans";
 import { generator as arithmeticSeries } from "./generators/arithmeticSeries";
 import { generator as geometricSeries } from "./generators/geometricSeries";
+import { generator as exponentialCommonBase } from "./generators/exponentialCommonBase";
+import { generator as logExponentialForm } from "./generators/logExponentialForm";
+import { generator as evaluatingLogarithms } from "./generators/evaluatingLogarithms";
+import { generator as logProperties } from "./generators/logProperties";
+import { generator as exponentialEquationsLogs } from "./generators/exponentialEquationsLogs";
+import { generator as logarithmicEquations } from "./generators/logarithmicEquations";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -65,6 +71,12 @@ export const GENERATORS: readonly Generator[] = [
   sequenceMeans,
   arithmeticSeries,
   geometricSeries,
+  exponentialCommonBase,
+  logExponentialForm,
+  evaluatingLogarithms,
+  logProperties,
+  exponentialEquationsLogs,
+  logarithmicEquations,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

@@ -75,7 +75,7 @@ describe("Course Outlines", () => {
 
   it("shows only the Precalculus Units that have Topics", () => {
     const names = groupByUnit(LISTINGS.filter((l) => l.course === "Precalculus")).map((u) => u.name);
-    expect(names).toEqual(["Sequences and Series"]);
+    expect(names).toEqual(["Exponential and Logarithmic Functions", "Sequences and Series"]);
   });
 
   it("finds a Topic's listing, preferring the given Course", () => {
