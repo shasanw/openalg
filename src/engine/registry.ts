@@ -23,6 +23,7 @@ import { generator as arithmeticSequences } from "./generators/arithmeticSequenc
 import { generator as geometricSequences } from "./generators/geometricSequences";
 import { generator as sequenceMeans } from "./generators/sequenceMeans";
 import { generator as arithmeticSeries } from "./generators/arithmeticSeries";
+import { generator as geometricSeries } from "./generators/geometricSeries";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -45,6 +46,7 @@ export const GENERATORS: readonly Generator[] = [
   geometricSequences,
   sequenceMeans,
   arithmeticSeries,
+  geometricSeries,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
