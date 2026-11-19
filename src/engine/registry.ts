@@ -21,6 +21,7 @@ import { generator as writingLinear } from "./generators/writingLinear";
 import { generator as generalSequences } from "./generators/generalSequences";
 import { generator as arithmeticSequences } from "./generators/arithmeticSequences";
 import { generator as geometricSequences } from "./generators/geometricSequences";
+import { generator as sequenceMeans } from "./generators/sequenceMeans";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -41,6 +42,7 @@ export const GENERATORS: readonly Generator[] = [
   generalSequences,
   arithmeticSequences,
   geometricSequences,
+  sequenceMeans,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

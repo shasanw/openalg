@@ -24,6 +24,7 @@ export const precalculus: CourseOutline = {
         { topic: "general-sequences" },
         { topic: "arithmetic-sequences" },
         { topic: "geometric-sequences" },
+        { topic: "arithmetic-geometric-means" },
       ],
     },
     { name: "Introduction to Calculus", topics: [] },
