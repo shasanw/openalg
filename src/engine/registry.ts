@@ -20,6 +20,7 @@ import { generator as graphingLinear } from "./generators/graphingLinear";
 import { generator as writingLinear } from "./generators/writingLinear";
 import { generator as systemsGraphing } from "./generators/systemsGraphing";
 import { generator as systemsElimination } from "./generators/systemsElimination";
+import { generator as systemsSubstitution } from "./generators/systemsSubstitution";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -39,6 +40,7 @@ export const GENERATORS: readonly Generator[] = [
   writingLinear,
   systemsGraphing,
   systemsElimination,
+  systemsSubstitution,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
