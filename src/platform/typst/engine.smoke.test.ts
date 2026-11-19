@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Smoke test for the real Typst-WASM compiler: the same engine the Web Worker
 // hosts, fed the bundled fonts and mitex package straight from disk.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
@@ -19,11 +19,11 @@ import {
   type ScrambleMode,
 } from "../../engine/worksheet";
 import { GENERATORS } from "../../engine/registry";
-import type { ParamValues } from "../../engine/types";
 import { QUADRATIC_FORMULA_ID } from "../../engine/generators/quadraticFormula";
 import { QUADRATIC_FACTORING_ID } from "../../engine/generators/quadraticFactoring";
 import { GRAPHING_QUADRATICS_ID } from "../../engine/generators/graphingQuadratics";
 import { plot } from "../../engine/plot";
+import { TOPIC_SHARDS, topicsOfShard } from "./topicSmoke.testkit";
 
 const require = createRequire(import.meta.url);
 const asset = (name: string) =>
@@ -193,39 +193,16 @@ describe("fillMath", () => {
 
 });
 
-// Every Topic, under every single-option variation, in both Response Formats
-// and every Answer Key format, must compile without warnings (graph Topics and
-// number lines included) through the real compiler: this is
-// what catches LaTeX that KaTeX accepts but mitex cannot convert, and markup
-// that only one key format emits (the in-context key's circled letters).
+// "Every Topic compiles" lives in topicsN.smoke.test.ts, one process per
+// shard (see topicSmoke.testkit.ts): one compiler cannot hold every Topic.
 describe("every Topic compiles", () => {
-  for (const g of GENERATORS) {
-    const variants: ParamValues[] = [{}];
-    for (const f of g.schema) {
-      if (f.type === "enum") for (const o of f.options) variants.push({ [f.key]: o.value });
-      if (f.type === "boolean") variants.push({ [f.key]: !f.default });
-      if (f.type === "int") variants.push({ [f.key]: f.min }, { [f.key]: f.max });
+  it("is sharded so every Topic is compiled exactly once", () => {
+    const ids = Array.from({ length: TOPIC_SHARDS }, (_, i) => topicsOfShard(i).map((g) => g.id)).flat();
+    expect(ids.sort()).toEqual(GENERATORS.map((g) => g.id).sort());
+    for (let i = 0; i < TOPIC_SHARDS; i++) {
+      expect(existsSync(fileURLToPath(new URL(`./topics${i + 1}.smoke.test.ts`, import.meta.url)))).toBe(true);
     }
-    it(`${g.id}: ${variants.length} option variants, free response and multiple choice, every Answer Key format`, async () => {
-      for (const [i, params] of variants.entries()) {
-        const fr = buildWorksheet({ generatorId: g.id, params, baseSeed: 1000 + i, count: 20 });
-        const mc = setResponseFormat(fr, { mode: "multiple-choice", choices: 5 });
-        for (const ws of [fr, mc]) {
-          const pages: Record<string, number> = {};
-          for (const keyFormat of ANSWER_KEY_FORMATS) {
-            pages[keyFormat] = (await engine.svgPages(buildTypstDocument(ws, { keyFormat }))).length;
-            expect(engine.warnings).toEqual([]);
-          }
-          expect(pages.none).toBeGreaterThan(0);
-          // Every key starts on its own page; in context repeats the whole sheet.
-          expect(pages.full).toBeGreaterThan(pages.none);
-          expect(pages.odds).toBeGreaterThan(pages.none);
-          expect(pages.odds).toBeLessThanOrEqual(pages.full);
-          expect(pages["in-context"]).toBeGreaterThanOrEqual(2 * pages.none);
-        }
-      }
-    }, 120_000);
-  }
+  });
 });
 
 // Versions (#11): Print and Export PDF emit every Version's student pages, then
