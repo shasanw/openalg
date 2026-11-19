@@ -122,6 +122,11 @@ export function sample<T>(make: () => T, ok: (t: T) => boolean, fallback: T, tri
   return fallback;
 }
 
+/** e, negated three times in four when it leads with a negative x term (printed systems mostly lead with a positive one). */
+export function mostlyLeadPositive(rng: Rng, e: StdEq): StdEq {
+  return e.a < 0 && rng.bool(0.75) ? scaleEq(e, -1) : e;
+}
+
 /** Neither coefficient zero, and no common factor (so the equation does not simplify). */
 export const isReduced = (e: StdEq): boolean => e.a !== 0 && e.b !== 0 && gcd(e.a, e.b) === 1;
 

@@ -31,7 +31,7 @@ export const algebra1: CourseOutline = {
     },
     {
       name: "Systems of Equations and Inequalities",
-      topics: [{ topic: "systems-graphing" }],
+      topics: [{ topic: "systems-graphing" }, { topic: "systems-elimination" }],
     },
     { name: "Exponents", topics: [] },
     { name: "Polynomials", topics: [] },
