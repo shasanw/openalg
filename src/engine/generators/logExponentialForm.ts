@@ -140,7 +140,8 @@ function naturalFact(rng: Rng, signed: boolean): [Quantity, Quantity, Quantity] 
   const v = rng.pick(LETTERS);
   if (rng.bool()) return [e, letter(v), num(rat(rng.int(2, 20)))];
   let y = rat(rng.int(2, 5));
-  if (signed && rng.bool(0.5)) y = rng.bool() ? rat(-rng.int(1, 3)) : rat(1, rng.pick([2, 3]));
+  // never -1: e^{-1} = k turns misplacements into true facts (\log_{k} e = -1)
+  if (signed && rng.bool(0.5)) y = rng.bool() ? rat(-rng.int(2, 3)) : rat(1, rng.pick([2, 3]));
   return [e, num(y), letter(v)];
 }
 
@@ -194,7 +195,12 @@ const positive = (q: Quantity) => q.value === null || q.value > 0;
  * base or a base of 1.
  */
 export function distractors(k: FormConstruction): string[] {
-  const { base: b, exponent: y, value: v } = k;
+  // the letter of a natural or common fact stands for the number the fact
+  // makes it (e^{-1} = k: k is 1/e), so a misplacement that happens to be
+  // true, like k^{-1} = e, is caught too
+  const b = k.base;
+  const y = k.exponent.value === null ? { ...k.exponent, value: Math.log(k.value.value!) / Math.log(b.value!) } : k.exponent;
+  const v = k.value.value === null ? { ...k.value, value: b.value! ** k.exponent.value! } : k.value;
   // each triple is (base, exponent, value) of a misplaced fact
   const triples: [Quantity, Quantity, Quantity][] = k.toLog
     ? [
