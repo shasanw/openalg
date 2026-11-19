@@ -22,6 +22,7 @@ import { generator as oneStepInequalities } from "./generators/oneStepInequaliti
 import { generator as twoStepInequalities } from "./generators/twoStepInequalities";
 import { generator as multiStepInequalities } from "./generators/multiStepInequalities";
 import { generator as compoundInequalities } from "./generators/compoundInequalities";
+import { generator as absoluteValueInequalities } from "./generators/absoluteValueInequalities";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -43,6 +44,7 @@ export const GENERATORS: readonly Generator[] = [
   twoStepInequalities,
   multiStepInequalities,
   compoundInequalities,
+  absoluteValueInequalities,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

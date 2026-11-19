@@ -24,6 +24,7 @@ export const algebra1: CourseOutline = {
         { topic: "two-step-inequalities" },
         { topic: "multi-step-inequalities" },
         { topic: "compound-inequalities" },
+        { topic: "absolute-value-inequalities" },
       ],
     },
     { name: "Proportions and Percents", topics: [] },
