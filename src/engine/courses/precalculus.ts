@@ -20,7 +20,7 @@ export const precalculus: CourseOutline = {
     { name: "Probability", topics: [] },
     {
       name: "Sequences and Series",
-      topics: [{ topic: "general-sequences" }],
+      topics: [{ topic: "general-sequences" }, { topic: "arithmetic-sequences" }],
     },
     { name: "Introduction to Calculus", topics: [] },
   ],
