@@ -212,7 +212,8 @@ ${markup}`;
 
 /** The prompt, with the Problem's graph (if any) under it, as the student sees it. */
 function promptWithGraph(problem: Problem, placeholder: Placeholder, graph: GraphMarkup): string {
-  const prompt = placeholder(problem.prompt);
+  // A prompt in parts (a given, then what to find) wraps between them like an Answer.
+  const prompt = answerMath(problem.prompt, placeholder);
   return problem.graph ? prompt + graphBlock(graph(problem.graph, { answer: false })) : prompt;
 }
 
@@ -222,7 +223,7 @@ function promptWithGraph(problem: Problem, placeholder: Placeholder, graph: Grap
  * blank graph there (when it does, the answer is drawn on that same window).
  */
 function inContextPrompt(problem: Problem, placeholder: Placeholder, graph: GraphMarkup): string {
-  const prompt = placeholder(problem.prompt);
+  const prompt = answerMath(problem.prompt, placeholder);
   const shown = problem.answerGraph ?? problem.graph;
   return shown ? prompt + graphBlock(graph(shown, { answer: !!problem.answerGraph })) : prompt;
 }
