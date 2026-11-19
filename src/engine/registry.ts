@@ -20,6 +20,7 @@ import { generator as graphingLinear } from "./generators/graphingLinear";
 import { generator as writingLinear } from "./generators/writingLinear";
 import { generator as generalSequences } from "./generators/generalSequences";
 import { generator as arithmeticSequences } from "./generators/arithmeticSequences";
+import { generator as geometricSequences } from "./generators/geometricSequences";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -39,6 +40,7 @@ export const GENERATORS: readonly Generator[] = [
   writingLinear,
   generalSequences,
   arithmeticSequences,
+  geometricSequences,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
