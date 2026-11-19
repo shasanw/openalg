@@ -18,6 +18,7 @@ import { generator as slope } from "./generators/slope";
 import { generator as parallelPerpendicular } from "./generators/parallelPerpendicular";
 import { generator as graphingLinear } from "./generators/graphingLinear";
 import { generator as writingLinear } from "./generators/writingLinear";
+import { generator as systemsGraphing } from "./generators/systemsGraphing";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -35,6 +36,7 @@ export const GENERATORS: readonly Generator[] = [
   parallelPerpendicular,
   graphingLinear,
   writingLinear,
+  systemsGraphing,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
