@@ -187,13 +187,13 @@ describe("graphing-inequalities: printing and Distractors", () => {
 
   it("prints a number-first inequality and describes its graph", () => {
     expect(inequalityLatex({ task: "graph", solution: ray, reversed: true })).toBe("-3 \\ge x");
-    expect(describeLatex(ray)).toBe("\\text{closed circle at } -3;\\quad \\text{shade left}");
+    expect(describeLatex(ray)).toBe("\\text{closed circle at } x = -3;\\quad \\text{shade left}");
   });
 
   it("lead with shading the wrong way, then the wrong circle", () => {
     expect(mistakes(ray).slice(0, 2).map(describeLatex)).toEqual([
-      "\\text{closed circle at } -3;\\quad \\text{shade right}",
-      "\\text{open circle at } -3;\\quad \\text{shade left}",
+      "\\text{closed circle at } x = -3;\\quad \\text{shade right}",
+      "\\text{open circle at } x = -3;\\quad \\text{shade left}",
     ]);
   });
 });

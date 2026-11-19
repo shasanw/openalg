@@ -173,22 +173,21 @@ export function promptLatex(k: GraphingInequalityConstruction): string {
   return k.task === "graph" ? inequalityLatex(k) : "\\text{Write an inequality for the graph.}";
 }
 
-/** "open circle at -3; shade right": the graph in words, for the key and the choices. */
+/** "open circle at x = -3; shade right": the graph in words, for the key and the choices. */
 export function describeLatex(s: SolutionSet): string {
   const circle = (closed: boolean) => (closed ? "closed" : "open");
+  // "at x = -7": after the words alone a minus prints as a binary "at − 7"
+  const num = (r: Rat) => `x = ${numLatex(r)}`;
   const sep = ANSWER_PART_SEPARATOR;
   switch (s.kind) {
     case "ray":
-      return `\\text{${circle(s.closed)} circle at } ${numLatex(s.at)}${sep}\\text{shade ${s.dir === "below" ? "left" : "right"}}`;
+      return `\\text{${circle(s.closed)} circle at } ${num(s.at)}${sep}\\text{shade ${s.dir === "below" ? "left" : "right"}}`;
     case "between":
     case "outside": {
       const shade = `\\text{shade ${s.kind === "between" ? "between" : "outside"}}`;
-      if (s.loClosed === s.hiClosed) {
-        return `\\text{${circle(s.loClosed)} circles at } ${numLatex(s.lo)} \\text{ and } ${numLatex(s.hi)}${sep}${shade}`;
-      }
       return (
-        `\\text{${circle(s.loClosed)} circle at } ${numLatex(s.lo)}${sep}` +
-        `\\text{${circle(s.hiClosed)} circle at } ${numLatex(s.hi)}${sep}${shade}`
+        `\\text{${circle(s.loClosed)} circle at } ${num(s.lo)}${sep}` +
+        `\\text{${circle(s.hiClosed)} circle at } ${num(s.hi)}${sep}${shade}`
       );
     }
     default:
