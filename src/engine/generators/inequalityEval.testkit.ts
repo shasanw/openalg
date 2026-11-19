@@ -43,6 +43,7 @@ function chain(tex: string, v: string, x: number): boolean {
 
 /** A printed inequality (with "\text{ and }", "\text{ or }") as a predicate. */
 export function inequalityHolds(tex: string, x: number, v = "x"): boolean {
+  tex = tex.replace(/\\mathord\{-\}/g, "-");
   if (tex === "\\text{all real numbers}") return true;
   if (tex === "\\text{no solution}") return false;
   return tex.split("\\text{ or }").some((part) => part.split("\\text{ and }").every((c) => chain(c.trim(), v, x)));

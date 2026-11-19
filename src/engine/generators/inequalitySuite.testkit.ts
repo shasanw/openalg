@@ -11,12 +11,14 @@ import { answerHolds, inequalityHolds, isInterval, probePoints } from "./inequal
 
 export const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 
-/** Printed forms no Problem may contain: 1x, -1x, + 0, double signs, -0. */
+/** Printed forms no Problem may contain: 1x, -1x, + 0, double signs, -0, a minus after words. */
 export function expectTidy(tex: string): void {
   expect(tex).not.toMatch(/(^|[^0-9.])1[a-z]/);
   expect(tex).not.toMatch(/[+-] 0(?![.\d])/);
   expect(tex).not.toMatch(/[+-] [+-]|--|\+-|-\+/);
   expect(tex).not.toMatch(/(^|[^0-9])-0(?![.\d])/);
+  // a minus right after words prints as subtraction ("and − 9x")
+  expect(tex).not.toMatch(/\\text\{[^}]*\}\s*-/);
 }
 
 export function solvedTopicSuite(

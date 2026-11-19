@@ -166,7 +166,13 @@ function partLatex(part: Part): string {
 }
 
 export function promptLatex(k: CompoundConstruction): string {
-  if (k.form === "two") return k.parts.map(partLatex).join(` \\text{ ${k.join} } `);
+  if (k.form === "two") {
+    // a minus right after the word would print as subtraction ("and − 9x"),
+    // in KaTeX and Typst alike, so a leading one is marked as a sign
+    const [first, second] = k.parts.map(partLatex);
+    const signed = second.startsWith("-") ? `\\mathord{-}${second.slice(1)}` : second;
+    return `${first} \\text{ ${k.join} } ${signed}`;
+  }
   const { lo, hi, expr } = k;
   // reading left to right the smaller value comes first; a negative a swaps the ends
   const [left, right] = expr.a > 0 ? [lo, hi] : [hi, lo];
