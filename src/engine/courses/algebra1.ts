@@ -19,7 +19,11 @@ export const algebra1: CourseOutline = {
     },
     {
       name: "Inequalities",
-      topics: [{ topic: "one-step-inequalities" }, { topic: "two-step-inequalities" }],
+      topics: [
+        { topic: "one-step-inequalities" },
+        { topic: "two-step-inequalities" },
+        { topic: "multi-step-inequalities" },
+      ],
     },
     { name: "Proportions and Percents", topics: [] },
     { name: "Relations and Functions", topics: [] },
