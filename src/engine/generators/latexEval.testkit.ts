@@ -5,6 +5,10 @@
 // Supported: integers and decimals, single letters (with _1 or _{1}
 // subscripts), \pi, \frac{..}{..}, parentheses, |..| absolute value, ^2 or
 // ^{..} powers, implicit multiplication, \cdot, unary minus, + and -.
+// Also \sqrt{..} and \sqrt[n]{..}, and logarithms: \ln, \log (base 10) and
+// \log_{b}, each applied to the single factor that follows (with its power),
+// so "2\log_{3} x^{2} + \ln y" reads as 2 log3(x^2) + ln(y). The constant e is
+// an ordinary letter: bind it in the env (e: Math.E).
 
 export type Env = Record<string, number>;
 
@@ -34,6 +38,7 @@ function tokenize(s: string): Tok[] {
       i += m[0].length;
       if (cmd === "pi") out.push({ t: "var", name: "pi" });
       else if (cmd === "frac" || cmd === "cdot") out.push({ t: "sym", v: cmd });
+      else if (cmd === "ln" || cmd === "log" || cmd === "sqrt") out.push({ t: "sym", v: cmd });
       else if (cmd === "left" || cmd === "right") continue;
       else if (cmd === "lvert" || cmd === "rvert") out.push({ t: "sym", v: "|" });
       else throw new Error(`unsupported command \\${cmd} in ${s}`);
@@ -50,7 +55,7 @@ function tokenize(s: string): Tok[] {
       out.push({ t: "var", name });
       continue;
     }
-    if ("+-()|{}^".includes(ch)) {
+    if ("+-()|{}^_[]".includes(ch)) {
       out.push({ t: "sym", v: ch });
       i++;
       continue;
@@ -109,7 +114,7 @@ class Parser {
     if (!t) return false;
     if (t.t !== "sym") return true;
     if (t.v === "|") return this.absDepth === 0;
-    return t.v === "(" || t.v === "frac" || t.v === "{";
+    return ["(", "frac", "{", "ln", "log", "sqrt"].includes(t.v);
   }
 
   term(): number {
@@ -166,6 +171,28 @@ class Parser {
       return n / d;
     }
     if (t.v === "{") return this.group();
+    if (t.v === "sqrt") {
+      this.i++;
+      let index = 2;
+      if (this.isSym("[")) {
+        this.i++;
+        index = this.expr();
+        this.expect("]");
+      }
+      const radicand = this.group();
+      return radicand < 0 && index % 2 === 1 ? -((-radicand) ** (1 / index)) : radicand ** (1 / index);
+    }
+    if (t.v === "ln" || t.v === "log") {
+      this.i++;
+      let base = t.v === "ln" ? Math.E : 10;
+      if (t.v === "log" && this.isSym("_")) {
+        this.i++;
+        base = this.group();
+      }
+      const arg = this.power();
+      if (!(arg > 0)) throw new Error(`log of non-positive ${arg}`);
+      return Math.log(arg) / Math.log(base);
+    }
     if (t.v === "(") {
       this.i++;
       const saved = this.absDepth;
