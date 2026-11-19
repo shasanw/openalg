@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
+import { listingFor } from "@/engine/courses";
 import { getGenerator } from "@/engine/registry";
 import { MAX_CHOICES, MIN_CHOICES } from "@/engine/mc";
 import type { ParamValues } from "@/engine/types";
@@ -182,7 +183,7 @@ function SectionPanel({
         <div className="min-w-0">
           <div className="text-subtle-foreground text-[11px] font-semibold tracking-[0.06em] uppercase">
             Section {letter}
-            {topic && ` · ${topic.unit}`}
+            {topic && ` · ${listingFor(topic.id)?.unit ?? ""}`}
           </div>
           <h2 className="mt-0.5 text-[15px] leading-snug font-semibold">
             {topic?.title ?? section.generatorId}

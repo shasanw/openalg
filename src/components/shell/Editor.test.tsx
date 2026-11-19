@@ -76,13 +76,17 @@ describe("Editor: Topic picker", () => {
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     const search = screen.getByRole("combobox", { name: "Search Topics" });
     await userEvent.type(search, "formula");
+    // Found in both Courses that list it, the opening Course (the first) first.
     const options = topicOptions();
-    expect(options.map((o) => o.textContent)).toEqual([expect.stringContaining("quadratic formula")]);
+    expect(options.map((o) => o.textContent)).toEqual([
+      expect.stringContaining("quadratic formula"),
+      expect.stringContaining("quadratic formula"),
+    ]);
     await userEvent.keyboard("{Enter}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(latest.ws.sections.map((s) => s.generatorId)).toEqual(["quadratic-formula"]);
     expect(latest.ws.sections[0].problems).toHaveLength(10);
-    expect(rowText()).toEqual([expect.stringMatching(/Problems 1–10 · Quadratics/)]);
+    expect(rowText()).toEqual([expect.stringMatching(/Problems 1–10 · Quadratic Functions/)]);
   });
 
   it("moves the highlight with the arrow keys and wraps", async () => {
@@ -104,7 +108,7 @@ describe("Editor: Topic picker", () => {
   it("says when nothing matches", async () => {
     mount(emptyWorksheet());
     fireEvent.keyDown(window, { key: "k", metaKey: true });
-    await userEvent.type(screen.getByRole("combobox"), "zzz");
+    await userEvent.type(screen.getByRole("combobox", { name: "Search Topics" }), "zzz");
     expect(screen.getByText(/No Topics match/)).toBeInTheDocument();
   });
 });
@@ -116,9 +120,9 @@ describe("Editor: Section outline", () => {
   it("lists each Section with its letter, Topic, continuous range and Unit", () => {
     mount(three());
     expect(rowText()).toEqual([
-      expect.stringMatching(/^ASection A: Solving quadratics by factoringProblems 1–8 · Quadratics$/),
-      expect.stringMatching(/Problems 9–14 · Quadratics/),
-      expect.stringMatching(/Problems 15–18 · Quadratics/),
+      expect.stringMatching(/^ASection A: Solving quadratics by factoringProblems 1–8 · Quadratic Functions$/),
+      expect.stringMatching(/Problems 9–14 · Quadratic Functions/),
+      expect.stringMatching(/Problems 15–18 · Quadratic Functions/),
     ]);
     expect(outline().getByText("18 problems")).toBeInTheDocument();
     expect(rows()[0]).toHaveAttribute("aria-current", "true");

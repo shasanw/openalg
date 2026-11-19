@@ -1,22 +1,26 @@
 # OpenAlg
 
-A worksheet and test generator for math teachers (Algebra 2 and Precalculus). A teacher picks a topic, tunes its options, and gets printable problems with matching answer keys.
+A worksheet and test generator for math teachers (Algebra 1, Algebra 2 and Precalculus). A teacher picks a topic, tunes its options, and gets printable problems with matching answer keys.
 
 ## Language
 
 ### Content
 
 **Course**:
-A subject a teacher teaches over a year, made of Units (e.g. "Algebra 2", "Precalculus"). Every Topic belongs to one Course, through its Unit.
+A subject a teacher teaches over a year, made of Units (e.g. "Algebra 1", "Algebra 2", "Precalculus"). A Worksheet has no Course of its own and may mix Topics from several.
 _Avoid_: Class, subject, book
 
 **Unit**:
-A grouping of related Topics within a Course, mirroring how the Course is taught (e.g. "Quadratics").
+A grouping of related Topics within a Course, mirroring how the Course is taught (e.g. "Quadratics"). A Unit belongs to exactly one Course.
 _Avoid_: Chapter, module
 
 **Topic**:
-One kind of problem a teacher can ask for (e.g. "Solve quadratics by factoring"), with its own Topic Options.
+One kind of problem a teacher can ask for (e.g. "Solve quadratics by factoring"), with its own Topic Options. A Topic is listed in one or more Courses, under one Unit in each, so a later Course can revisit an earlier Course's Topic at a harder level.
 _Avoid_: Generator (in user-facing language), skill, problem type
+
+**Course Outline**:
+The ordered Units of a Course and the Topics listed in each. A listing may set its own starting Topic Options, so the same Topic can begin easier in one Course than in another; the teacher can still change every option.
+_Avoid_: Syllabus, catalog, curriculum
 
 **Topic Options**:
 The teacher-adjustable settings of a Topic that shape the problems it produces (e.g. whether roots are rational, irrational or imaginary).

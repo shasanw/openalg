@@ -214,8 +214,6 @@ function asProperties(k: GraphingConstruction): ParabolaConstruction {
 
 export const generator: Generator = {
   id: GRAPHING_QUADRATICS_ID,
-  course: "Algebra 2",
-  unit: "Quadratics",
   title: "Graphing quadratics",
   defaultDirections:
     "Graph each parabola. Label the vertex, axis of symmetry, and intercepts.",

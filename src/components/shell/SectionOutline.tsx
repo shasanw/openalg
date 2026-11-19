@@ -5,6 +5,7 @@
 
 import { useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
+import { listingFor } from "@/engine/courses";
 import { getGenerator } from "@/engine/registry";
 import { sectionLetter, sectionRanges, type ProblemRange, type Worksheet } from "@/engine/worksheet";
 import { Button } from "@/components/ui/button";
@@ -119,7 +120,7 @@ export function SectionOutline({
                     )}
                   >
                     {rangeLabel(ranges[i])}
-                    {topic && ` · ${topic.unit}`}
+                    {topic && ` · ${listingFor(topic.id)?.unit ?? ""}`}
                   </span>
                 </span>
               </button>

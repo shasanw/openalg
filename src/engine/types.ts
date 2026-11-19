@@ -56,7 +56,8 @@ export interface Problem {
   distractorHints: Latex[];
   /**
    * A graph printed with the prompt on the student copy (#9), e.g. a blank
-   * coordinate grid to draw on. It must never give the Answer away.
+   * coordinate grid to draw on, or a given line whose slope is asked for. It
+   * must never give the Answer away: with an `answerGraph` it is blank.
    */
   graph?: GraphSpec;
   /**
@@ -69,10 +70,6 @@ export interface Problem {
 
 export interface Generator {
   id: string;
-  /** The Course the Topic belongs to (e.g. "Algebra 2", "Precalculus"). */
-  course: string;
-  /** The Unit of its Course the Topic is filed under (e.g. "Quadratics"). */
-  unit: string;
   /** Shown in the topic tree. */
   title: string;
   /** Default directions line, editable per worksheet (e.g. "Solve each…"). */

@@ -58,6 +58,13 @@ async function addSection(search: string) {
   await userEvent.keyboard("{Enter}");
 }
 
+/** Open a Topic's template from the home screen, showing every template first if it is folded away. */
+async function openTemplate(name: RegExp) {
+  const more = screen.queryByRole("button", { name: /^All Topics/ });
+  if (more) await userEvent.click(more);
+  await userEvent.click(screen.getByRole("button", { name }));
+}
+
 describe("App", () => {
   it("builds a multi-Section Worksheet that autosaves to the Library and reopens", async () => {
     render(
@@ -131,14 +138,14 @@ describe("App: throwaway Worksheets stay out of the Library", () => {
 
   it("a template opened and left untouched is not saved", async () => {
     renderApp();
-    await userEvent.click(screen.getByRole("button", { name: /Solving quadratics by factoring/ }));
+    await openTemplate(/Solving one-step equations/);
     await leave();
     expect(library.size).toBe(0);
   });
 
   it("a template that the teacher changes is saved", async () => {
     renderApp();
-    await userEvent.click(screen.getByRole("button", { name: /Solving quadratics by factoring/ }));
+    await openTemplate(/Solving one-step equations/);
     await addSection("formula");
     await leave();
     expect(stored()).toHaveLength(1);

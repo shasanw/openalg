@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getGenerator } from "@/engine/registry";
-import { resolveParams } from "@/engine/types";
+import type { Listing } from "@/engine/courses";
 import {
   buildWorksheet,
   DEFAULT_SECTION_PROBLEMS,
@@ -245,12 +244,11 @@ function App() {
   }
 
   /** A one-Section Worksheet from a Topic template on the home screen. */
-  function openTopic(id: string) {
-    const g = getGenerator(id)!;
+  function openTopic(listing: Listing) {
     openDocument(
       buildWorksheet({
-        generatorId: id,
-        params: resolveParams(g.schema, {}),
+        generatorId: listing.topic.id,
+        params: listing.options,
         baseSeed: randomSeed(),
         count: DEFAULT_SECTION_PROBLEMS,
       }),

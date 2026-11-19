@@ -5,8 +5,8 @@
 // the App owns the Worksheet itself and keeps it in the Library.
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import type { Listing } from "@/engine/courses";
 import { getGenerator } from "@/engine/registry";
-import { resolveParams } from "@/engine/types";
 import {
   addSection,
   buildSection,
@@ -74,12 +74,10 @@ export function Editor({
     setTab("section");
   }
 
-  function add(generatorId: string) {
-    const topic = getGenerator(generatorId);
-    if (!topic) return;
+  function add(listing: Listing) {
     const section = buildSection({
-      generatorId,
-      params: resolveParams(topic.schema, {}),
+      generatorId: listing.topic.id,
+      params: listing.options,
       baseSeed: randomSeed(),
       count: DEFAULT_SECTION_PROBLEMS,
     });

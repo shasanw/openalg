@@ -1,41 +1,60 @@
-// The Add Section picker (#31): a three-pane browser. Units of the chosen
-// Course on the left, matching Topics grouped by Unit in the middle, and a
-// preview of the highlighted Topic (sample Problems, Topic Options, default
-// Directions) on the right. Course tabs show only when more than one Course
-// has Topics.
+// The Add Section picker (#31, #36): a three-pane browser. On the left a
+// Course dropdown (shown when more than one Course has Topics) above the
+// Units of that Course; in the middle the matching Topics grouped by Unit;
+// on the right a preview of the highlighted Topic (sample Problems, Topic
+// Options, default Directions).
+//
+// It opens on the Course of the Worksheet's last Section, else the Course
+// this browser last added a Topic from, else the first Course (see
+// initialCourse). Typing searches every Course at once: the dropdown reads
+// "All Courses", results are grouped Course > Unit with the chosen Course
+// first, and clearing the search goes back to the chosen Course and Unit.
 //
 // It works with the keyboard alone. Focus starts in the search box, a
 // combobox that owns the Topic list: type to search, up/down to move, Enter to
-// add, Escape to close. Tab moves into the Units list (up/down picks a Unit;
-// Enter, right arrow or typing goes back to the search), then Cancel and Add.
+// add, Escape to close. Tab moves to the Course dropdown, then into the Units
+// list (up/down picks a Unit; Enter, right arrow or typing goes back to the
+// search), then Cancel and Add.
 
-import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "radix-ui";
 import { Search, X } from "lucide-react";
-import { GENERATORS, coursesOf } from "@/engine/registry";
-import type { Generator } from "@/engine/types";
+import { coursesOf, LISTINGS, type Listing } from "@/engine/courses";
 import { sectionLetter } from "@/engine/worksheet";
 import { Math as TeX } from "@/components/Math";
 import { Button } from "@/components/ui/button";
 import { GroupLabel, Kbd } from "@/components/ui/field";
-import { Segmented } from "@/components/ui/segmented";
+import { Select } from "@/components/ui/select";
+import { rememberCourse, rememberedCourse } from "@/lib/rememberedCourse";
 import { cn } from "@/lib/utils";
-import { browseTopics, sectionsByTopic, topicSample, usedLabel } from "./topicBrowser";
+import {
+  browseTopics,
+  initialCourse,
+  sameUnit,
+  sectionsByTopic,
+  topicSample,
+  usedLabel,
+  type UnitRef,
+} from "./topicBrowser";
+
+/** The dropdown's value while a search covers every Course. */
+const ALL_COURSES = "\u0000all";
 
 export function TopicPicker({
   open,
   onOpenChange,
   onPick,
   sections,
-  topics = GENERATORS,
+  listings = LISTINGS,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onPick: (generatorId: string) => void;
+  /** Called with the chosen listing; the Section starts from its Topic Options. */
+  onPick: (listing: Listing) => void;
   /** The generatorId of each Section on the Worksheet, in outline order. */
   sections: readonly string[];
-  /** The Topics to offer (the registry; tests pass their own). */
-  topics?: readonly Generator[];
+  /** The listings to offer (every Course Outline; tests pass their own). */
+  listings?: readonly Listing[];
 }) {
   const searchRef = useRef<HTMLInputElement>(null);
   return (
@@ -45,7 +64,7 @@ export function TopicPicker({
         <Dialog.Content
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => {
-            // Search first, even though the Course tabs come earlier.
+            // Search first, even though the Close button comes earlier.
             e.preventDefault();
             searchRef.current?.focus();
           }}
@@ -54,7 +73,7 @@ export function TopicPicker({
           <PickerBody
             onPick={onPick}
             sections={sections}
-            topics={topics}
+            listings={listings}
             searchRef={searchRef}
           />
         </Dialog.Content>
@@ -66,44 +85,57 @@ export function TopicPicker({
 function PickerBody({
   onPick,
   sections,
-  topics,
+  listings,
   searchRef,
 }: {
-  onPick: (generatorId: string) => void;
+  onPick: (listing: Listing) => void;
   sections: readonly string[];
-  topics: readonly Generator[];
+  listings: readonly Listing[];
   searchRef: React.RefObject<HTMLInputElement | null>;
 }) {
-  const courses = useMemo(() => coursesOf(topics), [topics]);
-  const [course, setCourse] = useState(courses[0] ?? "");
+  const courses = useMemo(() => coursesOf(listings), [listings]);
+  // The body mounts each time the picker opens, so this runs per opening.
+  const [course, setCourse] = useState(() =>
+    initialCourse({ sections, remembered: rememberedCourse(courses), listings }),
+  );
   const [query, setQuery] = useState("");
-  const [unit, setUnit] = useState<string | null>(null);
+  // The Unit chosen while browsing the Course, kept through a search.
+  const [unit, setUnit] = useState<UnitRef | null>(null);
+  // The Unit chosen during a search; it lasts only as long as the search.
+  const [searchUnit, setSearchUnit] = useState<UnitRef | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const listId = useId();
   const unitsId = useId();
   const listRef = useRef<HTMLDivElement>(null);
   const unitsRef = useRef<HTMLDivElement>(null);
 
+  const searching = query.trim() !== "";
   const view = useMemo(
-    () => browseTopics({ topics, course, unit, query }),
-    [topics, course, unit, query],
+    () => browseTopics({ listings, course, unit: searching ? searchUnit : unit, query }),
+    [listings, course, unit, searchUnit, searching, query],
   );
   const used = useMemo(() => sectionsByTopic(sections), [sections]);
   const { flat } = view;
-  // The highlight follows a Topic, not a row number, so changing the Unit
-  // keeps it when the Topic is still listed; otherwise the first Topic.
-  const found = flat.findIndex((g) => g.id === activeId);
+  // The highlight follows a listing, not a row number, so changing the Unit
+  // keeps it when the listing is still shown; otherwise the first one.
+  const found = flat.findIndex((l) => l.key === activeId);
   const active = found >= 0 ? found : 0;
   const activeTopic = flat[active];
   const nextLetter = sectionLetter(sections.length);
   const optionId = (i: number) => `${listId}-option-${i}`;
 
-  // Unit choices for the Units list: All Units, then each Unit with matches.
-  const unitChoices: { name: string | null; label: string; count: number }[] = [
-    { name: null, label: "All Units", count: view.total },
-    ...view.units.map((u) => ({ name: u.name, label: u.name, count: u.count })),
+  // The Units list: All Units, then each Unit with matches. While browsing
+  // these are the chosen Course's Units. During a search (which covers every
+  // Course) they are the Units holding results, under small Course headings
+  // in the same order as the results, so picking one narrows the results to
+  // that Course's Unit. That choice is separate from the browsing one and is
+  // dropped when the search is cleared, which restores the chosen Course and
+  // the Unit picked there.
+  const unitChoices: { unit: UnitRef | null; label: string; count: number }[] = [
+    { unit: null, label: "All Units", count: view.total },
+    ...view.units.map((u) => ({ unit: { course: u.course, name: u.name }, label: u.name, count: u.count })),
   ];
-  const unitIndex = unitChoices.findIndex((c) => c.name === view.unit);
+  const unitIndex = unitChoices.findIndex((c) => sameUnit(c.unit, view.unit));
   const unitOptionId = (i: number) => `${unitsId}-unit-${i}`;
 
   // Keep the highlighted Topic and the chosen Unit in view.
@@ -118,28 +150,36 @@ function PickerBody({
       ?.scrollIntoView?.({ block: "nearest" });
   }, [unitIndex]);
 
-  function pick(g: Generator | undefined) {
-    if (g) onPick(g.id);
+  function pick(l: Listing | undefined) {
+    if (!l) return;
+    rememberCourse(l.course);
+    onPick(l);
   }
 
-  function chooseUnit(name: string | null) {
-    setUnit(name);
+  function chooseUnit(u: UnitRef | null) {
+    if (searching) setSearchUnit(u);
+    else setUnit(u);
   }
 
+  function changeQuery(next: string) {
+    setQuery(next);
+    setActiveId(null);
+    if (!next.trim()) setSearchUnit(null);
+  }
+
+  /** Choosing a Course (even mid-search) clears the search and browses it. */
   function chooseCourse(next: string) {
+    if (next === ALL_COURSES) return;
     setCourse(next);
     setUnit(null);
-    setActiveId(null);
-    // A click hands the keyboard back to the search; arrow keys on the tabs
-    // move focus to the next tab right after this, so they keep working.
-    searchRef.current?.focus();
+    changeQuery("");
   }
 
   function onSearchKeyDown(e: React.KeyboardEvent) {
     const last = flat.length - 1;
     const go = (i: number) => {
       e.preventDefault();
-      if (flat[i]) setActiveId(flat[i].id);
+      if (flat[i]) setActiveId(flat[i].key);
     };
     if (e.key === "ArrowDown") go(active >= last ? 0 : active + 1);
     else if (e.key === "ArrowUp") go(active <= 0 ? last : active - 1);
@@ -155,7 +195,7 @@ function PickerBody({
     const last = unitChoices.length - 1;
     const go = (i: number) => {
       e.preventDefault();
-      chooseUnit(unitChoices[i].name);
+      chooseUnit(unitChoices[i].unit);
     };
     if (e.key === "ArrowDown") go(Math.min(last, unitIndex + 1));
     else if (e.key === "ArrowUp") go(Math.max(0, unitIndex - 1));
@@ -170,19 +210,15 @@ function PickerBody({
     }
   }
 
+  const courseOptions = [
+    ...(searching ? [{ value: ALL_COURSES, label: "All Courses" }] : []),
+    ...courses.map((c) => ({ value: c, label: c })),
+  ];
+
   return (
     <>
       <header className="flex h-12 shrink-0 items-center gap-3 border-b pr-2.5 pl-4">
         <Dialog.Title className="text-[14px] font-semibold">Add Section</Dialog.Title>
-        {courses.length > 1 && (
-          <Segmented
-            size="sm"
-            label="Course"
-            value={course}
-            options={courses.map((c) => ({ value: c, label: c }))}
-            onChange={chooseCourse}
-          />
-        )}
         <Dialog.Close asChild>
           <Button variant="quiet" size="icon-sm" className="ml-auto" aria-label="Close">
             <X />
@@ -203,12 +239,9 @@ function PickerBody({
             aria-label="Search Topics"
             aria-activedescendant={activeTopic ? optionId(active) : undefined}
             value={query}
-            onChange={(e) => {
-              setQuery(e.currentTarget.value);
-              setActiveId(null);
-            }}
+            onChange={(e) => changeQuery(e.currentTarget.value)}
             onKeyDown={onSearchKeyDown}
-            placeholder="Search Topics and Units…"
+            placeholder="Search Topics, Units and Courses…"
             className="placeholder:text-subtle-foreground min-w-0 flex-1 bg-transparent text-[13.5px] outline-none"
           />
           <span className="text-muted-foreground shrink-0 text-[12px] tabular-nums" aria-live="polite">
@@ -218,8 +251,19 @@ function PickerBody({
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[156px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] min-[880px]:grid-cols-[176px_minmax(0,1fr)_minmax(260px,300px)] min-[880px]:grid-rows-1">
-        {/* Units */}
+        {/* Course, then its Units */}
         <div className="bg-panel-2 flex min-h-0 flex-col border-r">
+          {courses.length > 1 && (
+            <div className="px-2 pt-3">
+              <Select
+                label="Course"
+                value={searching ? ALL_COURSES : course}
+                options={courseOptions}
+                onChange={chooseCourse}
+                className="font-medium"
+              />
+            </div>
+          )}
           <GroupLabel className="px-4 pt-3 pb-1.5">
             <span id={`${unitsId}-label`}>Units</span>
           </GroupLabel>
@@ -234,38 +278,53 @@ function PickerBody({
           >
             {unitChoices.map((c, i) => {
               const on = i === unitIndex;
+              const prev = unitChoices[i - 1]?.unit;
+              const courseHeading =
+                view.scope === "all" && c.unit && c.unit.course !== prev?.course ? c.unit.course : null;
               return (
-                <div
-                  key={c.label}
-                  id={unitOptionId(i)}
-                  role="option"
-                  aria-selected={on}
-                  data-unit-index={i}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => chooseUnit(c.name)}
-                  className={cn(
-                    "mb-px flex cursor-pointer items-center justify-between gap-2 rounded-md border px-2 py-1.5",
-                    on
-                      ? "border-selected-border bg-selected text-selected-foreground font-medium"
-                      : "hover:bg-hover border-transparent",
+                <Fragment key={c.unit ? `${c.unit.course}/${c.unit.name}` : ""}>
+                  {courseHeading && (
+                    <div
+                      role="presentation"
+                      className="text-muted-foreground truncate px-2 pt-2.5 pb-1 text-[12px] font-semibold"
+                    >
+                      {courseHeading}
+                    </div>
                   )}
-                >
-                  <span className="truncate">{c.label}</span>
-                  <span
+                  <div
+                    id={unitOptionId(i)}
+                    role="option"
+                    aria-selected={on}
+                    aria-label={
+                      view.scope === "all" && c.unit ? `${c.unit.course}, ${c.label}, ${c.count}` : undefined
+                    }
+                    data-unit-index={i}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => chooseUnit(c.unit)}
                     className={cn(
-                      "shrink-0 text-[12px] tabular-nums",
-                      on ? "text-selected-muted" : "text-muted-foreground",
+                      "mb-px flex cursor-pointer items-center justify-between gap-2 rounded-md border px-2 py-1.5",
+                      on
+                        ? "border-selected-border bg-selected text-selected-foreground font-medium"
+                        : "hover:bg-hover border-transparent",
                     )}
                   >
-                    {c.count}
-                  </span>
-                </div>
+                    <span className="truncate">{c.label}</span>
+                    <span
+                      className={cn(
+                        "shrink-0 text-[12px] tabular-nums",
+                        on ? "text-selected-muted" : "text-muted-foreground",
+                      )}
+                    >
+                      {c.count}
+                    </span>
+                  </div>
+                </Fragment>
               );
             })}
           </div>
         </div>
 
-        {/* Topics, grouped by Unit */}
+        {/* Topics, grouped by Unit (and by Course during a search) */}
         <div
           ref={listRef}
           id={listId}
@@ -278,53 +337,77 @@ function PickerBody({
               No Topics match “{query}”.
             </div>
           )}
-          {view.groups.map((group) => (
-            <div key={group.name} role="group" aria-labelledby={`${listId}-${group.name}`} className="mb-2">
-              <GroupLabel className="px-2 pt-1.5 pb-1">
-                <span id={`${listId}-${group.name}`}>{group.name}</span>
-              </GroupLabel>
-              {group.generators.map((g) => {
-                const index = flat.indexOf(g);
-                const on = index === active;
-                const letters = used.get(g.id);
-                return (
+          {view.groups.map((group, gi) => {
+            const courseHeading =
+              view.scope === "all" && group.course !== view.groups[gi - 1]?.course ? group.course : null;
+            const labelId = `${listId}-group-${gi}`;
+            const courseId = `${listId}-course-${courses.indexOf(group.course)}`;
+            return (
+              <Fragment key={`${group.course}/${group.name}`}>
+                {courseHeading && (
                   <div
-                    key={g.id}
-                    id={optionId(index)}
-                    role="option"
-                    aria-selected={on}
-                    data-index={index}
-                    // Keep focus in the search box so the keyboard keeps working.
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setActiveId(g.id)}
-                    onDoubleClick={() => pick(g)}
+                    id={courseId}
+                    role="presentation"
                     className={cn(
-                      "mb-px cursor-pointer rounded-md border px-2.5 py-1.5",
-                      on
-                        ? "border-selected-border bg-selected text-selected-foreground"
-                        : "hover:bg-hover border-transparent",
+                      "text-foreground px-2 pb-0.5 text-[13px] font-semibold",
+                      gi > 0 ? "mt-1 border-t pt-3" : "pt-1",
                     )}
                   >
-                    <div className="truncate font-medium">{g.title}</div>
-                    {letters && (
+                    {courseHeading}
+                  </div>
+                )}
+                <div
+                  role="group"
+                  aria-labelledby={view.scope === "all" ? `${courseId} ${labelId}` : labelId}
+                  className="mb-2"
+                >
+                  <GroupLabel className="px-2 pt-1.5 pb-1">
+                    <span id={labelId}>{group.name}</span>
+                  </GroupLabel>
+                  {group.listings.map((l) => {
+                    const index = flat.indexOf(l);
+                    const on = index === active;
+                    const letters = used.get(l.topic.id);
+                    return (
                       <div
+                        key={l.key}
+                        id={optionId(index)}
+                        role="option"
+                        aria-selected={on}
+                        data-index={index}
+                        // Keep focus in the search box so the keyboard keeps working.
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setActiveId(l.key)}
+                        onDoubleClick={() => pick(l)}
                         className={cn(
-                          "truncate text-[12px]",
-                          on ? "text-selected-muted" : "text-muted-foreground",
+                          "mb-px cursor-pointer rounded-md border px-2.5 py-1.5",
+                          on
+                            ? "border-selected-border bg-selected text-selected-foreground"
+                            : "hover:bg-hover border-transparent",
                         )}
                       >
-                        {usedLabel(letters)}
+                        <div className="truncate font-medium">{l.topic.title}</div>
+                        {letters && (
+                          <div
+                            className={cn(
+                              "truncate text-[12px]",
+                              on ? "text-selected-muted" : "text-muted-foreground",
+                            )}
+                          >
+                            {usedLabel(letters)}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                    );
+                  })}
+                </div>
+              </Fragment>
+            );
+          })}
         </div>
 
         {/* Preview of the highlighted Topic */}
-        <TopicPreview topic={activeTopic} />
+        <TopicPreview listing={activeTopic} />
       </div>
 
       <footer className="flex h-14 shrink-0 items-center gap-4 border-t px-4">
@@ -354,9 +437,10 @@ function PickerBody({
   );
 }
 
-function TopicPreview({ topic }: { topic: Generator | undefined }) {
-  // Cached per Topic, so moving the highlight never regenerates Problems.
-  const sample = topic ? topicSample(topic) : undefined;
+function TopicPreview({ listing }: { listing: Listing | undefined }) {
+  const topic = listing?.topic;
+  // Cached per Topic and Topic Options, so moving the highlight never regenerates Problems.
+  const sample = listing ? topicSample(listing.topic, listing.options) : undefined;
   // Fade the bottom edge while more of the preview is below it: with macOS's
   // hidden scrollbars, a cut-off line otherwise looks like a layout bug.
   const pane = useRef<HTMLElement>(null);

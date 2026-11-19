@@ -8,12 +8,14 @@ import {
   parabolaSpans,
   canLetter,
   letteringWidth,
+  lineSegment,
   placeLabels,
   plot,
   plotLayers,
   PLOT_WIDTH_PT,
   symmetricWindow,
   type CoordinatePlaneSpec,
+  type LineCurve,
   type NumberLineSpec,
   type ParabolaCurve,
 } from "./plot";
@@ -48,6 +50,20 @@ const offOrigin: CoordinatePlaneSpec = {
   curves: [{ kind: "parabola", form: "standard", a: -1, b: 14, c: -24 }],
 };
 
+const linesPlane: CoordinatePlaneSpec = {
+  ...blankPlane,
+  curves: [
+    { kind: "line", form: "slopeIntercept", m: 2 / 3, b: -1 },
+    { kind: "line", form: "slopeIntercept", m: -3, b: 4 },
+    { kind: "line", form: "slopeIntercept", m: 0, b: 6 },
+    { kind: "line", form: "vertical", x: -7 },
+  ],
+  points: [
+    { x: 0, y: -1 },
+    { x: 3, y: 1 },
+  ],
+};
+
 const blankLine: NumberLineSpec = { kind: "numberLine", range: { min: -5, max: 5 }, step: 1 };
 
 const answerLine: NumberLineSpec = {
@@ -69,6 +85,11 @@ describe("plot: snapshots", () => {
   it("a parabola with its axis of symmetry and labelled points, in an ink", async () => {
     await expect(plot(answerPlane, { ink: "#c62828" })).toMatchFileSnapshot(
       "__snapshots__/plot-plane-answer.svg",
+    );
+  });
+  it("straight lines of every kind, clipped to the window, with points on them", async () => {
+    await expect(plot(linesPlane, { ink: "#c62828" })).toMatchFileSnapshot(
+      "__snapshots__/plot-plane-lines.svg",
     );
   });
   it("a window that does not contain the origin (labels move to the edges)", async () => {
@@ -96,7 +117,7 @@ describe("plot: snapshots", () => {
 });
 
 describe("plot: output", () => {
-  const specs = [blankPlane, answerPlane, offOrigin, blankLine, answerLine];
+  const specs = [blankPlane, answerPlane, linesPlane, offOrigin, blankLine, answerLine];
 
   it("is deterministic", () => {
     for (const s of specs) expect(plot(s)).toBe(plot(structuredClone(s)));
@@ -170,6 +191,7 @@ describe("plot: output", () => {
 
   it("blankGraph keeps the frame and drops everything drawn on it", () => {
     expect(blankGraph(answerPlane)).toEqual(blankPlane);
+    expect(blankGraph(linesPlane)).toEqual(blankPlane);
     expect(blankGraph(answerLine)).toEqual(blankLine);
     expect(plot(blankGraph(answerPlane))).toBe(plot(blankPlane));
   });
@@ -287,6 +309,57 @@ describe("plot: windows always contain what they must show", () => {
     );
   });
 
+  const line: fc.Arbitrary<LineCurve> = fc.oneof(
+    fc.record({
+      kind: fc.constant("line" as const),
+      form: fc.constant("slopeIntercept" as const),
+      m: fc.oneof(fc.constant(0), fc.double({ min: -20, max: 20, noNaN: true })),
+      b: fc.double({ min: -30, max: 30, noNaN: true }),
+    }),
+    fc.record({
+      kind: fc.constant("line" as const),
+      form: fc.constant("vertical" as const),
+      x: fc.double({ min: -15, max: 15, noNaN: true }),
+    }),
+  );
+
+  it("lineSegment: the drawn piece lies on the line, inside the window, and covers every inside point", () => {
+    const x = { min: -10, max: 10 };
+    const y = { min: -10, max: 10 };
+    const inside = (px: number, py: number, eps: number) =>
+      px >= x.min - eps && px <= x.max + eps && py >= y.min - eps && py <= y.max + eps;
+    fc.assert(
+      fc.property(line, fc.double({ min: -10, max: 10, noNaN: true }), (c, t) => {
+        const seg = lineSegment(c, x, y);
+        if (seg) {
+          for (const [sx, sy] of seg) {
+            expect(inside(sx, sy, 1e-6)).toBe(true);
+            if (c.form === "vertical") expect(sx).toBe(c.x);
+            else expect(sy).toBeCloseTo(c.m * sx + c.b, 6);
+          }
+        }
+        // a point of the line at parameter t (x = t, or y = t when vertical)
+        const [qx, qy] = c.form === "vertical" ? [c.x, t] : [t, c.m * t + c.b];
+        if (inside(qx, qy, -1e-6)) {
+          expect(seg).not.toBeNull();
+          const [[x0, y0], [x1, y1]] = seg!;
+          if (c.form === "vertical") expect(qy >= y0 - 1e-9 && qy <= y1 + 1e-9).toBe(true);
+          else expect(qx >= x0 - 1e-9 && qx <= x1 + 1e-9).toBe(true);
+        }
+      }),
+    );
+  });
+
+  it("lineSegment: a line that misses the window draws nothing", () => {
+    const w = { min: -10, max: 10 };
+    expect(lineSegment({ kind: "line", form: "vertical", x: 11 }, w, w)).toBeNull();
+    expect(lineSegment({ kind: "line", form: "slopeIntercept", m: 0, b: -12 }, w, w)).toBeNull();
+    expect(lineSegment({ kind: "line", form: "slopeIntercept", m: 1, b: 25 }, w, w)).toBeNull();
+    // through a corner only
+    expect(lineSegment({ kind: "line", form: "slopeIntercept", m: -1, b: 20 }, w, w)).toBeNull();
+    expect(plot({ ...blankPlane, curves: [{ kind: "line", form: "vertical", x: 11 }] })).toBe(plot(blankPlane));
+  });
+
   it("standard and vertex forms of the same parabola draw the same curve", () => {
     // y = 2(x - 1)^2 - 8 = 2x^2 - 4x - 6
     const v: CoordinatePlaneSpec = { ...blankPlane, curves: [{ kind: "parabola", form: "vertex", a: 2, h: 1, k: -8 }] };
@@ -297,7 +370,7 @@ describe("plot: windows always contain what they must show", () => {
 
 describe("graphSpecProblem", () => {
   it("accepts every spec plot() draws", () => {
-    for (const s of [blankPlane, answerPlane, offOrigin, blankLine, answerLine]) {
+    for (const s of [blankPlane, answerPlane, linesPlane, offOrigin, blankLine, answerLine]) {
       expect(graphSpecProblem(JSON.parse(JSON.stringify(s)))).toBeNull();
     }
   });
@@ -309,6 +382,10 @@ describe("graphSpecProblem", () => {
     ["a zero step", { ...blankPlane, xStep: 0 }],
     ["a huge grid", { ...blankPlane, x: { min: -1e6, max: 1e6 } }],
     ["a flat parabola", { ...blankPlane, curves: [{ kind: "parabola", form: "vertex", a: 0, h: 0, k: 0 }] }],
+    ["a line without an intercept", { ...blankPlane, curves: [{ kind: "line", form: "slopeIntercept", m: 1 }] }],
+    ["a line with an infinite slope", { ...blankPlane, curves: [{ kind: "line", form: "slopeIntercept", m: Infinity, b: 0 }] }],
+    ["a vertical line without x", { ...blankPlane, curves: [{ kind: "line", form: "vertical" }] }],
+    ["a line of an unknown form", { ...blankPlane, curves: [{ kind: "line", form: "polar", r: 1 }] }],
     ["a point without y", { ...blankPlane, points: [{ x: 1 }] }],
     ["a number line point without closed", { ...blankLine, points: [{ x: 1 }] }],
     ["a shaded run with a string end", { ...blankLine, shaded: [{ from: "a", to: null }] }],

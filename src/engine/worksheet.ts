@@ -188,6 +188,15 @@ export interface BuildOptions extends SectionOptions {
   versions?: VersionSettings;
 }
 
+/**
+ * What a student is asked, for telling two Problems apart: the prompt, plus
+ * the graph printed with it. A Problem whose line is given as a graph shares
+ * its prompt ("The line shown") with every other such Problem.
+ */
+export function questionKey(problem: Pick<Problem, "prompt" | "graph">): string {
+  return problem.graph ? `${problem.prompt}\n${JSON.stringify(problem.graph)}` : problem.prompt;
+}
+
 /** Build one Section from its Recipe. */
 export function buildSection(opts: SectionOptions): Section {
   const generator = getGenerator(opts.generatorId);
@@ -197,11 +206,11 @@ export function buildSection(opts: SectionOptions): Section {
   const params = opts.params ?? {};
 
   // Reject-and-resample so a Section never shows the same question twice: draw
-  // seeds deterministically from the base seed and skip any problem whose prompt
-  // duplicates one already placed. The draw budget is bounded, so when the
-  // requested count approaches the Topic's finite problem space we still
-  // terminate instead of spinning forever hunting for a uniqueness that can't
-  // exist.
+  // seeds deterministically from the base seed and skip any problem whose
+  // question (its prompt, and the graph printed with it) duplicates one already
+  // placed. The draw budget is bounded, so when the requested count approaches
+  // the Topic's finite problem space we still terminate instead of spinning
+  // forever hunting for a uniqueness that can't exist.
   const problems: Problem[] = [];
   const seen = new Set<string>();
   const maxDraws = opts.count * 64;
@@ -209,8 +218,9 @@ export function buildSection(opts: SectionOptions): Section {
   while (problems.length < opts.count && draw < maxDraws) {
     const problem = generator.generate(params, deriveSeed(opts.baseSeed, draw));
     draw++;
-    if (seen.has(problem.prompt)) continue;
-    seen.add(problem.prompt);
+    const key = questionKey(problem);
+    if (seen.has(key)) continue;
+    seen.add(key);
     problems.push(problem);
   }
   // If the option-space was too small to fill uniquely, top up with repeats so

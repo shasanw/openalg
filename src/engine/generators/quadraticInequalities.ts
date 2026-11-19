@@ -536,8 +536,6 @@ export function numberLine(k: InequalityConstruction): NumberLineSpec {
 
 export const generator: Generator = {
   id: QUADRATIC_INEQUALITIES_ID,
-  course: "Algebra 2",
-  unit: "Quadratics",
   title: "Solving quadratic inequalities",
   defaultDirections: "Solve each inequality.",
   schema,
