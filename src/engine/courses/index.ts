@@ -6,12 +6,13 @@ import { getGenerator } from "../registry";
 import { resolveParams, type Generator, type ParamValues } from "../types";
 import { algebra1 } from "./algebra1";
 import { algebra2 } from "./algebra2";
+import { precalculus } from "./precalculus";
 import type { CourseOutline } from "./types";
 
 export type { CourseOutline, OutlineEntry, OutlineUnit } from "./types";
 
 /** Curriculum order. A Course with no listed Topics never shows. */
-export const COURSE_OUTLINES: readonly CourseOutline[] = [algebra1, algebra2];
+export const COURSE_OUTLINES: readonly CourseOutline[] = [algebra1, algebra2, precalculus];
 
 /** A Topic as listed in one Course and Unit. */
 export interface Listing {
