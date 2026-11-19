@@ -149,6 +149,8 @@ function tryConstruct(rng: Rng, form: Form, reciprocals: boolean, fractions: boo
   if (right.p === left.p) return null;
   // p1 a1 x + p1 b1 = p2 a2 x + p2 b2, so b2 = (p1(a1 x + b1) - p2 a2 x) / p2
   if (left.p * left.a === right.p * right.a) return null;
+  // 6^{3x + 3} = (1/6)^{3x} mirrors itself: every slip lands on the same few values
+  if (left.p === -right.p && left.a === right.a) return null;
   const b2 = div(sub(sideExponent(left, x), mul(rat(right.p * right.a), x)), rat(right.p))!;
   if (!isInt(b2) || Math.abs(b2.n) > 9) return null;
   right.b = b2.n;
