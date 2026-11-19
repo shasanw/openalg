@@ -192,9 +192,12 @@ export function specialDistractors(kind: SpecialKind, e1: StdEq, e2: StdEq): str
   const d = new Distractors(answer);
   if (kind === "none") {
     d.add(INFINITELY_MANY);
-    const p1 = latticePoints(e1, 3);
-    const p2 = latticePoints(e2, 3);
+    // Large constants can leave few small points on either line, so look
+    // further out, then fall back on sign slips of the points found.
+    const p1 = latticePoints(e1, 3, 20);
+    const p2 = latticePoints(e2, 3, 20);
     for (let i = 0; i < 3; i++) d.add(p1[i] && pointLatex(p1[i]), p2[i] && pointLatex(p2[i]));
+    for (const [x, y] of [...p1, ...p2]) d.add(...pointSlips(x, y));
   } else {
     d.add(NO_SOLUTION);
     if (!satisfiesEq(e1, 0, 0)) d.add(pointLatex([0, 0]));
