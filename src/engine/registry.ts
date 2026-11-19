@@ -22,6 +22,7 @@ import { generator as exponentialCommonBase } from "./generators/exponentialComm
 import { generator as logExponentialForm } from "./generators/logExponentialForm";
 import { generator as evaluatingLogarithms } from "./generators/evaluatingLogarithms";
 import { generator as logProperties } from "./generators/logProperties";
+import { generator as exponentialEquationsLogs } from "./generators/exponentialEquationsLogs";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -43,6 +44,7 @@ export const GENERATORS: readonly Generator[] = [
   logExponentialForm,
   evaluatingLogarithms,
   logProperties,
+  exponentialEquationsLogs,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
