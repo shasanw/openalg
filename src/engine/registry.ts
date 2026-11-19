@@ -19,6 +19,7 @@ import { generator as parallelPerpendicular } from "./generators/parallelPerpend
 import { generator as graphingLinear } from "./generators/graphingLinear";
 import { generator as writingLinear } from "./generators/writingLinear";
 import { generator as oneStepInequalities } from "./generators/oneStepInequalities";
+import { generator as twoStepInequalities } from "./generators/twoStepInequalities";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -37,6 +38,7 @@ export const GENERATORS: readonly Generator[] = [
   graphingLinear,
   writingLinear,
   oneStepInequalities,
+  twoStepInequalities,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
