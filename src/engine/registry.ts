@@ -19,6 +19,7 @@ import { generator as parallelPerpendicular } from "./generators/parallelPerpend
 import { generator as graphingLinear } from "./generators/graphingLinear";
 import { generator as writingLinear } from "./generators/writingLinear";
 import { generator as exponentialCommonBase } from "./generators/exponentialCommonBase";
+import { generator as logExponentialForm } from "./generators/logExponentialForm";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -37,6 +38,7 @@ export const GENERATORS: readonly Generator[] = [
   graphingLinear,
   writingLinear,
   exponentialCommonBase,
+  logExponentialForm,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

@@ -10,7 +10,7 @@ export const precalculus: CourseOutline = {
     { name: "Polynomial and Rational Functions", topics: [] },
     {
       name: "Exponential and Logarithmic Functions",
-      topics: [{ topic: "exponential-common-base" }],
+      topics: [{ topic: "exponential-common-base" }, { topic: "log-exponential-form" }],
     },
     { name: "Trigonometry", topics: [] },
     { name: "Parametric Equations", topics: [] },
