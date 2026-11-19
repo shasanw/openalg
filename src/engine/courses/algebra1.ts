@@ -20,6 +20,7 @@ export const algebra1: CourseOutline = {
     {
       name: "Inequalities",
       topics: [
+        { topic: "graphing-inequalities" },
         { topic: "one-step-inequalities" },
         { topic: "two-step-inequalities" },
         { topic: "multi-step-inequalities" },
