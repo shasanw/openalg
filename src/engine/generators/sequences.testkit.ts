@@ -22,6 +22,27 @@ export function parseList(latex: string): number[] {
   return parts.map((p) => evalLatex(p.trim()));
 }
 
+/**
+ * A written-out series: "3 + 7 + 11 + \cdots + 79" -> opening [3, 7, 11] and
+ * last 79; "12 - 6 + 3 + \cdots" -> opening [12, -6, 3] and no last term.
+ */
+export function parseSeries(latex: string): { opening: number[]; last: number | null } {
+  const tokens = latex.split(/ (?=[+-] )/);
+  const at = tokens.findIndex((t) => t.endsWith("\\cdots"));
+  if (at < 0) throw new Error(`no ellipsis in ${latex}`);
+  const opening = tokens.slice(0, at).map((t) => evalLatex(t));
+  const rest = tokens.slice(at + 1);
+  if (rest.length > 1) throw new Error(`more than one last term in ${latex}`);
+  return { opening, last: rest.length ? evalLatex(rest[0]) : null };
+}
+
+/** "\sum_{k=1}^{20} (3k - 1)" -> from 1, to 20 (or Infinity), body "(3k - 1)". */
+export function parseSigma(latex: string): { from: number; to: number; body: string } | null {
+  const m = latex.match(/^\\sum_\{k=(\d+)\}\^\{(\d+|\\infty)\} (.+)$/);
+  if (!m) return null;
+  return { from: Number(m[1]), to: m[2] === "\\infty" ? Infinity : Number(m[2]), body: m[3] };
+}
+
 /** The prompt's math part and its request, split at ";\quad ". */
 export function splitAsk(prompt: string): [string, string] {
   const at = prompt.lastIndexOf(";\\quad ");
