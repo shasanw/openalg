@@ -42,5 +42,7 @@ export default defineConfig(async () => ({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Agent worktrees hold whole copies of the repo (with their own React).
+    exclude: ["**/node_modules/**", "**/dist/**", ".claude/**"],
   },
 }));

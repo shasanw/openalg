@@ -27,3 +27,6 @@ dist-ssr
 check-results
 .vercel
 .env*
+
+# Agent worktrees
+.claude/worktrees
