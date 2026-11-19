@@ -136,7 +136,8 @@ export function answerLatex(k: ArithmeticConstruction): string {
 /**
  * Mistake-based Distractors, most common first.
  * A rule: a_1 + dn (the "- 1" forgotten), the difference with the wrong sign
- * (a_1 - a_2), a_1 and d swapped, the constant's sign slipped. From two terms:
+ * (a_1 - a_2), a_1 and d swapped, the constant's sign slipped, n + 1 for
+ * n - 1. From two terms:
  * the gap in values not divided by the gap in indices, or divided by one too
  * many, and the first given term taken as a_1.
  * A term: a_1 + kd, the wrong sign of d, and from two terms the same slips.
@@ -160,6 +161,7 @@ export function distractors(k: ArithmeticConstruction): string[] {
       rule(add(a1, mul(rat(2), d)), neg(d)), // the difference's sign wrong
       a1.n === d.n && a1.d === d.d ? null : rule(add(a1, d), a1), // a_1 and d swapped: a_1 n + d
       rule(sub(d, sub(a1, d)), d), // the constant's sign slipped
+      rule(add(a1, mul(rat(2), d)), d), // a_1 + d(n + 1)
     ];
   } else {
     const at = (first: Rat, dd: Rat, i: number) => numLatex(arithmeticTerm(first, dd, i));

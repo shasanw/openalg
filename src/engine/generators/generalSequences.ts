@@ -22,6 +22,7 @@ import {
   pow,
   powerLatex,
   rat,
+  ratEq,
   size,
   termName,
   type Rat,
@@ -210,7 +211,7 @@ function recursiveRule(rng: Rng, negOk: boolean): Rule {
   switch (form) {
     case "affine": {
       const c = nonzeroInt(rng, 1, 9, negOk);
-      const p = rng.pick(negOk ? [1, 2, 2, 3, -2, -1] : [1, 2, 2, 3]);
+      const p = rng.pick(negOk ? [1, 2, 2, 3, -2] : [1, 2, 2, 3]);
       const q = nonzeroInt(rng, 1, 9, true);
       const mistakes: Seq[] = [
         recursive([r(c)], (_t, n) => r(p * n + q)), // n used in place of a_{n-1}
@@ -287,7 +288,9 @@ function acceptable(k: SequenceConstruction, negOk: boolean): boolean {
     if (!printable(v)) return false;
     if (!negOk && v.n <= 0) return false;
   }
-  return true;
+  // not a constant sequence (a recursive rule started at its fixed point)
+  const opening = [1, 2, 3, 4, 5].map((i) => k.seq(i));
+  return opening.some((v) => v && opening[0] && !ratEq(v, opening[0]));
 }
 
 /** Pure construction from params + an RNG. */

@@ -86,7 +86,9 @@ export function construct(params: ParamValues, rng: Rng): ArithmeticSeriesConstr
     const a1 = rat(nonzeroInt(rng, 1, 20, negOk));
     // no printed term is 0 (a series "+ 0" reads as a slip)
     const printed = [1, 2, 3, n].map((i) => arithmeticTerm(a1, d, i));
-    if (printed.every((t) => t.n !== 0)) return { given, a1, d, n, from };
+    // nor is the sum (its terms would cancel, and every slip lands on 0 too)
+    const zeroSum = add(printed[0], printed[3]).n === 0;
+    if (printed.every((t) => t.n !== 0) && !zeroSum) return { given, a1, d, n, from };
   }
 }
 
@@ -142,6 +144,8 @@ export function distractors(k: ArithmeticSeriesConstruction): string[] {
     sumWith(n, add(a1, mul(rat(n), d))), // a_n = a_1 + nd
     sumWith(n + 1, an), // one term too many
     an, // the last term, not the sum
+    arithmeticSum(a1, d, n - 1), // the sum stopped a term early
+    arithmeticSum(a1, d, n + 1), // or a term late
   );
   return distinctHints(
     answerLatex(k),
