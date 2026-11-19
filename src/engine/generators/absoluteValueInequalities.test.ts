@@ -108,7 +108,7 @@ describe("absolute-value-inequalities: Distractors", () => {
       d: 0,
       solution: absSet(2, "<", 3),
     };
-    expect(promptLatex(k)).toBe("|2x - 4| < 6");
+    expect(promptLatex(k)).toBe("\\lvert 2x - 4 \\rvert < 6");
     expect(mistakes(k).slice(0, 3).map((m) => setLatex(m!, "inequality"))).toEqual([
       "x < -1 \\text{ or } x > 5",
       "x < 5",
@@ -130,6 +130,6 @@ describe("absolute-value-inequalities: Distractors", () => {
       d: 3,
       solution: absSet(1, "<", 4),
     };
-    expect(promptLatex(k)).toBe("-2|x - 1| + 3 > -5");
+    expect(promptLatex(k)).toBe("-2\\lvert x - 1 \\rvert + 3 > -5");
   });
 });

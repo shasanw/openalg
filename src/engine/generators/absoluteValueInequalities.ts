@@ -135,9 +135,11 @@ export function construct(params: ParamValues, rng: Rng): AbsConstruction {
   const a = p.coefficient && rng.bool(0.5) ? rng.int(2, 4) : 1;
   const special = (p.specialCases as boolean) && rng.bool(0.3);
 
-  // centre m != 0 (so the bars hold a real "+ b"), boundaries within S
-  const m = nonzeroInt(rng, 1, S - 1, true);
-  const h = special ? 0 : rng.int(1, Math.max(1, S - Math.abs(m)));
+  // half-width h, then a centre m != 0 (so the bars hold a real "+ b"),
+  // boundaries m - h and m + h within S
+  const h0 = rng.int(1, Math.ceil(S / 2));
+  const m = nonzeroInt(rng, 1, Math.max(1, S - h0), true);
+  const h = special ? 0 : h0;
   // the special cases: c = 0, or a negative c
   const c = special ? (rng.bool(0.4) ? 0 : -rng.int(1, 9)) : a * h;
   const b = -a * m;
@@ -173,7 +175,9 @@ export function insideLatex(k: AbsConstruction): string {
 }
 
 export function promptLatex(k: AbsConstruction): string {
-  const bars = `|${insideLatex(k)}|`;
+  // \lvert and \rvert, not plain bars: mitex then spaces them as opening and
+  // closing delimiters, as absoluteValueEquations does
+  const bars = `\\lvert ${insideLatex(k)} \\rvert`;
   if (k.k === 1 && k.d === 0) return `${bars} ${OP_LATEX[k.op]} ${k.c}`;
   const mult = k.k === -1 ? "-" : String(k.k);
   const left = `${mult}${bars} ${k.d < 0 ? "-" : "+"} ${Math.abs(k.d)}`;
