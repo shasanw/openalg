@@ -33,7 +33,7 @@ import { rememberCourse, rememberedCourse } from "@/lib/rememberedCourse";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { LogoMark } from "@/components/LogoMark";
+import { BrandLogo } from "@/components/BrandLogo";
 import type { Theme } from "@/lib/useTheme";
 import { BlankThumb, TopicThumb } from "./TopicThumb";
 import { recentTopics, rowTemplates, unitTemplates } from "./templates";
@@ -143,12 +143,11 @@ export function HomeScreen({
   return (
     <div className="bg-background flex h-screen flex-col overflow-y-auto">
       {/* Brand left, search centred on the page, settings right. */}
-      <header className="bg-background/80 sticky top-0 z-10 grid h-16 grid-cols-[1fr_minmax(0,600px)_1fr] items-center gap-4 border-b px-6 backdrop-blur">
-        <div className="flex items-center gap-2.5">
-          <LogoMark className="size-9" />
-          <span className="text-[19px] font-semibold tracking-tight">OpenAlg</span>
+      <header className="bg-background/80 sticky top-0 z-10 grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-b px-3 py-2 backdrop-blur sm:h-16 sm:grid-cols-[minmax(144px,1fr)_minmax(0,600px)_1fr] sm:px-6 sm:py-0">
+        <div className="col-start-1 row-start-1">
+          <BrandLogo />
         </div>
-        <div className="relative" role="search">
+        <div className="relative col-span-2 col-start-1 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1" role="search">
           <Search className="text-muted-foreground absolute top-1/2 left-4 size-[18px] -translate-y-1/2" />
           <input
             type="search"
@@ -159,7 +158,7 @@ export function HomeScreen({
             placeholder="Search your Worksheets"
           />
         </div>
-        <div className="flex justify-end">
+        <div className="col-start-2 row-start-1 flex justify-end sm:col-start-3">
           <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
         </div>
       </header>

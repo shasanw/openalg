@@ -17,7 +17,7 @@ import {
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { LogoMark } from "@/components/LogoMark";
+import { BrandLogo } from "@/components/BrandLogo";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import type { Theme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
@@ -92,11 +92,10 @@ export function TopBar({
         <button
           type="button"
           onClick={onHome}
-          className="hover:bg-hover flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1"
+          className="hover:bg-hover flex shrink-0 items-center rounded-md px-1.5 py-1"
           title="Home"
         >
-          <LogoMark className="size-6" />
-          <span className="font-semibold">OpenAlg</span>
+          <BrandLogo />
         </button>
         <ChevronRight aria-hidden className="text-subtle-foreground size-4 shrink-0" />
         <button
