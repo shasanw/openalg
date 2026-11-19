@@ -172,7 +172,7 @@ export function construct(params: ParamValues, rng: Rng): ExpLogConstruction {
   const p = resolveParams(schema, params);
   for (;;) {
     const base = pickBase(rng, p.naturalCommon as boolean);
-    const a = rng.pick([1, 1, 1, 2, 3, 4]);
+    const a = rng.pick([1, 1, 1, 1, 2, 3, 4]);
     const c = rng.bool(0.5) ? 0 : rng.int(1, 5) * (rng.bool() ? 1 : -1);
     const n = pickValue(rng, base);
     let k = 1;
