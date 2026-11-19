@@ -84,8 +84,9 @@ export function fractionToLatex(n: number, d: number): string {
 }
 
 /**
- * Separates the parts of a multi-part Answer (e.g. vertex; axis; intercepts).
- * Printed layouts split on it so a long Answer can wrap between its parts
+ * Separates the parts of a multi-part Answer (e.g. vertex; axis; intercepts),
+ * or of a prompt (a given, then what to find: "5, 8, 11, \ldots;\quad
+ * \text{find } a_{20}"). Printed layouts split on it so a long one can wrap between its parts
  * instead of overflowing as one unbreakable equation; on screen it renders as
  * "; " plus a quad.
  */

@@ -1,0 +1,147 @@
+import { describe, expect, it } from "vitest";
+import fc from "fast-check";
+import { createRng } from "../rng";
+import { construct, distractors, generator, MAX_PRINTED } from "./sequenceMeans";
+import { BLANK, rat } from "./sequenceKit";
+import { close, evalLatex } from "./latexEval.testkit";
+import { expectKatex, expectTidy, parseList, printedNumbers, splitAsk } from "./sequences.testkit";
+
+const anySeed = fc.integer({ min: 0, max: 0xffffffff });
+const anyParams = fc.record({
+  type: fc.constantFrom("arithmetic", "geometric", "mixed"),
+  maxMeans: fc.integer({ min: 1, max: 4 }),
+  fractions: fc.boolean(),
+  allowNegatives: fc.boolean(),
+});
+
+/** The printed ends, the number of blanks and the label. */
+function readPrompt(prompt: string) {
+  const [run, label] = splitAsk(prompt);
+  const parts = run.split(", ");
+  const blanks = parts.slice(1, -1);
+  for (const b of blanks) expect(b).toBe(BLANK);
+  return { first: evalLatex(parts[0]), last: evalLatex(parts[parts.length - 1]), m: blanks.length, label };
+}
+
+/** Whether the full run has a common difference (or ratio). */
+function isArithmetic(xs: number[]): boolean {
+  return xs.every((x, i) => i < 2 || close(x - xs[i - 1], xs[1] - xs[0]));
+}
+function isGeometric(xs: number[]): boolean {
+  return xs[0] !== 0 && xs.every((x, i) => i < 2 || close(x / xs[i - 1], xs[1] / xs[0]));
+}
+
+describe("arithmetic-geometric-means: answers", () => {
+  it("the means complete the printed run as labelled", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate(params, seed);
+        const { first, last, m, label } = readPrompt(p.prompt);
+        const means = parseList(p.answer);
+        expect(means).toHaveLength(m);
+        const full = [first, ...means, last];
+        if (label === "\\text{arithmetic}") expect(isArithmetic(full)).toBe(true);
+        else {
+          expect(isGeometric(full)).toBe(true);
+          // an even gap fits r and -r: the prompt pins r > 0
+          if ((m + 1) % 2 === 0) {
+            expect(label).toBe("\\text{geometric}, r > 0");
+            expect(full[1] / full[0]).toBeGreaterThan(0);
+          } else expect(label).toBe("\\text{geometric}");
+        }
+      }),
+    );
+  });
+
+  it("prints tidy, modest numbers and renders in KaTeX", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate(params, seed);
+        for (const s of [p.prompt, p.answer, ...p.distractorHints]) expectTidy(s);
+        for (const s of [p.prompt, p.answer]) {
+          expectKatex(s);
+          for (const n of printedNumbers(s)) expect(n).toBeLessThanOrEqual(MAX_PRINTED);
+        }
+      }),
+    );
+  });
+});
+
+describe("arithmetic-geometric-means: Topic Options", () => {
+  it("inserts between 1 and Most means, of the type asked for", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const k = construct(params, createRng(seed));
+        expect(k.m).toBeGreaterThanOrEqual(1);
+        expect(k.m).toBeLessThanOrEqual(params.maxMeans);
+        if (params.type !== "mixed") expect(k.type).toBe(params.type);
+      }),
+    );
+    const ms = new Set(Array.from({ length: 60 }, (_, s) => construct({ maxMeans: 4 }, createRng(s)).m));
+    expect(ms).toEqual(new Set([1, 2, 3, 4]));
+  });
+
+  it("keeps whole numbers unless fractions are allowed", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate({ ...params, fractions: false }, seed);
+        for (const s of [p.prompt, p.answer, ...p.distractorHints]) expect(s).not.toContain("\\frac");
+      }),
+    );
+    const fractional = Array.from({ length: 60 }, (_, s) =>
+      generator.generate({ type: "arithmetic", fractions: true }, s),
+    ).filter((p) => p.answer.includes("\\frac"));
+    expect(fractional.length).toBeGreaterThan(15);
+  });
+
+  it("prints no negative numbers when negatives are off", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate({ ...params, allowNegatives: false }, seed);
+        expect(p.prompt).not.toContain("-");
+        expect(p.answer).not.toContain("-");
+      }),
+    );
+  });
+});
+
+describe("arithmetic-geometric-means: distractors", () => {
+  it("are distinct, never the Answer, and at least two", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate(params, seed);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
+        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expect(p.distractorHints).not.toContain(p.answer);
+      }),
+    );
+  });
+
+  it("model dividing by the number of means and the negative ratio", () => {
+    // 2, _, _, _, 26 arithmetic: d = 6; 24/3 = 8 divides by the means, not the steps
+    const a = { type: "arithmetic" as const, m: 3, first: rat(2), step: rat(6), positiveRatio: false };
+    expect(distractors(a).slice(0, 2)).toEqual(["10, 18, 26", "-4, -10, -16"]);
+    // 4, _, _, _, 24: 20/3 and 20/5... 20/5 = 4 is whole, 20/3 is not (dropped among whole Answers)
+    expect(distractors({ ...a, first: rat(4), step: rat(5) })[0]).toBe("8, 12, 16");
+    // 2, _, _, _, 32 geometric, r > 0
+    const g = { type: "geometric" as const, m: 3, first: rat(2), step: rat(2), positiveRatio: true };
+    expect(distractors(g)[0]).toBe("-4, 8, -16");
+  });
+});
+
+describe("arithmetic-geometric-means: generate()", () => {
+  it("is deterministic for the same (params, seed)", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        expect(generator.generate(params, seed)).toEqual(generator.generate(params, seed));
+      }),
+    );
+  });
+
+  it("has enough variety for a 20-Problem Section without repeats", () => {
+    for (const type of ["arithmetic", "geometric"]) {
+      const prompts = new Set(Array.from({ length: 200 }, (_, s) => generator.generate({ type }, s).prompt));
+      expect(prompts.size, type).toBeGreaterThan(60);
+    }
+  });
+});

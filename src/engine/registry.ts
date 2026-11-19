@@ -27,6 +27,12 @@ import { generator as twoStepInequalities } from "./generators/twoStepInequaliti
 import { generator as multiStepInequalities } from "./generators/multiStepInequalities";
 import { generator as compoundInequalities } from "./generators/compoundInequalities";
 import { generator as absoluteValueInequalities } from "./generators/absoluteValueInequalities";
+import { generator as generalSequences } from "./generators/generalSequences";
+import { generator as arithmeticSequences } from "./generators/arithmeticSequences";
+import { generator as geometricSequences } from "./generators/geometricSequences";
+import { generator as sequenceMeans } from "./generators/sequenceMeans";
+import { generator as arithmeticSeries } from "./generators/arithmeticSeries";
+import { generator as geometricSeries } from "./generators/geometricSeries";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -53,6 +59,12 @@ export const GENERATORS: readonly Generator[] = [
   multiStepInequalities,
   compoundInequalities,
   absoluteValueInequalities,
+  generalSequences,
+  arithmeticSequences,
+  geometricSequences,
+  sequenceMeans,
+  arithmeticSeries,
+  geometricSeries,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

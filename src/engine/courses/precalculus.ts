@@ -19,7 +19,17 @@ export const precalculus: CourseOutline = {
     { name: "Conic Sections", topics: [] },
     { name: "Counting and the Binomial Theorem", topics: [] },
     { name: "Probability", topics: [] },
-    { name: "Sequences and Series", topics: [] },
+    {
+      name: "Sequences and Series",
+      topics: [
+        { topic: "general-sequences" },
+        { topic: "arithmetic-sequences" },
+        { topic: "geometric-sequences" },
+        { topic: "arithmetic-geometric-means" },
+        { topic: "arithmetic-series" },
+        { topic: "geometric-series" },
+      ],
+    },
     { name: "Introduction to Calculus", topics: [] },
   ],
 };
