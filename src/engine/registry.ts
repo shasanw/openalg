@@ -18,6 +18,27 @@ import { generator as slope } from "./generators/slope";
 import { generator as parallelPerpendicular } from "./generators/parallelPerpendicular";
 import { generator as graphingLinear } from "./generators/graphingLinear";
 import { generator as writingLinear } from "./generators/writingLinear";
+import { generator as systemsGraphing } from "./generators/systemsGraphing";
+import { generator as systemsElimination } from "./generators/systemsElimination";
+import { generator as systemsSubstitution } from "./generators/systemsSubstitution";
+import { generator as graphingInequalities } from "./generators/graphingInequalities";
+import { generator as oneStepInequalities } from "./generators/oneStepInequalities";
+import { generator as twoStepInequalities } from "./generators/twoStepInequalities";
+import { generator as multiStepInequalities } from "./generators/multiStepInequalities";
+import { generator as compoundInequalities } from "./generators/compoundInequalities";
+import { generator as absoluteValueInequalities } from "./generators/absoluteValueInequalities";
+import { generator as generalSequences } from "./generators/generalSequences";
+import { generator as arithmeticSequences } from "./generators/arithmeticSequences";
+import { generator as geometricSequences } from "./generators/geometricSequences";
+import { generator as sequenceMeans } from "./generators/sequenceMeans";
+import { generator as arithmeticSeries } from "./generators/arithmeticSeries";
+import { generator as geometricSeries } from "./generators/geometricSeries";
+import { generator as exponentialCommonBase } from "./generators/exponentialCommonBase";
+import { generator as logExponentialForm } from "./generators/logExponentialForm";
+import { generator as evaluatingLogarithms } from "./generators/evaluatingLogarithms";
+import { generator as logProperties } from "./generators/logProperties";
+import { generator as exponentialEquationsLogs } from "./generators/exponentialEquationsLogs";
+import { generator as logarithmicEquations } from "./generators/logarithmicEquations";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -35,6 +56,27 @@ export const GENERATORS: readonly Generator[] = [
   parallelPerpendicular,
   graphingLinear,
   writingLinear,
+  systemsGraphing,
+  systemsElimination,
+  systemsSubstitution,
+  graphingInequalities,
+  oneStepInequalities,
+  twoStepInequalities,
+  multiStepInequalities,
+  compoundInequalities,
+  absoluteValueInequalities,
+  generalSequences,
+  arithmeticSequences,
+  geometricSequences,
+  sequenceMeans,
+  arithmeticSeries,
+  geometricSeries,
+  exponentialCommonBase,
+  logExponentialForm,
+  evaluatingLogarithms,
+  logProperties,
+  exponentialEquationsLogs,
+  logarithmicEquations,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

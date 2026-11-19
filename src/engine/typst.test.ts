@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { answerMath, buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
 import { ANSWER_PART_SEPARATOR } from "./format";
 import { PARABOLA_PROPERTIES_ID } from "./generators/parabolaProperties";
+import { GENERAL_SEQUENCES_ID } from "./generators/generalSequences";
 import {
   allProblems,
   buildSection,
@@ -457,6 +458,20 @@ describe("multi-part Answers wrap between their parts", () => {
         count: 8,
         answerKeyFormat: key,
       });
+      if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
+      const { math } = buildTypstDocument(sheet);
+      expect(math.some((m) => m.includes(ANSWER_PART_SEPARATOR))).toBe(false);
+    }
+  });
+
+  // A prompt in parts ("rule; find a_6") wraps between its parts the same way.
+  it.each([
+    ["free response", false],
+    ["multiple choice", true],
+  ])("never sends a whole multi-part prompt as one equation (%s)", (_, mc) => {
+    for (const key of ANSWER_KEY_FORMATS) {
+      let sheet = buildWorksheet({ generatorId: GENERAL_SEQUENCES_ID, baseSeed: 3, count: 8, answerKeyFormat: key });
+      expect(sheet.sections[0].problems[0].prompt).toContain(ANSWER_PART_SEPARATOR);
       if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
       const { math } = buildTypstDocument(sheet);
       expect(math.some((m) => m.includes(ANSWER_PART_SEPARATOR))).toBe(false);

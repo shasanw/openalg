@@ -50,7 +50,7 @@ describe("Course Outlines", () => {
   });
 
   it("orders Courses by curriculum, showing only those with Topics", () => {
-    expect(coursesOf()).toEqual(["Algebra 1", "Algebra 2"]);
+    expect(coursesOf()).toEqual(["Algebra 1", "Algebra 2", "Precalculus"]);
   });
 
   it("lists the quadratics Topics in both Algebra 1 and Algebra 2", () => {
@@ -64,7 +64,18 @@ describe("Course Outlines", () => {
 
   it("hides Units with nothing listed", () => {
     const names = groupByUnit(LISTINGS.filter((l) => l.course === "Algebra 1")).map((u) => u.name);
-    expect(names).toEqual(["Equations", "Linear Equations and Inequalities", "Quadratic Functions"]);
+    expect(names).toEqual([
+      "Equations",
+      "Inequalities",
+      "Linear Equations and Inequalities",
+      "Systems of Equations and Inequalities",
+      "Quadratic Functions",
+    ]);
+  });
+
+  it("shows only the Precalculus Units that have Topics", () => {
+    const names = groupByUnit(LISTINGS.filter((l) => l.course === "Precalculus")).map((u) => u.name);
+    expect(names).toEqual(["Exponential and Logarithmic Functions", "Sequences and Series"]);
   });
 
   it("finds a Topic's listing, preferring the given Course", () => {

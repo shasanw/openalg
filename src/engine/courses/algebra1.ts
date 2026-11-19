@@ -17,7 +17,17 @@ export const algebra1: CourseOutline = {
         { topic: "literal-equations" },
       ],
     },
-    { name: "Inequalities", topics: [] },
+    {
+      name: "Inequalities",
+      topics: [
+        { topic: "graphing-inequalities" },
+        { topic: "one-step-inequalities" },
+        { topic: "two-step-inequalities" },
+        { topic: "multi-step-inequalities" },
+        { topic: "compound-inequalities" },
+        { topic: "absolute-value-inequalities" },
+      ],
+    },
     { name: "Proportions and Percents", topics: [] },
     { name: "Relations and Functions", topics: [] },
     {
@@ -29,7 +39,14 @@ export const algebra1: CourseOutline = {
         { topic: "writing-linear-equations" },
       ],
     },
-    { name: "Systems of Equations and Inequalities", topics: [] },
+    {
+      name: "Systems of Equations and Inequalities",
+      topics: [
+        { topic: "systems-graphing" },
+        { topic: "systems-substitution" },
+        { topic: "systems-elimination" },
+      ],
+    },
     { name: "Exponents", topics: [] },
     { name: "Polynomials", topics: [] },
     { name: "Factoring", topics: [] },
