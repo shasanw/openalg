@@ -68,7 +68,7 @@ describe("searchListings", () => {
 
   it("tolerates prefixes and typos in the real Course Outlines", () => {
     const ids = (q: string) => new Set(searchListings(q).map((l) => l.topic.id));
-    expect(ids("factr quad")).toEqual(new Set(["quadratic-factoring"]));
+    expect(ids("solv factr quad")).toEqual(new Set(["quadratic-factoring"]));
     const quadratics = ids("qaudratic");
     for (const id of [
       "quadratic-factoring",
@@ -81,7 +81,7 @@ describe("searchListings", () => {
   });
 
   it("finds a Topic listed in two Courses once under each", () => {
-    expect(searchListings("factr quad").map((l) => l.course).sort()).toEqual(["Algebra 1", "Algebra 2"]);
+    expect(searchListings("solv factr quad").map((l) => l.course).sort()).toEqual(["Algebra 1", "Algebra 2"]);
   });
 
   it("narrows by Course words", () => {

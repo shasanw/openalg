@@ -69,6 +69,8 @@ describe("Course Outlines", () => {
       "Inequalities",
       "Linear Equations and Inequalities",
       "Systems of Equations and Inequalities",
+      "Polynomials",
+      "Factoring",
       "Quadratic Functions",
     ]);
   });

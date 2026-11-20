@@ -48,8 +48,25 @@ export const algebra1: CourseOutline = {
       ],
     },
     { name: "Exponents", topics: [] },
-    { name: "Polynomials", topics: [] },
-    { name: "Factoring", topics: [] },
+    {
+      name: "Polynomials",
+      topics: [
+        { topic: "naming-polynomials" },
+        { topic: "adding-subtracting-polynomials" },
+        { topic: "multiplying-polynomials" },
+        { topic: "special-products" },
+        { topic: "dividing-polynomials" },
+      ],
+    },
+    {
+      name: "Factoring",
+      topics: [
+        { topic: "factoring-gcf" },
+        { topic: "factoring-quadratics" },
+        { topic: "factoring-special-cases" },
+        { topic: "factoring-by-grouping" },
+      ],
+    },
     {
       name: "Quadratic Functions",
       topics: [
