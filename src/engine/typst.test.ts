@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { answerMath, buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
-import { ANSWER_PART_SEPARATOR } from "./format";
+import { ANSWER_PART_SEPARATOR, prose, proseSegments } from "./format";
+import { MATRIX_INVERSES_ID } from "./generators/matrixInverses";
+import { PERMUTATIONS_VS_COMBINATIONS_ID } from "./generators/permutationsVsCombinations";
 import { PARABOLA_PROPERTIES_ID } from "./generators/parabolaProperties";
 import { GENERAL_SEQUENCES_ID } from "./generators/generalSequences";
 import {
@@ -475,6 +477,71 @@ describe("multi-part Answers wrap between their parts", () => {
       if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
       const { math } = buildTypstDocument(sheet);
       expect(math.some((m) => m.includes(ANSWER_PART_SEPARATOR))).toBe(false);
+    }
+  });
+});
+
+describe("word problems and matrices", () => {
+  function collect() {
+    const math: string[] = [];
+    const placeholder = (latex: string) => {
+      math.push(latex);
+      return `@@M${math.length - 1}@@`;
+    };
+    return { math, placeholder };
+  }
+
+  it("splits prose from the math around it", () => {
+    expect(proseSegments(`${prose("Find the 4th term of")} (2x - 3y)^{5}`)).toEqual([
+      { kind: "prose", text: "Find the 4th term of" },
+      { kind: "math", latex: " (2x - 3y)^{5}" },
+    ]);
+    expect(proseSegments("x = 2")).toEqual([{ kind: "math", latex: "x = 2" }]);
+    expect(() => prose("a {brace}")).toThrow();
+  });
+
+  it("prints prose as text that wraps, and the math beside it as whole equations", () => {
+    const { math, placeholder } = collect();
+    const out = answerMath(`${prose("Find the coefficient of")} x^{2}y ${prose("in")} (x - 3y)^{5}`, placeholder);
+    expect(out).toBe('#{"Find the coefficient of"} #box[@@M0@@] #{"in"} #box[@@M1@@]');
+    expect(math).toEqual(["x^{2}y", "(x - 3y)^{5}"]);
+  });
+
+  it("prints a word problem with no math as text alone", () => {
+    const { math, placeholder } = collect();
+    expect(answerMath(prose('A "club" of 8 elects #1 // 2.'), placeholder)).toBe('#{"A \\"club\\" of 8 elects #1 // 2."}');
+    expect(math).toEqual([]);
+  });
+
+  it("sets a matrix at display size on a line as tall as it is", () => {
+    const { math, placeholder } = collect();
+    const m = "\\begin{bmatrix} 1 & 2 \\\\ 3 & 4 \\end{bmatrix}";
+    expect(answerMath(m, placeholder)).toBe('#[#set text(top-edge: "bounds", bottom-edge: "bounds"); @@M0@@]');
+    expect(math).toEqual([`\\displaystyle ${m}`]);
+    // other math is untouched
+    expect(answerMath("x = 3", placeholder)).toBe("@@M1@@");
+  });
+
+  it("sends no prose to the math compiler, in any Answer Key or Response Format", () => {
+    for (const key of ANSWER_KEY_FORMATS) {
+      for (const mc of [false, true]) {
+        let sheet = buildWorksheet({ generatorId: PERMUTATIONS_VS_COMBINATIONS_ID, baseSeed: 3, count: 6, answerKeyFormat: key });
+        if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
+        const { source, math } = buildTypstDocument(sheet);
+        expect(math.some((m) => m.includes("\\textnormal"))).toBe(false);
+        expect(source).toContain('#{"');
+      }
+    }
+  });
+
+  it("sets every matrix of a sheet at display size, prompts, choices and keys alike", () => {
+    for (const key of ANSWER_KEY_FORMATS) {
+      for (const mc of [false, true]) {
+        let sheet = buildWorksheet({ generatorId: MATRIX_INVERSES_ID, baseSeed: 3, count: 6, answerKeyFormat: key });
+        if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
+        const { math } = buildTypstDocument(sheet);
+        for (const m of math) if (m.includes("matrix")) expect(m.startsWith("\\displaystyle ")).toBe(true);
+      }
     }
   });
 });

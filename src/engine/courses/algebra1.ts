@@ -6,7 +6,17 @@ import type { CourseOutline } from "./types";
 export const algebra1: CourseOutline = {
   course: "Algebra 1",
   units: [
-    { name: "Foundations", topics: [] },
+    {
+      name: "Foundations",
+      topics: [
+        { topic: "order-of-operations" },
+        { topic: "classifying-numbers" },
+        { topic: "adding-subtracting-rationals" },
+        { topic: "multiplying-rationals" },
+        { topic: "dividing-rationals" },
+        { topic: "distributive-property" },
+      ],
+    },
     {
       name: "Equations",
       topics: [
@@ -28,7 +38,10 @@ export const algebra1: CourseOutline = {
         { topic: "absolute-value-inequalities" },
       ],
     },
-    { name: "Proportions and Percents", topics: [] },
+    {
+      name: "Proportions and Percents",
+      topics: [{ topic: "solving-proportions" }, { topic: "percents" }, { topic: "percent-of-change" }],
+    },
     { name: "Relations and Functions", topics: [] },
     {
       name: "Linear Equations and Inequalities",
@@ -48,8 +61,25 @@ export const algebra1: CourseOutline = {
       ],
     },
     { name: "Exponents", topics: [] },
-    { name: "Polynomials", topics: [] },
-    { name: "Factoring", topics: [] },
+    {
+      name: "Polynomials",
+      topics: [
+        { topic: "naming-polynomials" },
+        { topic: "adding-subtracting-polynomials" },
+        { topic: "multiplying-polynomials" },
+        { topic: "special-products" },
+        { topic: "dividing-polynomials" },
+      ],
+    },
+    {
+      name: "Factoring",
+      topics: [
+        { topic: "factoring-gcf" },
+        { topic: "factoring-quadratics" },
+        { topic: "factoring-special-cases" },
+        { topic: "factoring-by-grouping" },
+      ],
+    },
     {
       name: "Quadratic Functions",
       topics: [
@@ -61,7 +91,18 @@ export const algebra1: CourseOutline = {
         { topic: "completing-the-square" },
       ],
     },
-    { name: "Radicals", topics: [] },
+    {
+      name: "Radicals",
+      topics: [
+        { topic: "simplifying-radicals" },
+        { topic: "distance-formula" },
+        { topic: "midpoint-formula" },
+        { topic: "adding-radicals" },
+        { topic: "multiplying-radicals" },
+        { topic: "dividing-radicals" },
+        { topic: "radical-equations" },
+      ],
+    },
     { name: "Rational Expressions", topics: [] },
     { name: "Right-Triangle Trigonometry", topics: [] },
     { name: "Statistics", topics: [] },

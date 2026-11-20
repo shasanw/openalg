@@ -82,8 +82,8 @@ describe("App", () => {
     const title = screen.getByRole("textbox", { name: "Worksheet title" });
     await userEvent.clear(title);
     await userEvent.type(title, "Unit 3 Test");
-    await addSection("factoring");
-    await addSection("formula");
+    await addSection("solving factoring");
+    await addSection("quadratic formula");
     await addSection("parabolas");
 
     await waitFor(() => expect(screen.getByText("Saved to Library")).toBeInTheDocument(), {
@@ -146,7 +146,7 @@ describe("App: throwaway Worksheets stay out of the Library", () => {
   it("a template that the teacher changes is saved", async () => {
     renderApp();
     await openTemplate(/Solving one-step equations/);
-    await addSection("formula");
+    await addSection("quadratic formula");
     await leave();
     expect(stored()).toHaveLength(1);
     expect(stored()[0].sections).toHaveLength(2);
@@ -155,7 +155,7 @@ describe("App: throwaway Worksheets stay out of the Library", () => {
   it("a blank Worksheet with a Section added and then deleted is removed on leaving", async () => {
     renderApp();
     await userEvent.click(screen.getByRole("button", { name: /New Worksheet/ }));
-    await addSection("factoring");
+    await addSection("solving factoring");
     await waitFor(() => expect(library.size).toBe(1), { timeout: 3000 });
     await userEvent.click(screen.getByRole("button", { name: "Section A actions" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /Delete Section/ }));
@@ -167,7 +167,7 @@ describe("App: throwaway Worksheets stay out of the Library", () => {
   it("an empty Worksheet the teacher named is kept", async () => {
     renderApp();
     await userEvent.click(screen.getByRole("button", { name: /New Worksheet/ }));
-    await addSection("factoring");
+    await addSection("solving factoring");
     const title = screen.getByRole("textbox", { name: "Worksheet title" });
     await userEvent.clear(title);
     await userEvent.type(title, "Unit 4 Quiz");

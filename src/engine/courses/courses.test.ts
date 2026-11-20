@@ -65,17 +65,27 @@ describe("Course Outlines", () => {
   it("hides Units with nothing listed", () => {
     const names = groupByUnit(LISTINGS.filter((l) => l.course === "Algebra 1")).map((u) => u.name);
     expect(names).toEqual([
+      "Foundations",
       "Equations",
       "Inequalities",
+      "Proportions and Percents",
       "Linear Equations and Inequalities",
       "Systems of Equations and Inequalities",
+      "Polynomials",
+      "Factoring",
       "Quadratic Functions",
+      "Radicals",
     ]);
   });
 
   it("shows only the Precalculus Units that have Topics", () => {
     const names = groupByUnit(LISTINGS.filter((l) => l.course === "Precalculus")).map((u) => u.name);
-    expect(names).toEqual(["Exponential and Logarithmic Functions", "Sequences and Series"]);
+    expect(names).toEqual([
+      "Exponential and Logarithmic Functions",
+      "Matrices and Systems",
+      "Counting and the Binomial Theorem",
+      "Sequences and Series",
+    ]);
   });
 
   it("finds a Topic's listing, preferring the given Course", () => {

@@ -25,9 +25,26 @@ export const precalculus: CourseOutline = {
     { name: "Polar Coordinates", topics: [] },
     { name: "Vectors", topics: [] },
     { name: "Vectors in Three Dimensions", topics: [] },
-    { name: "Matrices and Systems", topics: [] },
+    {
+      name: "Matrices and Systems",
+      topics: [
+        { topic: "matrix-operations" },
+        { topic: "determinants" },
+        { topic: "matrix-inverses" },
+        { topic: "cramers-rule" },
+      ],
+    },
     { name: "Conic Sections", topics: [] },
-    { name: "Counting and the Binomial Theorem", topics: [] },
+    {
+      name: "Counting and the Binomial Theorem",
+      topics: [
+        { topic: "counting-principle" },
+        { topic: "permutations" },
+        { topic: "combinations" },
+        { topic: "permutations-vs-combinations" },
+        { topic: "binomial-theorem" },
+      ],
+    },
     { name: "Probability", topics: [] },
     {
       name: "Sequences and Series",

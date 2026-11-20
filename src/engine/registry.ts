@@ -39,6 +39,40 @@ import { generator as evaluatingLogarithms } from "./generators/evaluatingLogari
 import { generator as logProperties } from "./generators/logProperties";
 import { generator as exponentialEquationsLogs } from "./generators/exponentialEquationsLogs";
 import { generator as logarithmicEquations } from "./generators/logarithmicEquations";
+import { generator as countingPrinciple } from "./generators/countingPrinciple";
+import { generator as permutations } from "./generators/permutations";
+import { generator as combinations } from "./generators/combinations";
+import { generator as permutationsVsCombinations } from "./generators/permutationsVsCombinations";
+import { generator as binomialTheorem } from "./generators/binomialTheorem";
+import { generator as matrixOperations } from "./generators/matrixOperations";
+import { generator as determinants } from "./generators/determinants";
+import { generator as matrixInverses } from "./generators/matrixInverses";
+import { generator as cramersRule } from "./generators/cramersRule";
+import { generator as namingPolynomials } from "./generators/namingPolynomials";
+import { generator as addingPolynomials } from "./generators/addingPolynomials";
+import { generator as multiplyingPolynomials } from "./generators/multiplyingPolynomials";
+import { generator as specialProducts } from "./generators/specialProducts";
+import { generator as dividingPolynomials } from "./generators/dividingPolynomials";
+import { generator as factoringGcf } from "./generators/factoringGcf";
+import { generator as factoringQuadratics } from "./generators/factoringQuadratics";
+import { generator as factoringSpecialCases } from "./generators/factoringSpecialCases";
+import { generator as factoringByGrouping } from "./generators/factoringByGrouping";
+import { generator as simplifyingRadicals } from "./generators/simplifyingRadicals";
+import { generator as distanceFormula } from "./generators/distanceFormula";
+import { generator as midpointFormula } from "./generators/midpointFormula";
+import { generator as addingRadicals } from "./generators/addingRadicals";
+import { generator as multiplyingRadicals } from "./generators/multiplyingRadicals";
+import { generator as dividingRadicals } from "./generators/dividingRadicals";
+import { generator as radicalEquations } from "./generators/radicalEquations";
+import { generator as orderOfOperations } from "./generators/orderOfOperations";
+import { generator as classifyingNumbers } from "./generators/classifyingNumbers";
+import { generator as addingSubtractingRationals } from "./generators/addingSubtractingRationals";
+import { generator as multiplyingRationals } from "./generators/multiplyingRationals";
+import { generator as dividingRationals } from "./generators/dividingRationals";
+import { generator as distributiveProperty } from "./generators/distributiveProperty";
+import { generator as solvingProportions } from "./generators/solvingProportions";
+import { generator as percents } from "./generators/percents";
+import { generator as percentOfChange } from "./generators/percentOfChange";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -77,6 +111,40 @@ export const GENERATORS: readonly Generator[] = [
   logProperties,
   exponentialEquationsLogs,
   logarithmicEquations,
+  countingPrinciple,
+  permutations,
+  combinations,
+  permutationsVsCombinations,
+  binomialTheorem,
+  matrixOperations,
+  determinants,
+  matrixInverses,
+  cramersRule,
+  namingPolynomials,
+  addingPolynomials,
+  multiplyingPolynomials,
+  specialProducts,
+  dividingPolynomials,
+  factoringGcf,
+  factoringQuadratics,
+  factoringSpecialCases,
+  factoringByGrouping,
+  simplifyingRadicals,
+  distanceFormula,
+  midpointFormula,
+  addingRadicals,
+  multiplyingRadicals,
+  dividingRadicals,
+  radicalEquations,
+  orderOfOperations,
+  classifyingNumbers,
+  addingSubtractingRationals,
+  multiplyingRationals,
+  dividingRationals,
+  distributiveProperty,
+  solvingProportions,
+  percents,
+  percentOfChange,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

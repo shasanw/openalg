@@ -135,10 +135,11 @@ describe("TopicPicker", () => {
       open({ listings: ALL });
       await userEvent.selectOptions(courseSelect(), "Algebra 2");
       await userEvent.click(search());
-      await userEvent.keyboard("factoring");
+      // "solving" keeps the Algebra 1 Factoring Unit's Topics out of the matches
+      await userEvent.keyboard("solving factoring");
       expect(courseSelect()).toHaveDisplayValue("All Courses");
       expect(groups()).toEqual(["Algebra 2 Quadratics", "Algebra 1 Quadratic Functions"]);
-      await userEvent.keyboard("{Backspace>9/}");
+      await userEvent.keyboard("{Backspace>17/}");
       expect(courseSelect()).toHaveDisplayValue("Algebra 2");
       expect(groups()).toEqual(["Quadratics"]);
       expect(within(courseSelect()).queryByRole("option", { name: "All Courses" })).toBeNull();
@@ -158,7 +159,7 @@ describe("TopicPicker", () => {
 
     it("badges both rows of a Topic listed in two Courses and adds the chosen row's listing", async () => {
       const { onPick } = open({ listings: ALL, sections: ["quadratic-factoring"] });
-      await userEvent.keyboard("factoring");
+      await userEvent.keyboard("solving factoring");
       const rows = topics();
       expect(rows).toHaveLength(2);
       for (const r of rows) expect(r).toHaveTextContent("Used in Section A");
