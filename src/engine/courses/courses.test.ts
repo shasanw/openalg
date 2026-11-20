@@ -65,8 +65,10 @@ describe("Course Outlines", () => {
   it("hides Units with nothing listed", () => {
     const names = groupByUnit(LISTINGS.filter((l) => l.course === "Algebra 1")).map((u) => u.name);
     expect(names).toEqual([
+      "Foundations",
       "Equations",
       "Inequalities",
+      "Proportions and Percents",
       "Linear Equations and Inequalities",
       "Systems of Equations and Inequalities",
       "Quadratic Functions",

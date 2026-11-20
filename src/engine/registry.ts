@@ -39,6 +39,15 @@ import { generator as evaluatingLogarithms } from "./generators/evaluatingLogari
 import { generator as logProperties } from "./generators/logProperties";
 import { generator as exponentialEquationsLogs } from "./generators/exponentialEquationsLogs";
 import { generator as logarithmicEquations } from "./generators/logarithmicEquations";
+import { generator as orderOfOperations } from "./generators/orderOfOperations";
+import { generator as classifyingNumbers } from "./generators/classifyingNumbers";
+import { generator as addingSubtractingRationals } from "./generators/addingSubtractingRationals";
+import { generator as multiplyingRationals } from "./generators/multiplyingRationals";
+import { generator as dividingRationals } from "./generators/dividingRationals";
+import { generator as distributiveProperty } from "./generators/distributiveProperty";
+import { generator as solvingProportions } from "./generators/solvingProportions";
+import { generator as percents } from "./generators/percents";
+import { generator as percentOfChange } from "./generators/percentOfChange";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -77,6 +86,15 @@ export const GENERATORS: readonly Generator[] = [
   logProperties,
   exponentialEquationsLogs,
   logarithmicEquations,
+  orderOfOperations,
+  classifyingNumbers,
+  addingSubtractingRationals,
+  multiplyingRationals,
+  dividingRationals,
+  distributiveProperty,
+  solvingProportions,
+  percents,
+  percentOfChange,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

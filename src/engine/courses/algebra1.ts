@@ -6,7 +6,17 @@ import type { CourseOutline } from "./types";
 export const algebra1: CourseOutline = {
   course: "Algebra 1",
   units: [
-    { name: "Foundations", topics: [] },
+    {
+      name: "Foundations",
+      topics: [
+        { topic: "order-of-operations" },
+        { topic: "classifying-numbers" },
+        { topic: "adding-subtracting-rationals" },
+        { topic: "multiplying-rationals" },
+        { topic: "dividing-rationals" },
+        { topic: "distributive-property" },
+      ],
+    },
     {
       name: "Equations",
       topics: [
@@ -28,7 +38,10 @@ export const algebra1: CourseOutline = {
         { topic: "absolute-value-inequalities" },
       ],
     },
-    { name: "Proportions and Percents", topics: [] },
+    {
+      name: "Proportions and Percents",
+      topics: [{ topic: "solving-proportions" }, { topic: "percents" }, { topic: "percent-of-change" }],
+    },
     { name: "Relations and Functions", topics: [] },
     {
       name: "Linear Equations and Inequalities",
