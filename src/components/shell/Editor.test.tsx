@@ -75,7 +75,7 @@ describe("Editor: Topic picker", () => {
     const latest = mount(emptyWorksheet());
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     const search = screen.getByRole("combobox", { name: "Search Topics" });
-    await userEvent.type(search, "formula");
+    await userEvent.type(search, "quadratic formula");
     // Found in both Courses that list it, the opening Course (the first) first.
     const options = topicOptions();
     expect(options.map((o) => o.textContent)).toEqual([

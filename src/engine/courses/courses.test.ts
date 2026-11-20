@@ -72,6 +72,7 @@ describe("Course Outlines", () => {
       "Polynomials",
       "Factoring",
       "Quadratic Functions",
+      "Radicals",
     ]);
   });
 

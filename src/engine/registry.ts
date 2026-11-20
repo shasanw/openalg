@@ -57,6 +57,13 @@ import { generator as factoringGcf } from "./generators/factoringGcf";
 import { generator as factoringQuadratics } from "./generators/factoringQuadratics";
 import { generator as factoringSpecialCases } from "./generators/factoringSpecialCases";
 import { generator as factoringByGrouping } from "./generators/factoringByGrouping";
+import { generator as simplifyingRadicals } from "./generators/simplifyingRadicals";
+import { generator as distanceFormula } from "./generators/distanceFormula";
+import { generator as midpointFormula } from "./generators/midpointFormula";
+import { generator as addingRadicals } from "./generators/addingRadicals";
+import { generator as multiplyingRadicals } from "./generators/multiplyingRadicals";
+import { generator as dividingRadicals } from "./generators/dividingRadicals";
+import { generator as radicalEquations } from "./generators/radicalEquations";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -113,6 +120,13 @@ export const GENERATORS: readonly Generator[] = [
   factoringQuadratics,
   factoringSpecialCases,
   factoringByGrouping,
+  simplifyingRadicals,
+  distanceFormula,
+  midpointFormula,
+  addingRadicals,
+  multiplyingRadicals,
+  dividingRadicals,
+  radicalEquations,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
