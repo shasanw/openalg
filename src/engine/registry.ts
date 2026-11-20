@@ -39,6 +39,11 @@ import { generator as evaluatingLogarithms } from "./generators/evaluatingLogari
 import { generator as logProperties } from "./generators/logProperties";
 import { generator as exponentialEquationsLogs } from "./generators/exponentialEquationsLogs";
 import { generator as logarithmicEquations } from "./generators/logarithmicEquations";
+import { generator as countingPrinciple } from "./generators/countingPrinciple";
+import { generator as permutations } from "./generators/permutations";
+import { generator as combinations } from "./generators/combinations";
+import { generator as permutationsVsCombinations } from "./generators/permutationsVsCombinations";
+import { generator as binomialTheorem } from "./generators/binomialTheorem";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -77,6 +82,11 @@ export const GENERATORS: readonly Generator[] = [
   logProperties,
   exponentialEquationsLogs,
   logarithmicEquations,
+  countingPrinciple,
+  permutations,
+  combinations,
+  permutationsVsCombinations,
+  binomialTheorem,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

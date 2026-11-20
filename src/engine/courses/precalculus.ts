@@ -27,7 +27,16 @@ export const precalculus: CourseOutline = {
     { name: "Vectors in Three Dimensions", topics: [] },
     { name: "Matrices and Systems", topics: [] },
     { name: "Conic Sections", topics: [] },
-    { name: "Counting and the Binomial Theorem", topics: [] },
+    {
+      name: "Counting and the Binomial Theorem",
+      topics: [
+        { topic: "counting-principle" },
+        { topic: "permutations" },
+        { topic: "combinations" },
+        { topic: "permutations-vs-combinations" },
+        { topic: "binomial-theorem" },
+      ],
+    },
     { name: "Probability", topics: [] },
     {
       name: "Sequences and Series",

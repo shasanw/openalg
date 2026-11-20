@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { answerMath, buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
 import { ANSWER_PART_SEPARATOR, prose, proseSegments } from "./format";
+import { PERMUTATIONS_VS_COMBINATIONS_ID } from "./generators/permutationsVsCombinations";
 import { PARABOLA_PROPERTIES_ID } from "./generators/parabolaProperties";
 import { GENERAL_SEQUENCES_ID } from "./generators/generalSequences";
 import {
@@ -518,6 +519,18 @@ describe("word problems and matrices", () => {
     expect(math).toEqual([`\\displaystyle ${m}`]);
     // other math is untouched
     expect(answerMath("x = 3", placeholder)).toBe("@@M1@@");
+  });
+
+  it("sends no prose to the math compiler, in any Answer Key or Response Format", () => {
+    for (const key of ANSWER_KEY_FORMATS) {
+      for (const mc of [false, true]) {
+        let sheet = buildWorksheet({ generatorId: PERMUTATIONS_VS_COMBINATIONS_ID, baseSeed: 3, count: 6, answerKeyFormat: key });
+        if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
+        const { source, math } = buildTypstDocument(sheet);
+        expect(math.some((m) => m.includes("\\textnormal"))).toBe(false);
+        expect(source).toContain('#{"');
+      }
+    }
   });
 });
 
