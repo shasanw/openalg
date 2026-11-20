@@ -83,7 +83,7 @@ describe("App", () => {
     await userEvent.clear(title);
     await userEvent.type(title, "Unit 3 Test");
     await addSection("factoring");
-    await addSection("formula");
+    await addSection("quadratic formula");
     await addSection("parabolas");
 
     await waitFor(() => expect(screen.getByText("Saved to Library")).toBeInTheDocument(), {
@@ -146,7 +146,7 @@ describe("App: throwaway Worksheets stay out of the Library", () => {
   it("a template that the teacher changes is saved", async () => {
     renderApp();
     await openTemplate(/Solving one-step equations/);
-    await addSection("formula");
+    await addSection("quadratic formula");
     await leave();
     expect(stored()).toHaveLength(1);
     expect(stored()[0].sections).toHaveLength(2);

@@ -70,6 +70,7 @@ describe("Course Outlines", () => {
       "Linear Equations and Inequalities",
       "Systems of Equations and Inequalities",
       "Quadratic Functions",
+      "Radicals",
     ]);
   });
 
