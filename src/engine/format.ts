@@ -91,3 +91,39 @@ export function fractionToLatex(n: number, d: number): string {
  * "; " plus a quad.
  */
 export const ANSWER_PART_SEPARATOR = ";\\quad ";
+
+/**
+ * A word problem's sentence(s) inside a prompt. Prose is written as
+ * \textnormal{...} (which KaTeX and mitex both read as upright text), and the
+ * printed layouts set it as ordinary text that wraps between words, so a
+ * sentence never runs past its column as one unbreakable equation. It may not
+ * contain braces or backslashes; put any math in the LaTeX around it.
+ */
+export function prose(text: string): string {
+  if (/[{}\\]/.test(text)) throw new Error(`prose: no braces or backslashes: ${text}`);
+  return `\\textnormal{${text}}`;
+}
+
+/** A run of a prompt: prose (plain text) or math (LaTeX). */
+export type ProseSegment = { kind: "prose"; text: string } | { kind: "math"; latex: string };
+
+/**
+ * Split LaTeX into its prose runs (see `prose`) and the math between them, in
+ * order. Whitespace between a prose run and math is kept on the math run, so
+ * a layout can print a space there. LaTeX with no prose is one math run.
+ */
+export function proseSegments(latex: string): ProseSegment[] {
+  const out: ProseSegment[] = [];
+  const re = /\\textnormal\{([^{}\\]*)\}/g;
+  let at = 0;
+  for (const m of latex.matchAll(re)) {
+    if (m.index > at) out.push({ kind: "math", latex: latex.slice(at, m.index) });
+    out.push({ kind: "prose", text: m[1] });
+    at = m.index + m[0].length;
+  }
+  if (at < latex.length || out.length === 0) out.push({ kind: "math", latex: latex.slice(at) });
+  return out;
+}
+
+/** True when the LaTeX typesets a matrix or a determinant's bars. */
+export const hasMatrix = (latex: string): boolean => /\\begin\{[bBpvV]?matrix\}/.test(latex);

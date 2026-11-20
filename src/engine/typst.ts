@@ -16,7 +16,7 @@
 // with no backslashes or newlines, so it sits in a Typst string unchanged
 // (typstStringLiteral escapes defensively all the same).
 
-import { ANSWER_PART_SEPARATOR } from "./format";
+import { ANSWER_PART_SEPARATOR, hasMatrix, proseSegments } from "./format";
 import { choiceLetter } from "./mc";
 import { plotLayers, PLOT_WIDTH_PT, type GraphSpec } from "./plot";
 import type { Problem } from "./types";
@@ -252,13 +252,41 @@ const numberedCell = (n: number, body: string): string =>
  */
 export function answerMath(latex: string, placeholder: Placeholder): string {
   const parts = latex.split(ANSWER_PART_SEPARATOR);
-  if (parts.length === 1) return placeholder(latex);
+  if (parts.length === 1) return mathRun(latex, placeholder);
   return parts
     // Each part is kept whole (boxed), so lines break only between parts.
-    .map((part) => `#box[${placeholder(part)}]`)
+    .map((part) => `#box[${mathRun(part, placeholder)}]`)
     // `#[;]`, not a bare ";": right after an embedded math call, Typst reads a
     // bare semicolon as the end of that expression and drops it.
     .join("#[;] ");
+}
+
+/**
+ * One part's LaTeX as Typst markup: one equation, except that a word
+ * problem's prose (see `prose` in ./format) prints as ordinary text that wraps
+ * between words, with the math around it as equations kept whole (a line
+ * breaks between words, never inside "(x - 3y)^5"). An equation holding a
+ * matrix is set at display size (Typst shrinks an inline matrix's entries)
+ * and measured by its full height, so a tall matrix pushes its neighbouring
+ * lines apart instead of overlapping them.
+ */
+function mathRun(latex: string, placeholder: Placeholder): string {
+  const segments = proseSegments(latex);
+  const withProse = segments.some((seg) => seg.kind === "prose");
+  return segments
+    .map((seg) => {
+      // A code block, so a following "." or "(" is never read as part of the expression.
+      if (seg.kind === "prose") return `#{${typstStringLiteral(seg.text)}}`;
+      const body = seg.latex.trim();
+      if (body === "") return seg.latex === "" ? "" : " ";
+      const lead = /^\s/.test(seg.latex) ? " " : "";
+      const trail = /\s$/.test(seg.latex) ? " " : "";
+      const eq = hasMatrix(body)
+        ? `#[#set text(top-edge: "bounds", bottom-edge: "bounds"); ${placeholder(`\\displaystyle ${body}`)}]`
+        : placeholder(body);
+      return lead + (withProse ? `#box[${eq}]` : eq) + trail;
+    })
+    .join("");
 }
 
 /**
