@@ -64,6 +64,15 @@ import { generator as addingRadicals } from "./generators/addingRadicals";
 import { generator as multiplyingRadicals } from "./generators/multiplyingRadicals";
 import { generator as dividingRadicals } from "./generators/dividingRadicals";
 import { generator as radicalEquations } from "./generators/radicalEquations";
+import { generator as orderOfOperations } from "./generators/orderOfOperations";
+import { generator as classifyingNumbers } from "./generators/classifyingNumbers";
+import { generator as addingSubtractingRationals } from "./generators/addingSubtractingRationals";
+import { generator as multiplyingRationals } from "./generators/multiplyingRationals";
+import { generator as dividingRationals } from "./generators/dividingRationals";
+import { generator as distributiveProperty } from "./generators/distributiveProperty";
+import { generator as solvingProportions } from "./generators/solvingProportions";
+import { generator as percents } from "./generators/percents";
+import { generator as percentOfChange } from "./generators/percentOfChange";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -127,6 +136,15 @@ export const GENERATORS: readonly Generator[] = [
   multiplyingRadicals,
   dividingRadicals,
   radicalEquations,
+  orderOfOperations,
+  classifyingNumbers,
+  addingSubtractingRationals,
+  multiplyingRationals,
+  dividingRationals,
+  distributiveProperty,
+  solvingProportions,
+  percents,
+  percentOfChange,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
