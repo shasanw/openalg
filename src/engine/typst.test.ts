@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { answerMath, buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
 import { ANSWER_PART_SEPARATOR, prose, proseSegments } from "./format";
+import { MATRIX_INVERSES_ID } from "./generators/matrixInverses";
 import { PERMUTATIONS_VS_COMBINATIONS_ID } from "./generators/permutationsVsCombinations";
 import { PARABOLA_PROPERTIES_ID } from "./generators/parabolaProperties";
 import { GENERAL_SEQUENCES_ID } from "./generators/generalSequences";
@@ -529,6 +530,17 @@ describe("word problems and matrices", () => {
         const { source, math } = buildTypstDocument(sheet);
         expect(math.some((m) => m.includes("\\textnormal"))).toBe(false);
         expect(source).toContain('#{"');
+      }
+    }
+  });
+
+  it("sets every matrix of a sheet at display size, prompts, choices and keys alike", () => {
+    for (const key of ANSWER_KEY_FORMATS) {
+      for (const mc of [false, true]) {
+        let sheet = buildWorksheet({ generatorId: MATRIX_INVERSES_ID, baseSeed: 3, count: 6, answerKeyFormat: key });
+        if (mc) sheet = setResponseFormat(sheet, { mode: "multiple-choice", choices: 4 });
+        const { math } = buildTypstDocument(sheet);
+        for (const m of math) if (m.includes("matrix")) expect(m.startsWith("\\displaystyle ")).toBe(true);
       }
     }
   });

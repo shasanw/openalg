@@ -1,0 +1,110 @@
+import { describe, expect, it } from "vitest";
+import fc from "fast-check";
+import { createRng } from "../rng";
+import { construct, distractors, generator } from "./cramersRule";
+import { rat } from "./equationKit";
+import { evalLatex, splitEquation } from "./latexEval.testkit";
+import { expectKatex, expectTidy } from "./matrices.testkit";
+
+const anySeed = fc.integer({ min: 0, max: 0xffffffff });
+const anyParams = fc.record({
+  variables: fc.constantFrom("2", "3", "mixed"),
+  fractions: fc.boolean(),
+});
+
+/** The equations of a printed system, as plain "lhs = rhs". */
+function equations(prompt: string): string[] {
+  const m = prompt.match(/^\\left\\\{ \\begin\{aligned\} (.*) \\end\{aligned\} \\right\.$/);
+  if (!m) throw new Error(`not a system: ${prompt}`);
+  return m[1].split(" \\\\ ").map((e) => e.replace(" &= ", " = "));
+}
+
+/** "(3, -2)", "\left(\frac{1}{2}, 4\right)" -> numbers */
+function readTuple(latex: string): number[] {
+  const m = latex.match(/^(?:\\left)?\((.*?)(?:\\right)?\)$/);
+  if (!m) throw new Error(`not a tuple: ${latex}`);
+  return m[1].split(", ").map((v) => evalLatex(v));
+}
+
+describe("cramers-rule: answers", () => {
+  it("the Answer satisfies every printed equation", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate(params, seed);
+        const values = readTuple(p.answer);
+        const eqs = equations(p.prompt);
+        expect(eqs).toHaveLength(values.length);
+        const env = Object.fromEntries(values.map((v, i) => [["x", "y", "z"][i], v]));
+        for (const eq of eqs) {
+          const [lhs, rhs] = splitEquation(eq);
+          expect(Math.abs(evalLatex(lhs, env) - evalLatex(rhs))).toBeLessThan(1e-9);
+        }
+      }),
+    );
+  });
+
+  it("prints tidy LaTeX that renders in KaTeX", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate(params, seed);
+        for (const s of [p.prompt, p.answer, ...p.distractorHints]) expectTidy(s);
+        expectKatex(p.prompt);
+        expectKatex(p.answer);
+      }),
+    );
+  });
+});
+
+describe("cramers-rule: Topic Options", () => {
+  it("solves for the variables asked for, with fractions only when allowed, and a single solution", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const k = construct(params, createRng(seed));
+        if (params.variables !== "mixed") expect(k.solution).toHaveLength(Number(params.variables));
+        if (!params.fractions) for (const v of k.solution) expect(v.d).toBe(1);
+        // distinct coordinates, so swapping them is a real slip
+        expect(new Set(k.solution.map((v) => v.n / v.d)).size).toBe(k.solution.length);
+        for (const b of k.b) expect(Math.abs(b)).toBeLessThanOrEqual(60);
+      }),
+    );
+    const withFractions = Array.from({ length: 100 }, (_, s) => construct({ fractions: true }, createRng(s))).filter((k) =>
+      k.solution.some((v) => v.d !== 1),
+    );
+    expect(withFractions.length).toBeGreaterThan(30);
+  });
+});
+
+describe("cramers-rule: distractors", () => {
+  it("are distinct points, never the Answer, and at least three", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate(params, seed);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
+        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expect(p.distractorHints).not.toContain(p.answer);
+        for (const d of p.distractorHints) expect(readTuple(d)).toHaveLength(readTuple(p.answer).length);
+      }),
+    );
+  });
+
+  it("model swapped coordinates, an upside-down quotient and undivided determinants", () => {
+    // 2x + y = 5, x - y = 1: (2, 1); D = -3, D_x = -6, D_y = -3
+    const k = { a: [[2, 1], [1, -1]], b: [5, 1], solution: [rat(2), rat(1)] };
+    expect(distractors(k).slice(0, 3)).toEqual(["(1, 2)", "\\left(\\frac{1}{2}, 1\\right)", "(-6, -3)"]);
+  });
+});
+
+describe("cramers-rule: generate()", () => {
+  it("is deterministic for the same (params, seed)", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        expect(generator.generate(params, seed)).toEqual(generator.generate(params, seed));
+      }),
+    );
+  });
+
+  it("has enough variety for a 20-Problem Section without repeats", () => {
+    const prompts = new Set(Array.from({ length: 200 }, (_, s) => generator.generate({}, s).prompt));
+    expect(prompts.size).toBeGreaterThan(190);
+  });
+});

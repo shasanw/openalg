@@ -25,7 +25,15 @@ export const precalculus: CourseOutline = {
     { name: "Polar Coordinates", topics: [] },
     { name: "Vectors", topics: [] },
     { name: "Vectors in Three Dimensions", topics: [] },
-    { name: "Matrices and Systems", topics: [] },
+    {
+      name: "Matrices and Systems",
+      topics: [
+        { topic: "matrix-operations" },
+        { topic: "determinants" },
+        { topic: "matrix-inverses" },
+        { topic: "cramers-rule" },
+      ],
+    },
     { name: "Conic Sections", topics: [] },
     {
       name: "Counting and the Binomial Theorem",

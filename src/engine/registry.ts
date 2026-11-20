@@ -44,6 +44,10 @@ import { generator as permutations } from "./generators/permutations";
 import { generator as combinations } from "./generators/combinations";
 import { generator as permutationsVsCombinations } from "./generators/permutationsVsCombinations";
 import { generator as binomialTheorem } from "./generators/binomialTheorem";
+import { generator as matrixOperations } from "./generators/matrixOperations";
+import { generator as determinants } from "./generators/determinants";
+import { generator as matrixInverses } from "./generators/matrixInverses";
+import { generator as cramersRule } from "./generators/cramersRule";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -87,6 +91,10 @@ export const GENERATORS: readonly Generator[] = [
   combinations,
   permutationsVsCombinations,
   binomialTheorem,
+  matrixOperations,
+  determinants,
+  matrixInverses,
+  cramersRule,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(

@@ -77,6 +77,7 @@ describe("Course Outlines", () => {
     const names = groupByUnit(LISTINGS.filter((l) => l.course === "Precalculus")).map((u) => u.name);
     expect(names).toEqual([
       "Exponential and Logarithmic Functions",
+      "Matrices and Systems",
       "Counting and the Binomial Theorem",
       "Sequences and Series",
     ]);
