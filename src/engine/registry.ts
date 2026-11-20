@@ -39,6 +39,15 @@ import { generator as evaluatingLogarithms } from "./generators/evaluatingLogari
 import { generator as logProperties } from "./generators/logProperties";
 import { generator as exponentialEquationsLogs } from "./generators/exponentialEquationsLogs";
 import { generator as logarithmicEquations } from "./generators/logarithmicEquations";
+import { generator as namingPolynomials } from "./generators/namingPolynomials";
+import { generator as addingPolynomials } from "./generators/addingPolynomials";
+import { generator as multiplyingPolynomials } from "./generators/multiplyingPolynomials";
+import { generator as specialProducts } from "./generators/specialProducts";
+import { generator as dividingPolynomials } from "./generators/dividingPolynomials";
+import { generator as factoringGcf } from "./generators/factoringGcf";
+import { generator as factoringQuadratics } from "./generators/factoringQuadratics";
+import { generator as factoringSpecialCases } from "./generators/factoringSpecialCases";
+import { generator as factoringByGrouping } from "./generators/factoringByGrouping";
 
 export const GENERATORS: readonly Generator[] = [
   quadraticFactoring,
@@ -77,6 +86,15 @@ export const GENERATORS: readonly Generator[] = [
   logProperties,
   exponentialEquationsLogs,
   logarithmicEquations,
+  namingPolynomials,
+  addingPolynomials,
+  multiplyingPolynomials,
+  specialProducts,
+  dividingPolynomials,
+  factoringGcf,
+  factoringQuadratics,
+  factoringSpecialCases,
+  factoringByGrouping,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
