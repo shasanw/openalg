@@ -8,6 +8,10 @@ import {
   coterminal,
   coterminalMistakes,
   decimalLatex,
+  degreeText,
+  rightTriangleCorners,
+  surdText,
+  truncateTo,
   degreeLatex,
   degreesToRadiansMistakes,
   dmsLatex,
@@ -485,5 +489,38 @@ describe("trigKit: points on the terminal side", () => {
       "-\\frac{5}{3}",
       "-\\frac{3}{7}",
     ]);
+  });
+});
+
+describe("trigKit: right triangles", () => {
+  it("truncates instead of rounding", () => {
+    expect(truncateTo(12.38, 1)).toBe(12.3);
+    expect(truncateTo(12.3, 1)).toBe(12.3);
+    expect(truncateTo(-2.25, 1)).toBe(-2.2);
+    expect(truncateTo(0.04, 1)).toBe(0);
+  });
+
+  it("prints sides and angles as triangle labels", () => {
+    expect(surdText(surd(12))).toBe("12");
+    expect(surdText(surd(1, 13))).toBe("√13");
+    expect(surdText(surd(1, 20))).toBe("2√5");
+    expect(surdText(surd(1, 3, 2))).toBe("√3/2");
+    expect(surdText(surd(-1, 1, 2))).toBe("−1/2");
+    expect(degreeText(36.869897)).toBe("36.9°");
+    expect(degreeText(35)).toBe("35°");
+  });
+
+  it("lays a right triangle out with its legs on the axes", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0.1, max: 100, noNaN: true }), fc.double({ min: 0.1, max: 100, noNaN: true }), fc.boolean(), (run, rise, flip) => {
+        const [r, h, v] = rightTriangleCorners(run, rise, flip);
+        expect(r).toEqual({ x: 0, y: 0 });
+        expect(Math.abs(h.x)).toBe(run);
+        expect(h.x < 0).toBe(flip);
+        expect(h.y).toBe(0);
+        expect(v).toEqual({ x: 0, y: rise });
+      }),
+    );
+    expect(() => rightTriangleCorners(0, 3)).toThrow();
   });
 });

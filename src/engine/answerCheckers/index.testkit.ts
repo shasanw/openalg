@@ -25,12 +25,16 @@ import { distanceFormula } from "../generators/radicals/distanceFormula.answer.t
 import { midpointFormula } from "../generators/radicals/midpointFormula.answer.testkit";
 import { binomialTheorem } from "../generators/counting/binomialTheorem.answer.testkit";
 import { graphingTrig } from "../generators/trig/graphingTrig.answer.testkit";
+import { rightTriangleRatios } from "../generators/trig/rightTriangleRatios.answer.testkit";
+import { rightTriangleSolving } from "../generators/trig/rightTriangleSolving.answer.testkit";
 import type { Problem } from "../types";
 
 export const checkers: Record<string, (p: Problem) => void> = {
   "angle-measure": angleMeasure,
   "radians-degrees": radiansDegrees,
   "trig-any-angle": trigAnyAngle,
+  "right-triangle-ratios": rightTriangleRatios,
+  "right-triangle-solving": rightTriangleSolving,
   "graphing-trig": graphingTrig,
   "arithmetic-sequences": arithmeticSequences,
   "arithmetic-series": arithmeticSeries,
