@@ -19,11 +19,14 @@
 // - Distractors. Mistake helpers return wrong angles, values and points
 //   modelled on real slips; generators filter them with distinctHints.
 // - Rounding. Decimals for non-standard angles and sides.
+// - Right triangles. Labels for triangle diagrams (surdText, degreeText) and
+//   a right triangle laid out with its legs on the axes (rightTriangleCorners).
 //
 // Nothing here solves a Problem: a Topic chooses the angle (and the form it is
 // written in) first, and every value follows from that angle by table lookup.
 
 import { gcd, simplifyRadical } from "../../format";
+import type { PlotXY } from "../../plot";
 import type { Rng } from "../../rng";
 import { add, mul, NO_SOLUTION, numLatex, rat, ratEq, ratValue, sub, type Rat } from "../shared/equationKit";
 
@@ -669,4 +672,41 @@ export function pointValueMistakes(fn: TrigFn, x: number, y: number): TrigValue[
     ],
     trigValueEq,
   );
+}
+
+// ------------------------------------------------------------------ right triangles
+
+/** x cut (not rounded) to `places` decimals: the "dropped the extra digits" slip. */
+export function truncateTo(x: number, places: number): number {
+  const s = 10 ** places;
+  return (Math.sign(x) * Math.floor(Math.abs(x) * s + 1e-9)) / s + 0;
+}
+
+/** A Surd as plain text for a triangle label: "12", "√13", "2√5", "√3/2", "−1/2". */
+export function surdText(s: Surd): string {
+  const m = Math.abs(s.n);
+  const body = s.r === 1 ? String(m) : `${m === 1 ? "" : m}√${s.r}`;
+  return (s.n < 0 ? "−" : "") + body + (s.d === 1 ? "" : `/${s.d}`);
+}
+
+/** An angle in degrees as a triangle label, to `places` decimals: "35°", "36.9°". */
+export const degreeText = (deg: number, places = 1): string => `${decimalLatex(deg, places)}°`;
+
+/** A side of a right triangle named from one of its acute angles. */
+export type RightSide = "opp" | "adj" | "hyp";
+
+/**
+ * A right triangle drawn with its legs along the axes: `run` the horizontal
+ * leg, `rise` the vertical one. Returns [the right-angle corner, the far end
+ * of the horizontal leg, the top of the vertical leg]; `flip` puts the right
+ * angle at the bottom right instead of the bottom left.
+ */
+export function rightTriangleCorners(run: number, rise: number, flip = false): [PlotXY, PlotXY, PlotXY] {
+  if (!(run > 0 && rise > 0)) throw new RangeError(`rightTriangleCorners: legs ${run}, ${rise}`);
+  const s = flip ? -1 : 1;
+  return [
+    { x: 0, y: 0 },
+    { x: s * run + 0, y: 0 },
+    { x: 0, y: rise },
+  ];
 }

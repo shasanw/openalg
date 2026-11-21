@@ -22,7 +22,14 @@ export const precalculus: CourseOutline = {
     },
     {
       name: "Trigonometry",
-      topics: [{ topic: "angle-measure" }, { topic: "radians-degrees" }, { topic: "trig-any-angle" }, { topic: "graphing-trig" }],
+      topics: [
+        { topic: "angle-measure" },
+        { topic: "radians-degrees" },
+        { topic: "right-triangle-ratios" },
+        { topic: "right-triangle-solving" },
+        { topic: "trig-any-angle" },
+        { topic: "graphing-trig" },
+      ],
     },
     { name: "Parametric Equations", topics: [] },
     { name: "Polar Coordinates", topics: [] },
