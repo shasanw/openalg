@@ -1,3 +1,4 @@
+import { expectDistinctDistractors } from "../sequences/distinctDistractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import katex from "katex";
@@ -108,12 +109,14 @@ describe("logarithmic-equations: Topic Options", () => {
 });
 
 describe("logarithmic-equations: distractors", () => {
-  it("are distinct, never the Answer, and at least three", () => {
+  it("are distinct, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, (a, b) => {
+          const left = values(a), right = values(b);
+          return left.length === right.length && left.every((x, i) => close(x, right[i]));
+        });
         const answer = values(p.answer);
         for (const d of p.distractorHints) {
           const v = values(d);
@@ -128,6 +131,11 @@ describe("logarithmic-equations: distractors", () => {
     for (let s = 0; s < 200; s++) {
       const k = construct({ extraneous: true, form: "exponential" }, createRng(s));
       if (k.form !== "sum") continue;
+      // Giving the value of the first argument fails to isolate x.
+      const left = k.left.split(" + \\")[0];
+      const argument = left.slice(left.indexOf(" ") + 1);
+      const u = evalLatex(argument, { x: k.solutions[0] });
+      if (u !== k.solutions[0]) expect(distractors(k)).toContain(`x = ${u}`);
       const [first] = distractors(k);
       expect(values(first)).toHaveLength(2);
       return;

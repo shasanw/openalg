@@ -1,10 +1,11 @@
+import { expectDistinctDistractors } from "./distinctDistractors.testkit";
 import { arithmeticSequences, readGiven, ruleValue } from "./arithmeticSequences.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator, MAX_PRINTED } from "./arithmeticSequences";
 import { rat } from "./sequenceKit";
-import { close } from "../shared/latexEval.testkit";
+import { close, evalLatex } from "../shared/latexEval.testkit";
 import { askedIndex, expectKatex, expectTidy, printedNumbers, splitAsk } from "./sequences.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
@@ -82,12 +83,13 @@ describe("arithmetic-sequences: Topic Options", () => {
 });
 
 describe("arithmetic-sequences: distractors", () => {
-  it("are distinct, never the Answer, and at least three", () => {
+  it("are distinct, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, (a, b) => p.answer.startsWith("a_n")
+          ? [1, 2].every((n) => close(ruleValue(a, n), ruleValue(b, n)))
+          : close(evalLatex(a), evalLatex(b)));
         expect(p.distractorHints).not.toContain(p.answer);
         if (p.answer.startsWith("a_n")) {
           // a different rule, not the same one written differently
@@ -101,6 +103,7 @@ describe("arithmetic-sequences: distractors", () => {
   it("model forgetting the - 1 and misreading two terms", () => {
     // a_3 = 11, a_7 = 23: d = 3, a_1 = 5, a_n = 3n + 2
     const k = { given: "twoTerms" as const, find: "rule" as const, a1: rat(5), d: rat(3), p: 3, q: 7, k: 20, integers: true };
+    expect(distractors(k)).toContain("a_n = 3n - 3"); // first term dropped
     expect(distractors(k).slice(0, 2)).toEqual([
       "a_n = 3n + 5", // a_1 + dn
       "a_n = 12n - 25", // 23 - 11 = 12 not divided by 4 (so a_1 = -13)

@@ -217,10 +217,52 @@ export function distractors(k: FormConstruction): string[] {
         [y, v, b],
         [v, b, y],
       ];
-  const candidates = triples.map(([B, E, V]) => {
+  const negated = (q: Quantity): Quantity => ({
+    tex: q.tex.startsWith("-") ? q.tex.slice(1) : `-${q.tex}`,
+    value: -q.value!,
+  });
+  // a number's reciprocal, spelled the way it is printed
+  const inverted = (q: Quantity): Quantity | null => {
+    if (q.value === null || q.value <= 0) return null;
+    const frac = q.tex.match(/^\\frac\{1\}\{(\d+)\}$/);
+    if (frac) return { tex: frac[1], value: 1 / q.value };
+    if (/^0\.0*1$/.test(q.tex)) return { tex: String(Math.round(1 / q.value)), value: 1 / q.value };
+    return /^\d+$/.test(q.tex) ? reciprocal(Number(q.tex)) : null;
+  };
+  const inverse = inverted(v);
+  const slips: [Quantity, Quantity, Quantity][] = [...triples, [b, negated(y), v]];
+  if (inverse) slips.push([b, y, inverse]); // invert the argument
+  // Omit the written base, reading the logarithm as log or ln.
+  if (b.tex !== "10") slips.push([num(rat(10)), y, v]);
+  if (b.tex !== "e") slips.push([{ tex: "e", value: Math.E }, y, v]);
+  if (y.value! < 0) slips.push([v, b, negated(y)]); // swap base and result, losing the negative sign
+
+  const letter = k.exponent.value === null ? y.tex : k.value.value === null ? v.tex : null;
+  const seen: number[][] = [];
+  const close = (a: number, b: number) => Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(a), Math.abs(b));
+  const candidates = slips.map(([B, E, V]) => {
     if (isTrue(B, E, V)) return null;
-    if (k.toLog) return positive(B) && B.value !== 1 ? logForm(B, E, V) : null;
-    return exponentialForm(B, E, V);
+    if (k.toLog && (!positive(B) || B.value === 1 || !positive(V))) return null;
+    let values: number[];
+    if (letter) {
+      // Different placements of a letter can still imply the same value for it.
+      let solution: number;
+      if (B.tex === letter) solution = V.value! ** (1 / E.value!);
+      else if (V.tex === letter) solution = B.value! ** E.value!;
+      else solution = Math.log(V.value!) / Math.log(B.value!) * (E.tex === `-${letter}` ? -1 : 1);
+      if (!Number.isFinite(solution)) return null;
+      values = [solution];
+    } else if (k.toLog) {
+      values = [Math.log(V.value!) / Math.log(B.value!), E.value!];
+    } else {
+      // Compare powers by sign and log magnitude, even if the power overflows.
+      if (B.value! < 0 && !Number.isInteger(E.value)) return null;
+      const negative = B.value! < 0 && E.value! % 2 !== 0;
+      values = [Number(negative), E.value! * Math.log(Math.abs(B.value!)), V.value!];
+    }
+    if (seen.some((earlier) => values.every((v, i) => close(v, earlier[i])))) return null;
+    seen.push(values);
+    return k.toLog ? logForm(B, E, V) : exponentialForm(B, E, V);
   });
   return distinctHints(answerLatex(k), candidates);
 }

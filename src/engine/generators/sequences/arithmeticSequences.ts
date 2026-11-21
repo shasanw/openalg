@@ -150,6 +150,12 @@ export function distractors(k: ArithmeticConstruction): string[] {
   // [first term, difference] pairs a mistake works from
   const wrongD: Rat[] = [];
   if (k.given === "twoTerms") wrongD.push(sub(aq, ap), div(sub(aq, ap), rat(q - p + 1))!);
+  // further wrong differences: backwards, and divided by one too few gaps
+  const extraD: Rat[] = [];
+  if (k.given === "twoTerms") {
+    extraD.push(neg(div(sub(aq, ap), rat(q - p))!));
+    if (q - p > 1) extraD.push(div(sub(aq, ap), rat(q - p - 1))!);
+  } else extraD.push(sub(arithmeticTerm(a1, d, 4), a1)); // first and last listed terms subtracted, not divided
   const fromAp = (dd: Rat) => sub(ap, mul(rat(p - 1), dd)); // a_1 back from a_p with difference dd
   let candidates: (string | null)[];
   if (k.find === "rule") {
@@ -162,6 +168,10 @@ export function distractors(k: ArithmeticConstruction): string[] {
       a1.n === d.n && a1.d === d.d ? null : rule(add(a1, d), a1), // a_1 and d swapped: a_1 n + d
       rule(sub(d, sub(a1, d)), d), // the constant's sign slipped
       rule(add(a1, mul(rat(2), d)), d), // a_1 + d(n + 1)
+      rule(sub(add(a1, d), rat(1)), d), // d(n - 1) + a_1 with the 1 left off the d
+      rule(rat(0), d), // a_1 dropped: a_n = d(n - 1)
+      ...extraD.map((dd) => rule(fromAp(dd), dd)),
+      rule(neg(a1), neg(d)), // every sign flipped
     ];
   } else {
     const at = (first: Rat, dd: Rat, i: number) => numLatex(arithmeticTerm(first, dd, i));
@@ -172,6 +182,11 @@ export function distractors(k: ArithmeticConstruction): string[] {
       at(a1, neg(d), k.k), // the difference's sign wrong
       at(a1, d, k.k - 1),
       at(a1, d, k.k + 1),
+      numLatex(mul(rat(k.k), d)), // a_1 forgotten: kd
+      a1.n === d.n && a1.d === d.d ? null : at(d, a1, k.k), // a_1 and d swapped
+      numLatex(neg(arithmeticTerm(a1, d, k.k))), // the whole term's sign slipped
+      at(aq, d, k.k), // the last given term taken as a_1
+      ...extraD.map((dd) => numLatex(add(ap, mul(rat(k.k - p), dd)))),
     ];
   }
   return distinctHints(

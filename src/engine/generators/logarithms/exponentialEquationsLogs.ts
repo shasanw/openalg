@@ -247,18 +247,64 @@ export function distractorCandidates(k: ExpLogConstruction): Candidate[] {
     const wrongNs = [k.rhs, (k.rhs + k.d) / k.k, k.rhs / k.k - k.d, k.rhs - k.d];
     for (const w of wrongNs) if (Number.isInteger(w) && w > 1 && w !== n) out.push(exactCandidate(k, w));
   }
+  const logb = Math.log(n) / Math.log(b);
+  const signed = (v: number) => (v > 0 ? "-" : "+");
+  if (base.kind === "number") {
+    // forgot to divide by \ln b
+    out.push({ tex: exactLatex(`\\ln ${n}`, null, a, c), value: (Math.log(n) - c) / a });
+    // \ln 7 divided by 3, not by \ln 3: the base's logarithm not taken
+    out.push({ tex: exactLatex(`\\ln ${n}`, null, a * base.b.n, c * base.b.n), value: (Math.log(n) / base.b.n - c) / a });
+    // multiplied the logarithms instead of dividing
+    out.push({ tex: exactLatex(`\\ln ${n} \\cdot \\ln ${base.b.n}`, null, a, c), value: (Math.log(n) * Math.log(b) - c) / a });
+  }
+  if (base.kind === "natural") {
+    // e^{x} = N: N divided by e, as if e were a number to divide by
+    out.push({
+      tex:
+        c === 0
+          ? `\\frac{${n}}{${a === 1 ? "" : a}e}`
+          : `\\frac{${n} ${c > 0 ? "-" : "+"} ${Math.abs(c) === 1 ? "" : Math.abs(c)}e}{${a === 1 ? "" : a}e}`,
+      value: (n / Math.E - c) / a,
+    });
+  }
+  // Reverse the sign when taking logs on both sides: use log_b(1/N).
+  out.push({ tex: exactLatex(`-${logN(base, n)}`, baseLog(base), a, c), value: (-logb - c) / a });
+  // the base ignored altogether: x = N - c
+  out.push({ tex: numLatex(rat(n - c, a)), value: (n - c) / a });
+  if (a !== 1) {
+    // multiplied by a instead of dividing
+    const inner = exactLatex(logN(base, n), baseLog(base), 1, c);
+    out.push({ tex: c === 0 ? `${a} \\cdot ${inner}` : `${a}\\left(${inner}\\right)`, value: (logb - c) * a });
+    // only the logarithm divided by a, the constant left alone
+    if (c !== 0)
+      out.push({
+        tex: `${exactLatex(logN(base, n), baseLog(base), a, 0)} ${signed(c)} ${Math.abs(c)}`,
+        value: logb / a - c,
+      });
+  }
+  // the exponential taken instead of the logarithm: x = b^{N}
+  if (n <= 12 && a === 1 && c === 0) out.push({ tex: `${baseLatex(base)}^{${n}}`, value: b ** n });
+  if (k.k !== 1 || k.d !== 0) {
+    const more = [k.rhs + k.d, k.rhs / k.k + k.d, (k.rhs - k.d) * k.k];
+    for (const w of more) if (Number.isInteger(w) && w > 1 && w !== n) out.push(exactCandidate(k, w));
+  }
   return out.filter((x) => Number.isFinite(x.value));
 }
 
 export function distractors(k: ExpLogConstruction, form: AnswerForm, places: number): string[] {
   const answer = answerLatex(k, form, places);
-  const rounded = roundedLatex(answerValue(k), places);
-  return distinctHints(
-    answer,
-    distractorCandidates(k).map((c) =>
-      form !== "exact" && roundedLatex(c.value, places) === rounded ? null : present(form, places, c),
-    ),
-  );
+  const seen = [answerValue(k)];
+  const rounded = new Set([roundedLatex(seen[0], places)]);
+  const hints: string[] = [];
+  for (const c of distractorCandidates(k)) {
+    if (seen.some((v) => Math.abs(v - c.value) < 1e-10 * Math.max(1, Math.abs(v)))) continue;
+    const decimal = roundedLatex(c.value, places);
+    if (form !== "exact" && rounded.has(decimal)) continue;
+    seen.push(c.value);
+    rounded.add(decimal);
+    hints.push(present(form, places, c));
+  }
+  return distinctHints(answer, hints);
 }
 
 export const generator: Generator = {

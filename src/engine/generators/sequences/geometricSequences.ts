@@ -11,6 +11,7 @@
 import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
 import {
+  add,
   arithmeticRuleLatex,
   arithmeticTerm,
   distinctHints,
@@ -166,7 +167,7 @@ export function distractors(k: GeometricConstruction): string[] {
   const one = rat(1);
   const flip = div(one, r)!;
   // [a_1, r] pairs a slip works from, with an exponent offset
-  type Slip = { a: Rat; r: Rat; shift?: number } | { power: Rat } | { arithmetic: Rat };
+  type Slip = { a: Rat; r: Rat; shift?: number } | { power: Rat } | { arithmetic: Rat; viaTerms?: boolean } | { times: Rat };
   const slips: Slip[] = [
     { a: a1, r, shift: 1 }, // exponent n
     { power: mul(a1, r) }, // (a_1 r)^{n-1}
@@ -184,26 +185,51 @@ export function distractors(k: GeometricConstruction): string[] {
   }
   if (!ratEq(a1, one) && !ratEq(a1, r)) slips.push({ a: r, r: a1 }); // a_1 and r swapped
   slips.push({ arithmetic: sub(geometricTerm(a1, r, 2), a1) }); // a common difference
+  const more: Slip[] = [];
+  const d = sub(geometricTerm(a1, r, 2), a1);
+  if (!ratEq(d, one) && d.n !== 0) more.push({ a: a1, r: d }); // the common difference used as the ratio
+  more.push({ a: aq, r }); // the last given term taken as a_1
+  if (k.given === "terms") more.push({ a: geometricTerm(a1, r, 2), r }); // a_2 taken as a_1
+  // the two given terms treated as an arithmetic sequence: d = (a_q - a_p)/(q - p)
+  if (k.given === "twoTerms") more.push({ arithmetic: div(sub(aq, ap), rat(q - p))!, viaTerms: true });
+  more.push({ times: mul(a1, r) }); // multiplied by the ratio n - 1 times over, not raised to it
 
   const at = (s: Slip, n: number): Rat | null => {
     if ("power" in s) return pow(s.power, n - 1);
-    if ("arithmetic" in s) return arithmeticTerm(a1, s.arithmetic, n);
+    if ("times" in s) return mul(s.times, rat(n - 1));
+    if ("arithmetic" in s) return s.viaTerms ? add(ap, mul(rat(n - p), s.arithmetic)) : arithmeticTerm(a1, s.arithmetic, n);
     return mul(s.a, pow(s.r, n - 1 + (s.shift ?? 0)));
   };
   const rule = (s: Slip): string | null => {
     if ("power" in s) return ratEq(s.power, one) ? null : `a_n = ${powerLatex(s.power, "n-1")}`;
-    if ("arithmetic" in s) return s.arithmetic.n === 0 ? null : arithmeticRuleLatex(a1, s.arithmetic);
+    if ("times" in s) return null;
+    if ("arithmetic" in s) {
+      if (s.arithmetic.n === 0) return null;
+      return arithmeticRuleLatex(s.viaTerms ? sub(ap, mul(rat(p - 1), s.arithmetic)) : a1, s.arithmetic);
+    }
     if (s.a.n === 0 || ratEq(s.r, one) || s.r.n === 0) return null;
     return `a_n = ${geometricLatex(s.a, s.r, s.shift ? "n" : "n-1")}`;
   };
 
   let candidates: (string | null)[];
-  if (k.find === "rule") candidates = slips.map(rule);
-  else {
+  if (k.find === "rule") {
+    // Three terms distinguish a geometric rule from a linear rule, including shifted powers.
+    const signature = (s: Slip) => [1, 2, 3].map((n) => numLatex(at(s, n)!)).join(",");
+    const seen = new Set([signature({ a: a1, r })]);
+    candidates = [...slips, ...more].map((s) => {
+      const tex = rule(s);
+      if (!tex) return null;
+      const key = signature(s);
+      if (seen.has(key)) return null;
+      seen.add(key);
+      return tex;
+    });
+  } else {
     const term = (x: Rat | null) => (x && size(x) <= 99999 ? numLatex(x) : null);
     candidates = slips.map((s) => term(at(s, k.k)));
     candidates.splice(2, 0, term(geometricTerm(a1, r, k.k - 1)));
     candidates.push(term(geometricTerm(a1, r, k.k + 1)));
+    candidates.push(...more.map((s) => term(at(s, k.k))));
   }
   return distinctHints(answerLatex(k), candidates);
 }

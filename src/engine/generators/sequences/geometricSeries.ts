@@ -20,6 +20,7 @@ import {
   mul,
   neg,
   numLatex,
+  pow,
   rat,
   ratEq,
   seriesLatex,
@@ -175,6 +176,12 @@ export function distractors(k: GeometricSeriesConstruction): string[] {
       sub(one, r).n === 0 ? null : div(a1, sub(one, r)),
       r.n < 0 ? geometricSum(a1, neg(r), k.n) : null, // the signs ignored
       sub(geometricSum(a1, r, k.n), a1), // summed from the second term
+      geometricTerm(a1, r, k.n), // the last term given as the sum
+      div(mul(rat(k.n), add(a1, geometricTerm(a1, r, k.n))), rat(2)), // the arithmetic series formula
+      add(one, r).n === 0 ? null : div(mul(a1, sub(one, pow(r, k.n))), add(one, r)), // 1 + r in the denominator
+      mul(a1, sub(one, pow(r, k.n))), // not divided by 1 - r
+      sub(one, r).n === 0 ? null : div(mul(a1, sub(one, mul(rat(k.n), r))), sub(one, r)), // r^n read as rn
+      mul(rat(k.n), a1), // n copies of the first term
     );
   } else if (converges(r)) {
     values.push(div(a1, add(one, r)), div(mul(a1, r), sub(one, r)), DIVERGES, mul(a1, sub(one, r)));
