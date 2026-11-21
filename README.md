@@ -88,7 +88,7 @@ Current Chrome, Edge, Safari and Firefox on laptops and Chromebooks, plus Safari
 
 ## Checking a new Topic
 
-Register an independent checker for its id in [the Answer checker map](src/engine/answerCheckers/index.testkit.ts). Read the printed prompt, Answer and any graph specs. Check the mathematical result, the requested form, and that each Distractor is wrong in value. Use test-only readers or evaluators for the reference calculation. Run `pnpm exec vitest run src/engine/answers.allGenerators.test.ts` to exercise every Topic over seeds, defaults and single-option variants. The existing Topic tests continue to cover option combinations and construction invariants.
+Register an independent checker for its id in [the Answer checker map](src/engine/answerCheckers/index.testkit.ts). Read the printed prompt, Answer and any graph specs. Check the mathematical result, the requested form, and that each Distractor is wrong in value. Use test-only readers or evaluators for the reference calculation. Run `pnpm exec vitest run src/engine/answers` to exercise every Topic (the check is sharded across `answersN.allGenerators.test.ts`) over seeds, defaults and single-option variants. The existing Topic tests continue to cover option combinations and construction invariants.
 
 ## Contributing
 

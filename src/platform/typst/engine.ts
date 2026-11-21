@@ -41,6 +41,11 @@ export interface TypstEngine {
   svgPages(doc: TypstDocument): Promise<string[]>;
   /** Compile to PDF bytes. */
   pdf(doc: TypstDocument): Promise<Uint8Array>;
+  /**
+   * Compile only, rendering nothing: throws on an error and leaves the
+   * warnings in `warnings`. For tests that only need "it compiles cleanly".
+   */
+  check(doc: TypstDocument): Promise<void>;
   /** Warnings from the most recent compile (e.g. a missing font). */
   readonly warnings: string[];
 }
@@ -174,6 +179,9 @@ export async function createTypstEngine(assets: TypstEngineAssets): Promise<Typs
     },
     async pdf(doc) {
       return await compile(doc, 1);
+    },
+    async check(doc) {
+      await compile(doc, 0);
     },
   };
 }
