@@ -10,6 +10,7 @@
     "serve:dist": "node scripts/serve-dist.mjs",
     "test": "vitest --project engine --project dom",
     "test:run": "vitest run --project engine --project dom",
+    "test:soak": "vitest run --config vitest.soak.config.ts --maxWorkers=1",
     "test:ui": "vitest --ui",
     "check:typst": "node scripts/check-typst-browser.mjs",
     "test:typst": "vitest run --project typst",
