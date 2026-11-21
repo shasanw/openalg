@@ -1,6 +1,6 @@
 // Problems where every real mistake lands on the same few values, so only
 // three distinct Distractors exist. Shared by the fixed-seed check
-// (distractors.allGenerators.test.ts) and the opt-in soak scan
+// (distractors.allGenerators.testkit.ts) and the opt-in soak scan
 // (distractors.soak.ts). Each is named exactly, needs three, and says why;
 // anything else still needs four.
 

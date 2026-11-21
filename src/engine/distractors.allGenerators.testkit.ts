@@ -1,3 +1,6 @@
+// Test-only, sharded across distractorsN.allGenerators.test.ts so the Topics
+// run on several workers at once.
+//
 // Every registered Topic must offer at least four distinct mistake-based
 // Distractors (`distractorHints`) for every Problem, so a multiple-choice sheet
 // of five never has to pad with numbers nudged by one (see mc.ts), which are not
@@ -12,7 +15,7 @@ import { choiceKey } from "./mc";
 import { GENERATORS } from "./registry";
 import { createRng } from "./rng";
 import { topicVariants } from "./topicVariants.testkit";
-import type { ParamSchema, ParamValues } from "./types";
+import type { Generator, ParamSchema, ParamValues } from "./types";
 
 const SEEDS = 80;
 
@@ -34,8 +37,16 @@ function combinations(schema: ParamSchema): ParamValues[] {
   return out;
 }
 
-describe("mistake-based Distractors across every Topic", () => {
-  for (const g of GENERATORS) {
+/** How many distractorsN.allGenerators.test.ts files share the Topics. */
+export const DISTRACTOR_SHARDS = 4;
+
+/** Shard `shard` (0-based) of DISTRACTOR_SHARDS: every DISTRACTOR_SHARDS-th Topic. */
+export const distractorTopicsOfShard = (shard: number): Generator[] =>
+  GENERATORS.filter((_, i) => i % DISTRACTOR_SHARDS === shard);
+
+export function everyTopicHasDistractors(shard: number): void {
+describe(`mistake-based Distractors across every Topic (shard ${shard + 1} of ${DISTRACTOR_SHARDS})`, () => {
+  for (const g of distractorTopicsOfShard(shard)) {
     it(`${g.id} offers at least 4 distinct mistake-based Distractors`, () => {
       for (const options of [...topicVariants(g.schema), ...combinations(g.schema)]) {
         for (let seed = 0; seed < SEEDS; seed++) {
@@ -52,3 +63,4 @@ describe("mistake-based Distractors across every Topic", () => {
     });
   }
 });
+}
