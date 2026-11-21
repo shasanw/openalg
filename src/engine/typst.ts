@@ -520,12 +520,13 @@ export function mcProblemBody(
   const { choices: rendered, correctIndex } = versionChoices(problem, choices, choiceVariant);
   const lines = rendered
     .map((latex, i) => {
+      const math = tallChoice(latex) ? measuredByBounds(answerMath(latex, placeholder)) : answerMath(latex, placeholder);
       if (showAnswer && i === correctIndex) {
         // The bare letter ringed where "(X)" sits on the sheet. Outset (not
         // inset) for the height, so the ring never changes the line spacing.
-        return `#box(width: 1.8em)[#h(0.2em)#box(stroke: 0.9pt + keycolor, radius: 50%, inset: (x: 2.5pt), outset: (y: 2.5pt))[#text(fill: keycolor)[#strong[${choiceLetter(i)}]]]] #text(fill: keycolor)[${answerMath(latex, placeholder)}]`;
+        return `#box(width: 1.8em)[#h(0.2em)#box(stroke: 0.9pt + keycolor, radius: 50%, inset: (x: 2.5pt), outset: (y: 2.5pt))[#text(fill: keycolor)[#strong[${choiceLetter(i)}]]]] #text(fill: keycolor)[${math}]`;
       }
-      return `#box(width: 1.8em)[(${choiceLetter(i)})] ${answerMath(latex, placeholder)}`;
+      return `#box(width: 1.8em)[(${choiceLetter(i)})] ${math}`;
     })
     // One paragraph per choice, so a long choice wraps under its own text
     // (hanging indent) rather than under its letter.
@@ -540,6 +541,23 @@ export function mcProblemBody(
 #pad(left: 1.6em)[#set par(leading: 0.75em, spacing: 0.75em, hanging-indent: 1.8em)
 ${lines}${answerLine}]`;
 }
+
+/**
+ * A choice whose math rises above the capitals or drops below the baseline: a
+ * fraction or a radical. Paragraph spacing is measured from the baseline to
+ * the cap height, so stacked tall choices would touch (a denominator on the
+ * radical bar below it).
+ */
+const tallChoice = (latex: string): boolean => /\\(?:d?frac|sqrt)/.test(latex);
+
+/**
+ * Math whose top is measured by its ink, so a radical bar or numerator gets
+ * real space above it and never meets the denominator of the choice above.
+ * The bottom keeps the baseline edge: measuring it by ink too would lift the
+ * math off the choice letter's baseline, and the gap below a line already
+ * clears a denominator.
+ */
+const measuredByBounds = (math: string): string => `#[#set text(top-edge: "bounds"); ${math}]`;
 
 /** A multiple-choice Answer Key cell body: the correct letter, then the Answer. */
 export function mcAnswerBody(

@@ -24,7 +24,7 @@ import { GENERATORS } from "../../engine/registry";
 import { topicVariants } from "../../engine/topicVariants.testkit";
 
 /** How many topicsN.smoke.test.ts files share the Topics. */
-export const TOPIC_SHARDS = 7;
+export const TOPIC_SHARDS = 9;
 
 const require = createRequire(import.meta.url);
 const asset = (name: string) =>

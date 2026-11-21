@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { answerMath, buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
+import type { Problem } from "./types";
+import { answerMath, buildTypstDocument, escapeTypstText, mcProblemBody, TEXT_FONT } from "./typst";
 import { ANSWER_PART_SEPARATOR, prose, proseSegments } from "./format";
 import { MATRIX_INVERSES_ID } from "./generators/matrices/matrixInverses";
 import { PERMUTATIONS_VS_COMBINATIONS_ID } from "./generators/counting/permutationsVsCombinations";
@@ -393,7 +394,7 @@ describe("Answer Key formats", () => {
         const sheet = mc(twoSections(), choices);
         const doc = buildTypstDocument(sheet, { keyFormat: "in-context" });
         const key = keyOf(doc.source);
-        const circled = [...key.matchAll(/radius: 50%[^\n]*?#strong\[([A-E])\]\]\]\] #text\(fill: keycolor\)\[@@M(\d+)@@\]/g)];
+        const circled = [...key.matchAll(/radius: 50%[^\n]*?#strong\[([A-E])\]\]\]\] #text\(fill: keycolor\)\[(?:#\[#set text\(top-edge: "bounds"\); )?@@M(\d+)@@\]?\]/g)];
         const named = [...key.matchAll(/Answer: \(([A-E])\)/g)].map((m) => m[1]);
         const problems = allProblems(sheet);
         expect(circled).toHaveLength(problems.length);
@@ -417,6 +418,28 @@ describe("Answer Key formats", () => {
       expect(student).not.toContain("radius: 50%");
       expect(student).not.toContain("Answer:");
     });
+  });
+});
+
+describe("stacked multiple-choice choices", () => {
+  it("measure a fraction or radical choice by its top, so it never touches the choice above", () => {
+    const problem: Problem = {
+      kind: "generated",
+      generatorId: "t",
+      params: {},
+      seed: 1,
+      prompt: "x",
+      answer: "\\frac{\\sqrt{2}}{4}",
+      distractorHints: ["\\sqrt{2 + \\sqrt{2}}", "2", "-1"],
+    };
+    const body = mcProblemBody(problem, 4, (latex) => `<<${latex}>>`, () => "");
+    const bounded = (latex: string) => `#[#set text(top-edge: "bounds"); <<${latex}>>]`;
+    expect(body).toContain(bounded("\\frac{\\sqrt{2}}{4}"));
+    expect(body).toContain(bounded("\\sqrt{2 + \\sqrt{2}}"));
+    // plain choices, and every choice letter, keep the usual edges
+    expect(body).toContain("] <<2>>");
+    expect(body).not.toContain(bounded("2"));
+    expect(body).not.toMatch(/bounds"\); \(/);
   });
 });
 
@@ -666,7 +689,7 @@ describe("buildTypstDocument Versions", () => {
               const { choices: rendered } = versionChoices(p, choices, v.choiceVariant);
               const at = student.indexOf(`<<${p.prompt}>>`);
               const block = student.slice(at);
-              const printed = [...block.matchAll(/\[\(([A-E])\)\] <<(.*?)>>/g)]
+              const printed = [...block.matchAll(/\[\(([A-E])\)\] (?:#\[#set text\(top-edge: "bounds"\); )?<<(.*?)>>/g)]
                 .slice(0, choices)
                 .map((m) => m[2]);
               expect(printed).toEqual(rendered);
@@ -688,7 +711,7 @@ describe("buildTypstDocument Versions", () => {
         const start = doc.indexOf(`[${v.label} Answer Key]`);
         const next = doc.indexOf("Answer Key]", start + 20);
         const key = doc.slice(start, next < 0 ? undefined : next);
-        const circled = [...key.matchAll(/#strong\[([A-E])\]\]\]\] #text\(fill: keycolor\)\[<<(.*?)>>\]/g)];
+        const circled = [...key.matchAll(/#strong\[([A-E])\]\]\]\] #text\(fill: keycolor\)\[(?:#\[#set text\(top-edge: "bounds"\); )?<<(.*?)>>\]?\]/g)];
         const problems = allProblems(v.worksheet);
         expect(circled).toHaveLength(problems.length);
         problems.forEach((p, i) => {
