@@ -32,9 +32,9 @@ import {
   MIN_SECTION_PROBLEMS,
   type Worksheet,
 } from "./worksheet";
-import { PARABOLA_PROPERTIES_ID } from "./generators/parabolaProperties";
-import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
-import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
+import { PARABOLA_PROPERTIES_ID } from "./generators/quadratics/parabolaProperties";
+import { QUADRATIC_FACTORING_ID } from "./generators/quadratics/quadraticFactoring";
+import { QUADRATIC_FORMULA_ID } from "./generators/quadratics/quadraticFormula";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 

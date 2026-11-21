@@ -1,6 +1,7 @@
 // Every Course Outline, in curriculum order, and the listings they produce.
-// Adding a Topic = register its generator in ../registry.ts, then list it here
-// in each Course that teaches it.
+// Adding a Topic = add its generator to its area folder under ../generators
+// (and that folder's index.ts list), then list it here in each Course that
+// teaches it.
 
 import { getGenerator } from "../registry";
 import { resolveParams, type Generator, type ParamValues } from "../types";

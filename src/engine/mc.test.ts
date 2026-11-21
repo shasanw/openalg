@@ -10,11 +10,11 @@ import {
   MAX_CHOICES,
   MIN_CHOICES,
 } from "./mc";
-import { generator as factoring } from "./generators/quadraticFactoring";
+import { generator as factoring } from "./generators/quadratics/quadraticFactoring";
 import {
   generator as formula,
   type RootType,
-} from "./generators/quadraticFormula";
+} from "./generators/quadratics/quadraticFormula";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyCount = fc.integer({ min: MIN_CHOICES, max: MAX_CHOICES });

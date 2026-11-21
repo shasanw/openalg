@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { answerMath, buildTypstDocument, escapeTypstText, TEXT_FONT } from "./typst";
 import { ANSWER_PART_SEPARATOR, prose, proseSegments } from "./format";
-import { MATRIX_INVERSES_ID } from "./generators/matrixInverses";
-import { PERMUTATIONS_VS_COMBINATIONS_ID } from "./generators/permutationsVsCombinations";
-import { PARABOLA_PROPERTIES_ID } from "./generators/parabolaProperties";
-import { GENERAL_SEQUENCES_ID } from "./generators/generalSequences";
+import { MATRIX_INVERSES_ID } from "./generators/matrices/matrixInverses";
+import { PERMUTATIONS_VS_COMBINATIONS_ID } from "./generators/counting/permutationsVsCombinations";
+import { PARABOLA_PROPERTIES_ID } from "./generators/quadratics/parabolaProperties";
+import { GENERAL_SEQUENCES_ID } from "./generators/sequences/generalSequences";
 import {
   allProblems,
   buildSection,
@@ -26,10 +26,10 @@ import {
   MAX_CHOICES,
   MIN_CHOICES,
 } from "./mc";
-import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
-import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
-import { GRAPHING_QUADRATICS_ID } from "./generators/graphingQuadratics";
-import { QUADRATIC_INEQUALITIES_ID } from "./generators/quadraticInequalities";
+import { QUADRATIC_FACTORING_ID } from "./generators/quadratics/quadraticFactoring";
+import { QUADRATIC_FORMULA_ID } from "./generators/quadratics/quadraticFormula";
+import { GRAPHING_QUADRATICS_ID } from "./generators/quadratics/graphingQuadratics";
+import { QUADRATIC_INEQUALITIES_ID } from "./generators/quadratics/quadraticInequalities";
 
 function ws(count: number, print?: Partial<PrintConfig>) {
   return buildWorksheet({
