@@ -9,22 +9,12 @@
 import { describe, expect, it } from "vitest";
 import { GENERATORS } from "./registry";
 import { blankGraph, graphSpecProblem, plotLayers, type GraphSpec } from "./plot";
-import type { ParamValues } from "./types";
-
-function variants(schema: (typeof GENERATORS)[number]["schema"]): ParamValues[] {
-  const out: ParamValues[] = [{}];
-  for (const f of schema) {
-    if (f.type === "enum") for (const o of f.options) out.push({ [f.key]: o.value });
-    if (f.type === "boolean") out.push({ [f.key]: !f.default });
-    if (f.type === "int") out.push({ [f.key]: f.min }, { [f.key]: f.max });
-  }
-  return out;
-}
+import { topicVariants } from "./topicVariants.testkit";
 
 describe("graphs across every Topic", () => {
   for (const g of GENERATORS) {
     it(`${g.id}: every graph is valid and fully lettered`, () => {
-      for (const params of variants(g.schema)) {
+      for (const params of topicVariants(g.schema)) {
         for (let seed = 1; seed <= 60; seed++) {
           const p = g.generate(params, seed);
           for (const spec of [p.graph, p.answerGraph].filter((s): s is GraphSpec => !!s)) {

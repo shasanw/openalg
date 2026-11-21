@@ -1,10 +1,11 @@
+import { geometricSeries, readSeries } from "./geometricSeries.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, DIVERGES, generator, MAX_PRINTED } from "./geometricSeries";
 import { rat } from "./sequenceKit";
 import { close, evalLatex } from "../shared/latexEval.testkit";
-import { expectKatex, expectTidy, parseSeries, parseSigma, printedNumbers } from "./sequences.testkit";
+import { expectKatex, expectTidy, printedNumbers } from "./sequences.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyParams = fc.record({
@@ -15,54 +16,12 @@ const anyParams = fc.record({
   includeDiverges: fc.boolean(),
 });
 
-interface Read {
-  notation: "terms" | "sigma";
-  a1: number;
-  r: number;
-  /** Infinity for an infinite series */
-  n: number;
-}
-
-/** The series, read back from the printed prompt alone. */
-function readSeries(prompt: string): Read {
-  const sigma = parseSigma(prompt);
-  if (sigma) {
-    expect(sigma.from).toBe(1);
-    const a1 = evalLatex(sigma.body, { k: 1 });
-    return { notation: "sigma", a1, r: evalLatex(sigma.body, { k: 2 }) / a1, n: sigma.to };
-  }
-  const { opening, last } = parseSeries(prompt);
-  expect(opening).toHaveLength(3);
-  const r = opening[1] / opening[0];
-  expect(close(opening[2] / opening[1], r)).toBe(true);
-  if (last === null) return { notation: "terms", a1: opening[0], r, n: Infinity };
-  let n = 1;
-  let t = opening[0];
-  while (!close(t, last) && n < 50) {
-    t *= r;
-    n++;
-  }
-  expect(close(t, last)).toBe(true);
-  expect(n).toBeGreaterThan(4); // the ellipsis hides at least one term
-  return { notation: "terms", a1: opening[0], r, n };
-}
-
-/** The sum worked out term by term (finite) or by the textbook test (infinite). */
-function expected({ a1, r, n }: Read): number | "diverges" {
-  if (n === Infinity) return Math.abs(r) < 1 ? a1 / (1 - r) : "diverges";
-  let s = 0;
-  for (let i = 0; i < n; i++) s += a1 * r ** i;
-  return s;
-}
-
 describe("geometric-series: answers", () => {
   it("the Answer is the printed series' sum, or that it diverges", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        const want = expected(readSeries(p.prompt));
-        if (want === "diverges") expect(p.answer).toBe(DIVERGES);
-        else expect(close(evalLatex(p.answer), want)).toBe(true);
+        geometricSeries(p);
       }),
     );
   });

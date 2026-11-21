@@ -27,6 +27,7 @@ export function readMatrices(latex: string): number[][][] {
 
 /** The one matrix in the LaTeX, and that it is all there is. */
 export function readMatrix(latex: string): number[][] {
+  expect(latex).toMatch(/^\\begin\{bmatrix\} .* \\end\{bmatrix\}$/);
   const ms = readMatrices(latex);
   expect(ms, latex).toHaveLength(1);
   return ms[0];

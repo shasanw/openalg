@@ -1,9 +1,9 @@
+import { distanceFormula, valueOf } from "./distanceFormula.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distanceLatex, generator } from "./distanceFormula";
-import { evalLatex } from "../shared/latexEval.testkit";
-import { anySeed, commonChecks, expectSimplest } from "./radicals.testkit";
+import { anySeed, commonChecks } from "./radicals.testkit";
 
 const anyParams = fc.record({
   distances: fc.constantFrom("mixed", "whole", "radical"),
@@ -11,27 +11,12 @@ const anyParams = fc.record({
   maxCoordinate: fc.integer({ min: 4, max: 20 }),
 });
 
-/** The two points of a printed prompt "(x1, y1) \text{ and } (x2, y2)". */
-function points(prompt: string): number[] {
-  return [...prompt.matchAll(/-?\d+/g)].map((m) => Number(m[0]));
-}
-
-const valueOf = (answer: string) => evalLatex(answer);
-
 describe("distance-formula: answers", () => {
   it("the Answer is the distance between the printed points", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        const [x1, y1, x2, y2] = points(p.prompt);
-        const d = Math.hypot(x2 - x1, y2 - y1);
-        if (params.answerForm === "rounded") {
-          expect(Math.abs(valueOf(p.answer) - d)).toBeLessThanOrEqual(0.05 + 1e-9);
-          expect(p.answer).toMatch(/^\d+(\.\d)?$/);
-        } else {
-          expect(valueOf(p.answer)).toBeCloseTo(d, 9);
-          expectSimplest(p.answer);
-        }
+        distanceFormula(p);
       }),
     );
   });

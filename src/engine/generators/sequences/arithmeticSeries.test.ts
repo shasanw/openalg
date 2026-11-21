@@ -1,10 +1,10 @@
+import { arithmeticSeries, readSeries } from "./arithmeticSeries.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator, MAX_PRINTED } from "./arithmeticSeries";
 import { rat } from "./sequenceKit";
-import { evalLatex } from "../shared/latexEval.testkit";
-import { expectKatex, expectTidy, parseSeries, parseSigma, printedNumbers, splitAsk } from "./sequences.testkit";
+import { expectKatex, expectTidy, printedNumbers } from "./sequences.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyParams = fc.record({
@@ -13,40 +13,12 @@ const anyParams = fc.record({
   allowNegatives: fc.boolean(),
 });
 
-type Read = { kind: "firstN" | "lastTerm" | "sigma"; terms: number[] };
-
-/** Every term of the printed series, read from the prompt alone. */
-function readSeries(prompt: string): Read {
-  const sigma = parseSigma(prompt);
-  if (sigma) {
-    const terms: number[] = [];
-    for (let k = sigma.from; k <= sigma.to; k++) terms.push(evalLatex(sigma.body, { k }));
-    return { kind: "sigma", terms };
-  }
-  const asksN = prompt.includes(";\\quad ");
-  const [series, ask] = asksN ? splitAsk(prompt) : [prompt, ""];
-  const { opening, last } = parseSeries(series);
-  const d = opening[1] - opening[0];
-  expect(opening[2] - opening[1]).toBe(d);
-  let n: number;
-  if (asksN) {
-    expect(last).toBeNull();
-    n = Number(ask.match(/^\\text\{find \} S_\{(\d+)\}$/)![1]);
-  } else {
-    n = (last! - opening[0]) / d + 1;
-    expect(Number.isInteger(n)).toBe(true);
-  }
-  return { kind: asksN ? "firstN" : "lastTerm", terms: Array.from({ length: n }, (_, i) => opening[0] + i * d) };
-}
-
-const total = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-
 describe("arithmetic-series: answers", () => {
   it("the Answer is the sum of the printed series, term by term", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(evalLatex(p.answer)).toBe(total(readSeries(p.prompt).terms));
+        arithmeticSeries(p);
       }),
     );
   });
