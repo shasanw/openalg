@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { matrixOperations } from "./matrixOperations.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -69,13 +70,14 @@ describe("matrix-operations: Topic Options", () => {
 });
 
 describe("matrix-operations: distractors", () => {
-  it("are distinct matrices, never the Answer, and at least one", () => {
+  it("are distinct matrices, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(1);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        expect(p.distractorHints).not.toContain(p.answer);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        expect(new Set(choices.map((s) => s.startsWith("\\text") ? s : JSON.stringify(readMatrix(s)))).size).toBe(choices.length);
         for (const d of p.distractorHints) readMatrix(d);
       }),
     );
@@ -92,6 +94,10 @@ describe("matrix-operations: distractors", () => {
     ]);
     // AB = [2 1; 4 3]; BA = [3 4; 1 2]
     const product = distractors({ operation: "multiply", a, b, s1: 1, s2: 1 });
+    expect(product).toContain("\\begin{bmatrix} 1 & 3 \\\\ 4 & 4 \\end{bmatrix}"); // A + B
+    // [-2 -2][2; 2] = [-8]: the products listed without adding them up
+    const rowCol = distractors({ operation: "multiply", a: fromInts([[-2, -2]]), b: fromInts([[2], [2]]), s1: 1, s2: 1 });
+    expect(rowCol).toContain("\\begin{bmatrix} -4 & -4 \\end{bmatrix}");
     expect(product[0]).toBe("\\begin{bmatrix} 3 & 4 \\\\ 1 & 2 \\end{bmatrix}");
     // 2A - 3B = [2 1; 3 8]; 2A - B = [2 3; 5 8]
     const combo = distractors({ operation: "combination", a, b, s1: 2, s2: -3 });

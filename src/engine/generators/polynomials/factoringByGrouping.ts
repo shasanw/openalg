@@ -154,6 +154,8 @@ export function distractors(k: GroupingConstruction): string[] {
   if (k.form === "cubic") c.push(factoredOf(k, [p, q, r, s], k.g, true));
   if (k.g > 1) c.push(factoredOf(k, [p, q, r, s], 1));
   c.push(factoredOf(k, [r, q, p, s]));
+  // Extract the shared binomial and lose the other factor.
+  c.push({ g: mono(k.g), factors: [factoredOf(k).factors[1]] });
   return factoredHints(answerLatex(k), expandFactored(factoredOf(k)), c, k.vars);
 }
 

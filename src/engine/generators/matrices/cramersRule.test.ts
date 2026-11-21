@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { cramersRule, readTuple } from "./cramersRule.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -54,28 +55,30 @@ describe("cramers-rule: Topic Options", () => {
 });
 
 describe("cramers-rule: distractors", () => {
-  it("are distinct points, never the Answer, and at least three", () => {
+  it("are distinct points, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        expect(p.distractorHints).not.toContain(p.answer);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        expect(new Set(choices.map((s) => JSON.stringify(readTuple(s)))).size).toBe(choices.length);
         for (const d of p.distractorHints) expect(readTuple(d)).toHaveLength(readTuple(p.answer).length);
       }),
     );
   });
 
-  it("keep three when the Answer has a zero coordinate and D = ±1", () => {
+  it("keep distinct sign and determinant slips when the Answer has a zero coordinate and D = ±1", () => {
     // x - y = -5, -7x + 6y = 30: (0, 5); D = -1, D_x = 0
     const k = { a: [[1, -1], [-7, 6]], b: [-5, 30], solution: [rat(0), rat(5)] };
     // D found as ad + bc = 6 + 7 = 13, then the swapped, negated point
-    expect(distractors(k)).toEqual(["(5, 0)", "(0, -5)", "\\left(0, -\\frac{5}{13}\\right)", "(-5, 0)"]);
+    expect(distractors(k)).toEqual(["(5, 0)", "(0, -5)", "\\left(0, -\\frac{5}{13}\\right)", "(-5, 0)", "\\left(-\\frac{60}{13}, 5\\right)"]);
   });
 
   it("model swapped coordinates, an upside-down quotient and undivided determinants", () => {
     // 2x + y = 5, x - y = 1: (2, 1); D = -3, D_x = -6, D_y = -3
     const k = { a: [[2, 1], [1, -1]], b: [5, 1], solution: [rat(2), rat(1)] };
+    expect(distractors(k)).toContain("(2, -1)"); // sign slip in y
     expect(distractors(k).slice(0, 3)).toEqual(["(1, 2)", "\\left(\\frac{1}{2}, 1\\right)", "(-6, -3)"]);
   });
 });

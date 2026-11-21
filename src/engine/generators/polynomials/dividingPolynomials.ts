@@ -255,7 +255,16 @@ export function distractors(k: DividingConstruction): string[] {
     out.push(plain(flipLast));
     out.push(plain(raise));
     out.push(plain(q.map((t, i) => (i === 0 ? t : mono(-t.c, ...t.e)))));
+    // only the last term divided (the others left as they were, when that does not run like terms together)
+    const lastOnly = [...dividend.slice(0, -1), q[q.length - 1]];
+    if (norm(lastOnly).length === lastOnly.length) out.push(plain(lastOnly));
+    // divided by the variable part only (the number in the divisor ignored)
+    out.push(plain(dividend.map((t) => mono(t.c, t.e[0] - m.e[0]))));
+    // every exponent lowered by exactly 1, whatever the divisor's power is
+    out.push(plain(dividend.map((t) => mono(t.c / m.c, Math.max(t.e[0] - 1, 0)))));
   }
+  // Stop after dividing the leading term.
+  out.push(plain(q.slice(0, 1)));
   return distinctHints(answer, out);
 }
 

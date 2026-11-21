@@ -70,7 +70,7 @@ describe("factoring-gcf: distractors", () => {
     fc.assert(
       fc.property(anySeed, params, (seed, ps) => {
         const p = generator.generate(ps, seed);
-        expectGoodHints(p, 3);
+        expectGoodHints(p, 4);
         expectHintsWrongInValue(p);
       }),
     );
@@ -80,6 +80,7 @@ describe("factoring-gcf: distractors", () => {
     const gcf = mono(3, 1);
     const inner = [mono(2, 2), mono(1)];
     const out = distractors({ vars: ["x", "y"], gcf, inner, expanded: mul([gcf], inner) });
+    expect(out).toContain("3x(2x^{2} + 3x)"); // last term left undivided
     expect(out[0]).toBe("3x(2x^{3} + x)");
     expect(out).toContain("3x(2x^{2})");
     expect(out).toContain("3(2x^{2} + 1)");

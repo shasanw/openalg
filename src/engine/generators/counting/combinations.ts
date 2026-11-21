@@ -99,6 +99,8 @@ export function distractors(k: CombinationsConstruction): string[] {
   if (k.form === "notation") {
     const { n, r } = k;
     values = [perm(n, r), factorial(n) / factorial(r), perm(n, r) / r, comb(n, r - 1), comb(n - 1, r), comb(n, r + 1), n * r];
+    // Pascal's rule with only one term ((n - 1)C(r - 1)), and (n - r) left unfactorialled in the denominator
+    values.push(comb(n - 1, r - 1), n - r > 0 ? factorial(n) / (factorial(r) * (n - r)) : 0);
   } else values = scenarioSlips(k.scenario);
   return distinctHints(
     answerLatex(k),

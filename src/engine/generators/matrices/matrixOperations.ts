@@ -13,6 +13,7 @@ import {
   cols,
   hadamard,
   madd,
+  mapEntries,
   matrixLatex,
   mmul,
   msub,
@@ -175,6 +176,11 @@ export function distractors(k: MatrixOpConstruction): string[] {
       mscale(rat(-k.s1), a),
       a.map((r, i) => (i === 0 ? r.map((x) => rat(x.n * k.s1)) : r)),
       mapAdd(a, -k.s1),
+      // only the first entry multiplied, the scalar divided into each entry, and the sign
+      // rule broken (every product given a minus sign)
+      mapEntries(a, (x, i, j) => (i === 0 && j === 0 ? rat(x.n * k.s1) : x)),
+      mapEntries(a, (x) => rat(x.n, x.d * k.s1)),
+      mapEntries(a, (x) => rat(-Math.abs(x.n * k.s1), x.d)),
     );
   } else if (k.operation === "multiply") {
     const ab = mmul(a, b!);
@@ -185,10 +191,35 @@ export function distractors(k: MatrixOpConstruction): string[] {
       mmul(a, transpose(b!)),
       mmul(transpose(a), b!),
       mmul(transpose(b!), transpose(a)),
+      // Transpose a factor or reverse the order to make the dimensions fit.
+      mmul(transpose(a), transpose(b!)),
+      mmul(transpose(b!), a),
+      mmul(b!, transpose(a)),
+      // Confuse matrix multiplication with addition, subtraction or entrywise multiplication.
+      sharedEntries(a, b!, (x, y) => x + y),
+      sharedEntries(a, b!, (x, y) => x - y),
+      sharedEntries(a, b!, (x, y) => x * y),
     );
+    // Pair up the available row and column entries, even for incompatible shapes.
+    const paired = Math.min(cols(a), rows(b!));
+    const dotSlip = (compute: (x: number, y: number, index: number) => number) =>
+      a.map((row) => b![0].map((_, j) => rat(row.slice(0, paired).reduce(
+        (sum, x, i) => sum + compute(x.n, b![i][j].n, i), 0,
+      ))));
+    out.push(
+      dotSlip((x, y, i) => i === 0 ? x * y : 0), // stop at the first product
+      dotSlip((x, y, i) => i === paired - 1 ? x * y : 0), // overwrite the running total
+      dotSlip((x, y, i) => (i % 2 === 0 ? 1 : -1) * x * y), // alternate signs as in a determinant
+      dotSlip((x, y) => x + y), // add entries in place of multiplying
+      dotSlip((x, y) => x * y), // ignore any unpaired entries
+    );
+    // a row times a column: the products written out as a row without adding them up
+    if (rows(a) === 1 && cols(b!) === 1 && paired > 1) out.push([a[0].slice(0, paired).map((x, i) => rat(x.n * b![i][0].n))]);
   } else if (!sameShape(a, b!)) {
     out.push(combine(k, k.s1, k.s2, transpose(b!)), transpose(combine(k, k.s1, k.s2, transpose(b!))!));
     out.push(hadamard(transpose(a), b!));
+    // Add only the rows and columns that line up.
+    out.push(sharedEntries(a, b!, (x, y) => k.s1 * x + k.s2 * y));
   } else if (k.operation === "addSubtract") {
     out.push(
       combine(k, k.s1, -k.s2),
@@ -196,6 +227,12 @@ export function distractors(k: MatrixOpConstruction): string[] {
       // a negative entry of B taken as positive: A - (-3) read as A - 3 (or A + (-3) as A + 3)
       madd(a, mscale(rat(k.s2), b!.map((r) => r.map((x) => rat(Math.abs(x.n), x.d))))),
       madd(b!, mscale(rat(k.s2), a)),
+      // the entries multiplied instead of added, the minus sign left on only the first entry of B,
+      // and the result written with its rows and columns swapped
+      hadamard(a, b!),
+      k.s2 < 0 ? madd(a, mapEntries(b!, (x, i, j) => (i === 0 && j === 0 ? rat(-x.n, x.d) : x))) : null,
+      transpose(resultOf(k)!),
+      flipFirstNonzero(resultOf(k)!),
     );
   } else {
     out.push(
@@ -203,12 +240,42 @@ export function distractors(k: MatrixOpConstruction): string[] {
       combine(k, 1, k.s2),
       combine(k, k.s1, -k.s2),
       madd(mscale(rat(k.s1), a), mscale(rat(k.s2), b!.map((r) => r.map((x) => rat(Math.abs(x.n), x.d))))),
+      // the two scalars swapped, the entries multiplied (A times B, times both scalars), the
+      // minus sign left on only the first entry of B, and the result written with rows and columns swapped
+      combine(k, k.s2, k.s1),
+      mscale(rat(k.s1 * k.s2), hadamard(a, b!)),
+      k.s2 < 0
+        ? madd(mscale(rat(k.s1), a), mscale(rat(-k.s2), b!).map((r, i) => r.map((x, j) => (i === 0 && j === 0 ? rat(-x.n, x.d) : x))))
+        : null,
+      transpose(resultOf(k)!),
+      flipFirstNonzero(resultOf(k)!),
     );
+  }
+  if (k.b && k.operation !== "multiply") {
+    // Drop an entire operand; apply only the scalar to the other matrix.
+    out.push(mscale(rat(k.s1), a), mscale(rat(k.s2), k.b));
   }
   return distinctHints(
     answerLatex(k),
     out.map((m) => (m ? matrixLatex(m) : null)),
   );
+}
+
+/** Combine corresponding entries and discard any rows or columns without a partner. */
+function sharedEntries(a: Matrix, b: Matrix, combine: (x: number, y: number) => number): Matrix {
+  return a.slice(0, rows(b)).map((row, i) =>
+    row.slice(0, cols(b)).map((x, j) => rat(combine(x.n, b[i][j].n))),
+  );
+}
+
+/** The same matrix with its first nonzero entry's sign flipped (a sign slip in one entry). */
+function flipFirstNonzero(m: Matrix): Matrix {
+  let done = false;
+  return mapEntries(m, (x) => {
+    if (done || x.n === 0) return x;
+    done = true;
+    return rat(-x.n, x.d);
+  });
 }
 
 const mapAdd = (m: Matrix, s: number): Matrix => m.map((r) => r.map((x) => rat(x.n + s * x.d, x.d)));

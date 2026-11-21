@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -91,13 +92,14 @@ describe("permutations: Topic Options", () => {
 });
 
 describe("permutations: distractors", () => {
-  it("are distinct whole numbers, never the Answer, and at least two", () => {
+  it("are distinct whole numbers, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        expect(p.distractorHints).not.toContain(p.answer);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        expect(new Set(choices.map(readCount)).size).toBe(choices.length);
         for (const d of p.distractorHints) expect(readCount(d)).toBeGreaterThan(0);
       }),
     );
@@ -108,6 +110,7 @@ describe("permutations: distractors", () => {
     expect(distractors({ form: "notation", n: 8, r: 3 }).slice(0, 2)).toEqual(["56", "512"]);
     // BANANA: 60; 6! = 720 ignores the repeats, 6!/3! = 120 divides by one of them
     expect(distractors({ form: "letters", symbols: [..."BANANA"], word: true }).slice(0, 2)).toEqual(["720", "120"]);
+    expect(distractors({ form: "notation", n: 8, r: 3 })).toContain("24"); // 8 × 3
     expect(perm(8, 3)).toBe(336);
   });
 });

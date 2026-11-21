@@ -70,10 +70,12 @@ export function expectGoodHints(p: Problem, atLeast = 3): void {
 
 /** A Distractor that is an expression must differ in value from the Answer: a wrong choice must be wrong. */
 export function expectHintsWrongInValue(p: Problem): void {
-  if (p.answer.startsWith("\\text")) return;
-  for (const h of p.distractorHints) {
-    if (h.startsWith("\\text")) continue;
-    expect(sameValue(h, p.answer), `${h} vs ${p.answer}`).toBe(false);
+  const choices = [p.answer, ...p.distractorHints].filter((tex) => !tex.startsWith("\\text"));
+  const samples = choices.map(values);
+  for (let i = 0; i < samples.length; i++) {
+    for (let j = 0; j < i; j++) {
+      expect(samples[i].every((v, k) => close(v, samples[j][k], 1e-9)), choices[i] + " vs " + choices[j]).toBe(false);
+    }
   }
 }
 
