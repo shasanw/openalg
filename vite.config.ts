@@ -42,6 +42,9 @@ export default defineConfig(async () => ({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Property tests take 1 to 3 s alone, and the Typst smoke shards run
+    // beside them: the default 5 s timed them out under load.
+    testTimeout: 20_000,
     // Agent worktrees hold whole copies of the repo (with their own React).
     exclude: ["**/node_modules/**", "**/dist/**", ".claude/**"],
   },
