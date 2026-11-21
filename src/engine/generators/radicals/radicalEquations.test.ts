@@ -81,6 +81,21 @@ describe("radical-equations: Topic Options", () => {
 });
 
 describe("radical-equations: distractors", () => {
+  it("still offer three when the radical equals -1 or the cube-root slips coincide", () => {
+    // sqrt(-2x + 5) = -1: forgetting to square gives x = 3, which is also x + 1;
+    // and two cube-root equations whose sign slips land on the same value.
+    for (const [params, seed] of [
+      [{}, 10348],
+      [{ cubeRoots: true }, 13111],
+      [{ cubeRoots: true }, 18339],
+    ] as const) {
+      const p = generator.generate(params, seed);
+      expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(3);
+      expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+      expect(p.distractorHints).not.toContain(p.answer);
+    }
+  });
+
   it("are distinct, never the Answer, and at least three", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
