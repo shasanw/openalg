@@ -1,10 +1,11 @@
+import { arithmeticSequences, readGiven, ruleValue } from "./arithmeticSequences.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator, MAX_PRINTED } from "./arithmeticSequences";
 import { rat } from "./sequenceKit";
-import { close, evalLatex } from "../shared/latexEval.testkit";
-import { askedIndex, expectKatex, expectTidy, parseList, printedNumbers, splitAsk } from "./sequences.testkit";
+import { close } from "../shared/latexEval.testkit";
+import { askedIndex, expectKatex, expectTidy, printedNumbers, splitAsk } from "./sequences.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyParams = fc.record({
@@ -14,38 +15,12 @@ const anyParams = fc.record({
   allowNegatives: fc.boolean(),
 });
 
-/** a_1 and d, read back from the printed givens alone. */
-function readGiven(given: string): { a1: number; d: number; twoTerms: boolean } {
-  const two = given.match(/^a_\{(\d+)\} = (.+),\\ a_\{(\d+)\} = (.+)$/);
-  if (two) {
-    const [p, x, q, y] = [Number(two[1]), evalLatex(two[2]), Number(two[3]), evalLatex(two[4])];
-    expect(q - p).toBeGreaterThanOrEqual(2); // not consecutive
-    const d = (y - x) / (q - p);
-    return { a1: x - (p - 1) * d, d, twoTerms: true };
-  }
-  const terms = parseList(given.replace(/, \\ldots$/, ""));
-  expect(terms).toHaveLength(4);
-  const d = terms[1] - terms[0];
-  for (let i = 2; i < 4; i++) expect(close(terms[i] - terms[i - 1], d)).toBe(true);
-  return { a1: terms[0], d, twoTerms: false };
-}
-
-const ruleValue = (answer: string, n: number) => evalLatex(answer.replace(/^a_n = /, ""), { n });
-
 describe("arithmetic-sequences: answers", () => {
   it("the Answer fits the printed givens", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        const [given, ask] = splitAsk(p.prompt);
-        const { a1, d } = readGiven(given);
-        const k = askedIndex(ask);
-        if (k !== null) expect(close(evalLatex(p.answer), a1 + (k - 1) * d)).toBe(true);
-        else {
-          expect(ask).toBe("\\text{find a rule for } a_n");
-          expect(p.answer).toMatch(/^a_n = /);
-          for (const n of [1, 2, 7]) expect(close(ruleValue(p.answer, n), a1 + (n - 1) * d)).toBe(true);
-        }
+        arithmeticSequences(p);
       }),
     );
   });

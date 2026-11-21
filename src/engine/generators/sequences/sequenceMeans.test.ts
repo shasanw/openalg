@@ -1,10 +1,10 @@
+import { sequenceMeans } from "./sequenceMeans.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator, MAX_PRINTED } from "./sequenceMeans";
-import { BLANK, rat } from "./sequenceKit";
-import { close, evalLatex } from "../shared/latexEval.testkit";
-import { expectKatex, expectTidy, parseList, printedNumbers, splitAsk } from "./sequences.testkit";
+import { rat } from "./sequenceKit";
+import { expectKatex, expectTidy, printedNumbers } from "./sequences.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyParams = fc.record({
@@ -14,41 +14,12 @@ const anyParams = fc.record({
   allowNegatives: fc.boolean(),
 });
 
-/** The printed ends, the number of blanks and the label. */
-function readPrompt(prompt: string) {
-  const [run, label] = splitAsk(prompt);
-  const parts = run.split(", ");
-  const blanks = parts.slice(1, -1);
-  for (const b of blanks) expect(b).toBe(BLANK);
-  return { first: evalLatex(parts[0]), last: evalLatex(parts[parts.length - 1]), m: blanks.length, label };
-}
-
-/** Whether the full run has a common difference (or ratio). */
-function isArithmetic(xs: number[]): boolean {
-  return xs.every((x, i) => i < 2 || close(x - xs[i - 1], xs[1] - xs[0]));
-}
-function isGeometric(xs: number[]): boolean {
-  return xs[0] !== 0 && xs.every((x, i) => i < 2 || close(x / xs[i - 1], xs[1] / xs[0]));
-}
-
 describe("arithmetic-geometric-means: answers", () => {
   it("the means complete the printed run as labelled", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        const { first, last, m, label } = readPrompt(p.prompt);
-        const means = parseList(p.answer);
-        expect(means).toHaveLength(m);
-        const full = [first, ...means, last];
-        if (label === "\\text{arithmetic}") expect(isArithmetic(full)).toBe(true);
-        else {
-          expect(isGeometric(full)).toBe(true);
-          // an even gap fits r and -r: the prompt pins r > 0
-          if ((m + 1) % 2 === 0) {
-            expect(label).toBe("\\text{geometric}, r > 0");
-            expect(full[1] / full[0]).toBeGreaterThan(0);
-          } else expect(label).toBe("\\text{geometric}");
-        }
+        sequenceMeans(p);
       }),
     );
   });

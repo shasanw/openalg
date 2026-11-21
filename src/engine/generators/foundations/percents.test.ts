@@ -1,3 +1,5 @@
+import { percentOfChange } from "./percentOfChange.answer.testkit";
+import { percents, num, printed } from "./percents.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -8,14 +10,6 @@ import { close } from "../shared/latexEval.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 
-/** "12.5\%" -> 12.5, "48" -> 48 */
-const num = (s: string) => Number(s.replace("\\%", ""));
-
-/** The numbers printed in a prompt, in order: [value, isPercent]. */
-function printed(prompt: string): { value: number; percent: boolean }[] {
-  return [...prompt.matchAll(/(\d+(?:\.\d+)?)(\\%)?/g)].map((m) => ({ value: Number(m[1]), percent: !!m[2] }));
-}
-
 // ------------------------------------------------------------------ percents
 
 const percentParams = fc.record({
@@ -25,27 +19,12 @@ const percentParams = fc.record({
   maxWhole: fc.integer({ min: 20, max: 1000 }),
 });
 
-/** Answer the printed question from its wording and numbers alone. */
-function answerPercentQuestion(prompt: string): number {
-  const nums = printed(prompt);
-  if (/what percent/i.test(prompt)) {
-    // "P is what percent of W" / "What percent of W is P"
-    const [a, b] = nums.map((n) => n.value);
-    const [part, whole] = prompt.startsWith("\\text{What percent") ? [b, a] : [a, b];
-    return (part / whole) * 100;
-  }
-  const pc = nums.find((n) => n.percent)!.value;
-  const other = nums.find((n) => !n.percent)!.value;
-  if (prompt.includes("of what number")) return other / (pc / 100);
-  return (pc / 100) * other;
-}
-
 describe("percents: answers", () => {
   it("the Answer answers the printed question, for any seed and options", () => {
     fc.assert(
       fc.property(anySeed, percentParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(close(num(p.answer), answerPercentQuestion(p.prompt)), `${p.prompt} => ${p.answer}`).toBe(true);
+        percents(p);
       }),
     );
   });
@@ -126,19 +105,7 @@ describe("percent-of-change: answers", () => {
     fc.assert(
       fc.property(anySeed, changeParams, (seed, params) => {
         const p = Change.generator.generate(params, seed);
-        const nums = printed(p.prompt);
-        if (p.prompt.includes("\\text{ to }")) {
-          const [from, to] = nums.map((n) => n.value);
-          const m = p.answer.match(/^([\d.]+)\\% \\text\{ (increase|decrease)\}$/)!;
-          expect(m, p.answer).not.toBeNull();
-          expect(close(Number(m[1]), (Math.abs(to - from) / from) * 100), `${p.prompt} => ${p.answer}`).toBe(true);
-          expect(m[2]).toBe(to > from ? "increase" : "decrease");
-        } else {
-          const from = nums[0].value;
-          const pc = nums[1].value;
-          const up = p.prompt.includes("increased");
-          expect(close(num(p.answer), from * (1 + ((up ? 1 : -1) * pc) / 100)), `${p.prompt} => ${p.answer}`).toBe(true);
-        }
+        percentOfChange(p);
       }),
     );
   });

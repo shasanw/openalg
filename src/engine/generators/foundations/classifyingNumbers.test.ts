@@ -1,7 +1,8 @@
+import { classifyingNumbers } from "./classifyingNumbers.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
-import { construct, generator, type NumberSet } from "./classifyingNumbers";
+import { construct, generator } from "./classifyingNumbers";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyParams = fc.record({
@@ -10,52 +11,12 @@ const anyParams = fc.record({
   disguised: fc.boolean(),
 });
 
-/**
- * Classify a printed number from its LaTeX alone, independently of the
- * generator: \pi, a never-repeating pattern (\ldots) or the root of a
- * non-square is irrational; otherwise the exact value decides.
- */
-function classify(latex: string): { irrational: true } | { irrational: false; value: number } {
-  if (latex.includes("\\pi") || latex.includes("\\ldots")) return { irrational: true };
-  const root = latex.match(/\\sqrt\{(\d+)\}/);
-  if (root && !Number.isInteger(Math.sqrt(Number(root[1])))) return { irrational: true };
-  const sign = latex.startsWith("-") ? -1 : 1;
-  const body = latex.replace(/^-/, "");
-  let value: number;
-  let m: RegExpMatchArray | null;
-  if ((m = body.match(/^\\sqrt\{\\frac\{(\d+)\}\{(\d+)\}\}$/))) value = Math.sqrt(Number(m[1])) / Math.sqrt(Number(m[2]));
-  else if ((m = body.match(/^\\sqrt\{(\d+)\}$/))) value = Math.sqrt(Number(m[1]));
-  else if ((m = body.match(/^(\d+)\.\\overline\{(\d+)\}$/))) value = Number(m[1]) + Number(m[2]) / (10 ** m[2].length - 1);
-  else if ((m = body.match(/^(\d+)\\frac\{(\d+)\}\{(\d+)\}$/))) value = Number(m[1]) + Number(m[2]) / Number(m[3]);
-  else if ((m = body.match(/^\\frac\{(\d+)\}\{(\d+)\}$/))) value = Number(m[1]) / Number(m[2]);
-  else if (/^\d+(\.\d+)?$/.test(body)) value = Number(body);
-  else throw new Error(`cannot read ${latex}`);
-  return { irrational: false, value: sign * value };
-}
-
-function expectedSets(latex: string, includeNatural: boolean): NumberSet[] {
-  const c = classify(latex);
-  let sets: NumberSet[];
-  if (c.irrational) sets = ["irrational"];
-  else {
-    const isInt = Math.abs(c.value - Math.round(c.value)) < 1e-9;
-    const v = Math.round(c.value);
-    if (!isInt) sets = ["rational"];
-    else if (v > 0) sets = ["natural", "whole", "integer", "rational"];
-    else if (v === 0) sets = ["whole", "integer", "rational"];
-    else sets = ["integer", "rational"];
-  }
-  return includeNatural ? sets : sets.filter((s) => s !== "natural");
-}
-
-const setsOf = (answer: string) => answer.replace(/^\\text\{|\}$/g, "").split(", ");
-
 describe("classifying-numbers: answers", () => {
   it("names exactly the sets the printed number belongs to", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(setsOf(p.answer), p.prompt).toEqual(expectedSets(p.prompt, params.includeNatural));
+        classifyingNumbers(p);
       }),
       { numRuns: 300 },
     );

@@ -1,9 +1,10 @@
+import { matrixInverses } from "./matrixInverses.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator, MAX_ENTRY, NO_INVERSE } from "./matrixInverses";
 import { fromInts } from "./matrixKit";
-import { expectClose, expectKatex, expectTidy, leibnizDet, matMul, readMatrix } from "../shared/matrices.testkit";
+import { expectKatex, expectTidy, readMatrix } from "../shared/matrices.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyParams = fc.record({
@@ -12,21 +13,12 @@ const anyParams = fc.record({
   includeSingular: fc.boolean(),
 });
 
-const identity = (n: number) => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
-
 describe("matrix-inverses: answers", () => {
   it("the printed matrix times the Answer is the identity, both ways; no inverse exactly when the determinant is 0", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        const a = readMatrix(p.prompt);
-        if (p.answer === NO_INVERSE) {
-          expect(leibnizDet(a)).toBe(0);
-          return;
-        }
-        const inv = readMatrix(p.answer);
-        expectClose(matMul(a, inv), identity(a.length), p.prompt);
-        expectClose(matMul(inv, a), identity(a.length), p.prompt);
+        matrixInverses(p);
       }),
     );
   });
