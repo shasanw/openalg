@@ -1,3 +1,4 @@
+import { expectDistinctDistractors } from "../sequences/distinctDistractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import katex from "katex";
@@ -103,12 +104,12 @@ describe("exponential-equations-logs: Topic Options", () => {
 });
 
 describe("exponential-equations-logs: distractors", () => {
-  it("are distinct, never the Answer's value, in the Answer's form, and at least two", () => {
+  it("are distinct, never the Answer's value, in the Answer's form, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, (a, b) => params.answerForm === "decimal"
+          ? rounded(a) === rounded(b) : close(exactValue(a), exactValue(b)));
         const x = exactValue(generator.generate({ ...params, answerForm: "exact" }, seed).answer);
         for (const d of p.distractorHints) {
           if (params.answerForm === "decimal") {
@@ -123,6 +124,7 @@ describe("exponential-equations-logs: distractors", () => {
   it("model dividing by the base and the quotient of logarithms", () => {
     // 3^{x} = 7
     const k = { base: numberBase(rat(3)), a: 1, c: 0, n: 7, k: 1, d: 0, rhs: 7 };
+    expect(distractors(k, "exact", 2)).toContain("x = \\ln 7"); // omit the base-change denominator
     expect(distractors(k, "exact", 2).slice(0, 2)).toEqual(["x = \\frac{7}{3}", "x = \\ln 7 - \\ln 3"]);
   });
 });

@@ -1,3 +1,4 @@
+import { expectDistinctDistractors } from "../sequences/distinctDistractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import katex from "katex";
@@ -76,12 +77,11 @@ describe("evaluating-logarithms: Topic Options", () => {
 });
 
 describe("evaluating-logarithms: distractors", () => {
-  it("are distinct, never the Answer's value, and at least three", () => {
+  it("are distinct, never the Answer's value, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, (a, b) => close(value(a), value(b)));
         for (const d of p.distractorHints) expect(close(value(d), value(p.answer))).toBe(false);
       }),
     );
@@ -93,6 +93,7 @@ describe("evaluating-logarithms: distractors", () => {
     expect(distractors(k).slice(0, 3)).toEqual(["3", "-\\frac{1}{3}", "\\frac{1}{4}"]);
     // log_2 8 = 3: divided 8 by 2
     const d = { base: numberBase(rat(2)), arg: "8", q: rat(3), argInt: 8, m: 1, n: rat(3) };
+    expect(distractors(d)).toContain("2"); // report the base instead of the exponent
     expect(distractors(d)).toContain("4");
   });
 });

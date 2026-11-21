@@ -1,3 +1,4 @@
+import { expectDistinctDistractors } from "../sequences/distinctDistractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import katex from "katex";
@@ -107,14 +108,25 @@ describe("log-exponential-form: Topic Options", () => {
 });
 
 describe("log-exponential-form: distractors", () => {
-  it("are distinct, in the Answer's form, false, and at least three", () => {
+  it("are distinct, in the Answer's form, false, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
         const k = construct(params, createRng(seed));
         const env = envOf(k);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, (a, b) => {
+          const [al, ar] = splitEquation(a), [bl, br] = splitEquation(b);
+          if (!close(evalLatex(ar, env), evalLatex(br, env))) return false;
+          if (k.toLog) return close(evalLatex(al, env), evalLatex(bl, env));
+          // Even 1000^10 and 10^1000 can be compared without overflow.
+          const power = (tex: string) => {
+            const [, base, exponent] = tex.match(/^(.+)\^\{(.+)\}$/)!;
+            const b = evalLatex(base, env), e = evalLatex(exponent, env);
+            return [b < 0 && e % 2 !== 0, e * Math.log(Math.abs(b))] as const;
+          };
+          const [signA, magnitudeA] = power(al), [signB, magnitudeB] = power(bl);
+          return signA === signB && close(magnitudeA, magnitudeB);
+        });
         for (const d of p.distractorHints) {
           expect(d).not.toBe(p.answer);
           expect(isLog(d)).toBe(k.toLog);
@@ -127,6 +139,7 @@ describe("log-exponential-form: distractors", () => {
   it("put the numbers in the wrong places", () => {
     const k = construct({ direction: "toLog", commonNatural: false, negativesAndFractions: false }, createRng(1));
     const { base: b, exponent: y, value: v } = k;
+    expect(distractors(k)).toContain(`\\log_{${b.tex}} ${v.tex} = -${y.tex}`); // flip the exponent sign
     expect(distractors(k)[0]).toBe(`\\log_{${b.tex}} ${y.tex} = ${v.tex}`);
   });
 });

@@ -13,11 +13,13 @@ import { resolveParams, type Generator, type ParamSchema, type ParamValues, type
 import { nonzeroInt } from "../shared/equationKit";
 import {
   BLANK,
+  add,
   arithmeticTerm,
   distinctHints,
   div,
   geometricTerm,
   listLatex,
+  mul,
   neg,
   numLatex,
   rat,
@@ -171,6 +173,30 @@ export function distractors(k: MeansConstruction): string[] {
   }
   // the ends listed too, and the means listed from the far end
   candidates.push(listLatex(terms), listLatex(terms.slice(1, -1).reverse()));
+  const inner = terms.slice(1, -1);
+  if (k.type === "geometric") {
+    const whole = div(last, first)!;
+    candidates.push(means(whole)); // the ratio of the ends used as r, not rooted
+    candidates.push(means(div(whole, rat(k.m)))); // the ratio of the ends divided by the number of means
+    candidates.push(means(arithmeticStep(k.m), "arithmetic")); // arithmetic means, gap divided by the number of means
+    candidates.push(means(arithmeticStep(k.m + 2), "arithmetic")); // arithmetic means, gap divided by the number of terms
+    // each mean found by adding the ratio instead of multiplying
+    candidates.push(listLatex(inner.map((_, i) => add(first, mul(rat(i + 1), k.step)))));
+    if (k.m === 1) {
+      candidates.push(numLatex(add(first, last))); // the ends added
+      candidates.push(numLatex(sub(last, first))); // the ends subtracted
+      candidates.push(numLatex(mul(rat(2), first))); // the first end doubled
+    }
+  } else {
+    // the difference added to the last end, working backwards, instead of subtracted
+    candidates.push(listLatex(inner.map((_, i) => add(last, mul(rat(i + 1), k.step)))));
+    // counted from the second term: first + (i + 1)d with the index one too many
+    candidates.push(listLatex(inner.map((_, i) => add(first, mul(rat(i + 2), k.step)))));
+    // geometric means found instead of arithmetic ones
+    candidates.push(means(exactRoot(div(last, first)!, k.m + 1), "geometric"));
+  }
+  // one end listed along with the means (the blanks counted from the wrong end)
+  candidates.push(listLatex(terms.slice(0, -1)), listLatex(terms.slice(1)));
   const wholeAnswer = !answerLatex(k).includes("\\frac");
   return distinctHints(
     answerLatex(k),

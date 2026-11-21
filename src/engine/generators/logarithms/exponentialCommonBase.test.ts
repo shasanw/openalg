@@ -1,3 +1,4 @@
+import { expectDistinctDistractors } from "../sequences/distinctDistractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import katex from "katex";
@@ -91,12 +92,11 @@ describe("exponential-common-base: Topic Options", () => {
 });
 
 describe("exponential-common-base: distractors", () => {
-  it("are distinct, never the Answer's value, and at least two", () => {
+  it("are distinct, never the Answer's value, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, (a, b) => close(answerValues(a).values[0], answerValues(b).values[0]));
         const answer = answerValues(p.answer).values[0];
         for (const d of p.distractorHints) expect(close(answerValues(d).values[0], answer)).toBe(false);
       }),
@@ -113,6 +113,7 @@ describe("exponential-common-base: distractors", () => {
       k: 0,
       x: rat(8),
     };
+    expect(distractors(k)).toContain("x = 30"); // report the common exponent 2(2·8 - 1)
     expect(distractors(k)[0]).toBe("x = 3"); // 2x - 1 = x + 2
     // 8^{x} = 32: 3x = 5; forgot to rewrite: x = 5
     const one = { form: "oneSide" as const, c: 2, left: { p: 3, a: 1, b: 0 }, right: null, k: 5, x: rat(5, 3) };

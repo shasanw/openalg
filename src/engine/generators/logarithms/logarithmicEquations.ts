@@ -84,11 +84,15 @@ const lin = (a: number, c: number) => linearLatex([{ coef: rat(a), v: "x" }, { c
 /** A logarithm's argument: a lone x stays bare, anything else is bracketed. */
 const arg = (expr: string) => (expr === "x" ? expr : `(${expr})`);
 
-/** x = \frac{e^{3} - 2}{4}, x = e^{2} + 5 */
-export function exactELatex(k: number, a: number, c: number): string {
-  const power = k === 1 ? "e" : `e^{${k}}`;
+/** x = (power - c)/a with the power printed as given: x = \frac{3e - 2}{4} */
+function eLatex(power: string, a: number, c: number): string {
   const numer = c === 0 ? power : `${power} ${c > 0 ? "-" : "+"} ${Math.abs(c)}`;
   return `x = ${a === 1 ? numer : `\\frac{${numer}}{${a}}`}`;
+}
+
+/** x = \frac{e^{3} - 2}{4}, x = e^{2} + 5 */
+export function exactELatex(k: number, a: number, c: number): string {
+  return eLatex(k === 1 ? "e" : `e^{${k}}`, a, c);
 }
 
 const hint = (r: Rat | null) => solutionHint("x", r);
@@ -128,6 +132,10 @@ function exponentialForm(rng: Rng, base: LogBase): LogEquationConstruction | nul
       a !== 1 ? exactELatex(k, 1, c) : null,
       hint(div(rat(k - c), rat(a))),
       hint(div(rat(10 ** k - c), rat(a))),
+      eLatex(`${k === 1 ? "" : k}e`, a, c), // e times k, not e to the k
+      k === 1 ? null : eLatex(`${k}^{e}`, a, c), // base and exponent swapped: k^{e}
+      exactELatex(k, a, 0), // the constant dropped
+      eLatex(`e^{-${k}}`, a, c), // undo ln using a negative exponent
     ];
     return { form: "exponential", base, left, right: String(k), solutions: [], extraneous: null, exactE: { k, a, c }, hints };
   }
@@ -147,6 +155,11 @@ function exponentialForm(rng: Rng, base: LogBase): LogEquationConstruction | nul
     hint(div(rat(k - c), rat(a))),
     hint(div(rat(V), rat(a))),
     hint(rat(-x)),
+    hint(div(rat(intPow(b, k - 1)! - c), rat(a))), // exponent one too small
+    hint(div(rat(intPow(b, k + 1)! - c), rat(a))), // exponent one too large
+    a !== 1 ? hint(rat((V - c) * a)) : null, // multiplied by a instead of dividing
+    a !== 1 ? hint(div(rat(V - c * a), rat(a))) : null, // the constant not divided by a
+    hint(rat(V)), // the argument's value given as x
   ];
   return { form: "exponential", base, left, right: String(k), solutions: [x], extraneous: null, exactE: null, hints };
 }
@@ -165,6 +178,10 @@ function oneToOneForm(rng: Rng, base: LogBase): LogEquationConstruction | null {
     hint(rat(-x)),
     hint(div(rat(c2 - c1), rat(a1 + a2))),
     hint(div(rat(c1 + c2), rat(a1 + a2))),
+    hint(rat(v)), // the common argument given as x
+    hint(div(rat(c2 - c1), rat(a1))), // the x term on the right forgotten
+    hint(div(rat(c1 - c2), rat(a2))), // the x term on the left forgotten
+    hint(rat(c2 - c1)), // not divided by the difference of the coefficients
   ];
   return {
     form: "oneToOne",
@@ -207,6 +224,10 @@ function sumForm(rng: Rng, base: LogBase): LogEquationConstruction | null {
       hint(div(rat(N - p - q), rat(2))),
       NO_SOLUTION,
       hint(rat(-x)),
+      hint(rat(u)), // x + p = u left as the answer
+      hint(rat(w)), // x + q = w left as the answer
+      hint(rat(w - p)), // the factors paired with the wrong terms
+      hint(rat(u - q)),
     ],
   };
 }
@@ -235,8 +256,8 @@ function quadraticForm(rng: Rng, base: LogBase): LogEquationConstruction | null 
     extraneous: bothValid ? null : r2,
     exactE: null,
     hints: bothValid
-      ? [hint(rat(r1)), hint(rat(r2)), negated, NO_SOLUTION]
-      : [both, hint(rat(r2)), negated, NO_SOLUTION, hint(rat(-r1))],
+      ? [hint(rat(r1)), hint(rat(r2)), negated, NO_SOLUTION, hint(rat(-r1)), hint(rat(-r2)), hint(rat(f)) /* report the sum of the roots */]
+      : [both, hint(rat(r2)), negated, NO_SOLUTION, hint(rat(-r1)), hint(rat(-r2)), hint(rat(f)) /* report the sum of the roots */],
   };
 }
 

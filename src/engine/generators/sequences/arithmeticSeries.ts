@@ -19,6 +19,7 @@ import {
   isInt,
   linearLatex,
   mul,
+  neg,
   numLatex,
   rat,
   seriesLatex,
@@ -146,6 +147,10 @@ export function distractors(k: ArithmeticSeriesConstruction): string[] {
     an, // the last term, not the sum
     arithmeticSum(a1, d, n - 1), // the sum stopped a term early
     arithmeticSum(a1, d, n + 1), // or a term late
+    add(a1, an), // only the two ends added
+    mul(rat(n), a1), // n copies of the first term
+    mul(rat(n), an), // n copies of the last term
+    arithmeticSum(a1, neg(d), n), // the difference's sign flipped
   );
   return distinctHints(
     answerLatex(k),

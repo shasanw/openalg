@@ -1,3 +1,4 @@
+import { expectDistinctDistractors } from "./distinctDistractors.testkit";
 import { geometricSeries, readSeries } from "./geometricSeries.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -80,12 +81,12 @@ describe("geometric-series: Topic Options", () => {
 });
 
 describe("geometric-series: distractors", () => {
-  it("are distinct, never the Answer, and at least three", () => {
+  it("are distinct, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, (a, b) => a === DIVERGES || b === DIVERGES
+          ? a === b : close(evalLatex(a), evalLatex(b)));
         expect(p.distractorHints).not.toContain(p.answer);
         if (p.answer !== DIVERGES)
           for (const d of p.distractorHints) if (d !== DIVERGES) expect(close(evalLatex(d), evalLatex(p.answer))).toBe(false);
@@ -99,6 +100,7 @@ describe("geometric-series: distractors", () => {
     expect(distractors(k).slice(0, 3)).toEqual(["8", "12", DIVERGES]);
     // 4 + 8 + 16 + ...: diverges, yet a_1/(1 - r) = -4
     expect(distractors({ ...k, a1: rat(4), r: rat(2) })[0]).toBe("-4");
+    expect(distractors({ ...k, kind: "finite", a1: rat(2), r: rat(3), n: 5 })).toContain("162"); // last term
     // 2 + 6 + ... + 162 (5 terms): 242; one short 80, one more 728
     expect(distractors({ ...k, kind: "finite", a1: rat(2), r: rat(3), n: 5 }).slice(0, 2)).toEqual(["80", "728"]);
   });

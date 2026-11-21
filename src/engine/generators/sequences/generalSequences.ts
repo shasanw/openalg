@@ -21,6 +21,7 @@ import {
   numLatex,
   pow,
   powerLatex,
+  sub,
   rat,
   ratEq,
   size,
@@ -77,6 +78,8 @@ export interface SequenceConstruction {
   seq: Seq;
   /** sequences a common mistake produces, most common first */
   mistakes: Seq[];
+  /** further mistakes, offered after every other Distractor so earlier choices never change */
+  moreMistakes: Seq[];
   ask: Ask;
   /** how many terms are asked for (firstTerms) */
   count: number;
@@ -94,6 +97,7 @@ interface Rule {
   ruleLatex: string;
   seq: Seq;
   mistakes: Seq[];
+  moreMistakes: Seq[];
 }
 
 /** A recursive sequence from its starting terms and a step, memoised. */
@@ -122,6 +126,11 @@ function explicitRule(rng: Rng, negOk: boolean): Rule {
         seq: (n) => r(p * n + q),
         // the coefficient and constant swapped; the constant multiplied in
         mistakes: [(n) => r(q * n + p), (n) => r(p * (n + q))],
+        moreMistakes: [
+          (n) => r((p + q) * n), // like terms combined: the constant added to the coefficient
+          (n) => r(p * n - q), // the constant's sign flipped
+          (n) => r(p * n * q), // the constant multiplied in, not added
+        ],
       };
     }
     case "quadratic": {
@@ -134,6 +143,12 @@ function explicitRule(rng: Rng, negOk: boolean): Rule {
         ruleLatex: `a_n = ${linearLatex([{ coef: r(p), v: "n^2" }, { coef: r(q), v: "" }])}`,
         seq: (n) => r(p * n * n + q),
         mistakes,
+        moreMistakes: [
+          (n) => r(p * (n * n + q)), // the coefficient distributed over the constant too
+          (n) => r(p * n * n - q), // the constant's sign flipped
+          (n) => r(p * n + q), // n^2 read as n
+          (n) => r((p * n + q) * (p * n + q)), // the whole expression squared
+        ],
       };
     }
     case "exponential": {
@@ -147,6 +162,13 @@ function explicitRule(rng: Rng, negOk: boolean): Rule {
           (n) => pow(r(c * base), n - 1), // multiplied before the power
           (n) => mul(r(c), pow(r(base), n)), // exponent n, not n - 1
         ],
+        moreMistakes: [
+          (n) => r(c * base * (n - 1)), // multiplied by n - 1 instead of raised to it
+          (n) => mul(r(base), pow(r(c), n - 1)), // coefficient and base swapped
+          (n) => n < 2 ? null : mul(r(c), pow(r(base), n - 2)), // exponent n - 2
+          (n) => pow(r(base), n - 1), // initial multiplier omitted
+          (n) => sub(mul(r(c), pow(r(base), n)), r(1)), // subtract 1 after exponentiating
+        ],
       };
     }
     case "powerPlus": {
@@ -159,6 +181,12 @@ function explicitRule(rng: Rng, negOk: boolean): Rule {
         mistakes: [
           (n) => r(base * n + q), // multiplied instead of a power
           (n) => r(base ** (n - 1) + q), // exponent n - 1
+        ],
+        moreMistakes: [
+          (n) => r(n ** base + q), // base and exponent swapped
+          (n) => r(base ** n - q), // the constant's sign flipped
+          (n) => r(base ** (n + 1) + q), // exponent n + 1
+          (n) => r((base + q) ** n), // the constant added to the base
         ],
       };
     }
@@ -180,6 +208,12 @@ function explicitRule(rng: Rng, negOk: boolean): Rule {
           (n) => (n + q === 0 ? null : rat(den(n), n + q)), // numerator and denominator swapped
           (n) => (den(n + 1) === 0 ? null : rat(n + q, den(n + 1))), // denominator one step ahead
         ],
+        moreMistakes: [
+          (n) => (den(n) === 0 ? null : add(r(n), rat(q, den(n)))), // only the constant divided
+          () => (overN ? rat(1 + q, p) : rat(q, s)), // the n's cancelled across a sum
+          (n) => (den(n - 1) === 0 ? null : rat(n - 1 + q, den(n - 1))), // started at n = 0
+          (n) => (den(n) === 0 ? null : rat(n, den(n))), // the constant in the numerator dropped
+        ],
       };
     }
     default: {
@@ -199,6 +233,19 @@ function explicitRule(rng: Rng, negOk: boolean): Rule {
           (n) => r(-sign(n) * body(n)), // the sign pattern the wrong way round
           (n) => r(body(n)), // the sign factor ignored
         ],
+        moreMistakes: squared
+          ? [
+              (n) => r(-body(n)), // (-1)^n read as -1
+              (n) => r(sign(n) * n), // n^2 read as n
+              (n) => r(sign(n) * body(n + 1)), // body evaluated one index ahead
+              (n) => r(sign(n) * 2 * n), // n^2 read as 2n
+            ]
+          : [
+              (n) => r(sign(n) * p * n + q), // the sign applied to the first term only
+              (n) => r(p * n + sign(n) * q), // the sign applied to the last term only
+              (n) => r(-body(n)), // (-1)^n read as -1
+              (n) => r(sign(n) * body(n + 1)), // body evaluated one index ahead
+            ],
       };
     }
   }
@@ -223,6 +270,12 @@ function recursiveRule(rng: Rng, negOk: boolean): Rule {
         ruleLatex: `a_1 = ${c},\\ a_n = ${linearLatex([{ coef: r(p), v: prev }, { coef: r(q), v: "" }])}`,
         seq: recursive([r(c)], (t) => r(p * t[t.length - 1].n + q)),
         mistakes,
+        moreMistakes: [
+          recursive([r(c)], (t) => r(p * t[t.length - 1].n - q)), // the constant's sign flipped
+          recursive([r(c)], (t) => r(p * q * t[t.length - 1].n)), // multiplied by the constant, not added
+          recursive([r(c)], (t) => r((p + q) * t[t.length - 1].n)), // the constant added to the multiplier
+          recursive([r(c)], (t, n) => r(p * t[t.length - 1].n + q * n)), // the constant grows with n
+        ],
       };
     }
     case "addN": {
@@ -236,6 +289,12 @@ function recursiveRule(rng: Rng, negOk: boolean): Rule {
           recursive([r(c)], (t, n) => r(t[t.length - 1].n + p * (n - 1))), // n - 1 for n
           recursive([r(c)], (t) => r(t[t.length - 1].n + p)), // n left out
         ],
+        moreMistakes: [
+          recursive([r(c)], (_t, n) => r(c + p * n)), // every term built from a_1, not the one before
+          recursive([r(c)], (t, n) => r(t[t.length - 1].n + p * (n + 1))), // n + 1 for n
+          recursive([r(c)], (t, n) => r(t[t.length - 1].n - p * n)), // the added term's sign flipped
+          recursive([r(c)], (t, n) => r(p * n * t[t.length - 1].n)), // multiplied instead of added
+        ],
       };
     }
     case "timesN": {
@@ -248,6 +307,11 @@ function recursiveRule(rng: Rng, negOk: boolean): Rule {
           recursive([r(c)], (t, n) => r((n - 1) * t[t.length - 1].n)), // n - 1 for n
           recursive([r(c)], (t, n) => r(n + t[t.length - 1].n)), // added instead of multiplied
         ],
+        moreMistakes: [
+          recursive([r(c)], (_t, n) => r(c * n)), // every term built from a_1, not the one before
+          recursive([r(c)], (t, n) => r((n + 1) * t[t.length - 1].n)), // n + 1 for n
+          recursive([r(c)], (_t, n) => r(n * (n - 1))), // n used in place of a_{n-1}
+        ],
       };
     }
     default: {
@@ -259,6 +323,14 @@ function recursiveRule(rng: Rng, negOk: boolean): Rule {
       const mistakes: Seq[] = [];
       if (u !== w) mistakes.push(recursive([r(c1), r(c2)], step(w, u))); // the two terms swapped
       mistakes.push(recursive([r(c1), r(c2)], (t) => r((u + w) * t[t.length - 1].n))); // a_{n-1} used twice
+      const moreMistakes: Seq[] = [
+        recursive([r(c1), r(c2)], (t) => r(u * t[t.length - 1].n - w * t[t.length - 2].n)), // the second term subtracted
+        recursive([r(c1), r(c2)], (t) => r(t[t.length - 1].n * t[t.length - 2].n)), // the two terms multiplied
+        recursive([r(c1), r(c2)], (t) => r((u + w) * t[t.length - 2].n)), // a_{n-2} used twice
+        recursive([r(c1), r(c2)], (t) => r(t[t.length - 1].n + t[t.length - 2].n)), // the coefficients ignored
+        recursive([r(c1), r(c2)], (_t, n) => r(u * (n - 1) + w * (n - 2))), // use the indices as terms
+        recursive([r(c1), r(c2)], (t, n) => r(u * t[t.length - 1].n + w * (n - 2))), // read a_{n-2} as n - 2
+      ];
       return {
         form: "twoTerm",
         ruleLatex: `a_1 = ${c1},\\ a_2 = ${c2},\\ a_n = ${linearLatex([
@@ -267,6 +339,7 @@ function recursiveRule(rng: Rng, negOk: boolean): Rule {
         ])}`,
         seq: recursive([r(c1), r(c2)], step(u, w)),
         mistakes,
+        moreMistakes,
       };
     }
   }
@@ -308,12 +381,15 @@ export function construct(params: ParamValues, rng: Rng): SequenceConstruction {
     const chosen: Rule =
       made ??
       (rule === "explicit"
-        ? { form: "linear", ruleLatex: "a_n = 3n + 2", seq: (n) => r(3 * n + 2), mistakes: [(n) => r(2 * n + 3), (n) => r(3 * (n + 2))] }
+        ? { form: "linear", ruleLatex: "a_n = 3n + 2", seq: (n) => r(3 * n + 2), mistakes: [(n) => r(2 * n + 3), (n) => r(3 * (n + 2))],
+          moreMistakes: [(n) => r(5 * n), (n) => r(3 * n - 2), (n) => r(6 * n)],
+        }
         : {
             form: "affine",
             ruleLatex: "a_1 = 2,\\ a_n = 2a_{n-1} + 1",
             seq: recursive([r(2)], (t) => r(2 * t[t.length - 1].n + 1)),
             mistakes: [recursive([r(2)], (t) => mul(r(2), add(t[t.length - 1], r(1)))), recursive([r(2)], (_t, n) => r(2 * n + 1))],
+            moreMistakes: [recursive([r(2)], (t) => r(2 * t[t.length - 1].n - 1)), recursive([r(2)], (t) => r(2 * t[t.length - 1].n)), recursive([r(2)], (t) => r(3 * t[t.length - 1].n))],
           });
     const count = chosen.form === "twoTerm" ? 5 : 4;
     const k = rule === "recursive" ? rng.int(chosen.form === "twoTerm" ? 6 : 5, chosen.form === "twoTerm" ? 7 : 6) : rng.int(5, 12);
@@ -368,6 +444,7 @@ export function distractors(k: SequenceConstruction): string[] {
     const v = k.seq(n);
     return v && neg(v);
   }, at));
+  for (const m of k.moreMistakes) candidates.push(valuesAt(m, at));
   return distinctHints(
     answerLatex(k),
     candidates.map((c) => (c ? (k.ask === "term" ? numLatex(c[0]) : listLatex(c)) : null)),

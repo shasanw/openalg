@@ -1,3 +1,4 @@
+import { expectDistinctDistractors } from "./distinctDistractors.testkit";
 import { geometricSequences, readGiven, ruleValue } from "./geometricSequences.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -71,12 +72,13 @@ describe("geometric-sequences: Topic Options", () => {
 });
 
 describe("geometric-sequences: distractors", () => {
-  it("are distinct, never the Answer, and at least three", () => {
+  it("are distinct, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, (a, b) => p.answer.startsWith("a_n")
+          ? [1, 2, 3].every((n) => close(ruleValue(a, n), ruleValue(b, n)))
+          : close(evalLatex(a), evalLatex(b)));
         if (p.answer.startsWith("a_n")) {
           for (const d of p.distractorHints)
             expect([1, 2, 3].every((n) => close(ruleValue(d, n), ruleValue(p.answer, n), 1e-6))).toBe(false);
@@ -90,6 +92,7 @@ describe("geometric-sequences: distractors", () => {
   it("model the exponent and order-of-operations mistakes", () => {
     // 3, 6, 12, 24, ...: a_n = 3 \cdot 2^{n-1}
     const k = { given: "terms" as const, find: "rule" as const, a1: rat(3), r: rat(2), p: 1, q: 4, k: 7 };
+    expect(distractors({ ...k, find: "term" })).toContain("36"); // 3 · 2 · (7 - 1)
     expect(distractors(k).slice(0, 3)).toEqual([
       "a_n = 3 \\cdot 2^{n}",
       "a_n = 6^{n-1}",
