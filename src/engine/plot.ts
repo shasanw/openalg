@@ -1081,11 +1081,14 @@ function triangleAngles(pts: readonly PlotXY[]): number[] {
   });
 }
 
-/** Size of side and angle labels on a triangle diagram, and of its corner names. */
-const TRIANGLE_LABEL_PT = 7.5;
-const TRIANGLE_NAME_PT = 8.5;
+/**
+ * Size of side and angle labels on a triangle diagram, and of its corner
+ * names: close to the 11pt body text, so a student reads them on paper.
+ */
+const TRIANGLE_LABEL_PT = 10;
+const TRIANGLE_NAME_PT = 10;
 /** Most of the column a triangle's own outline may take: room is left round it for labels. */
-const TRIANGLE_MAX_W = PLOT_WIDTH_PT - 56;
+const TRIANGLE_MAX_W = PLOT_WIDTH_PT - 70;
 const TRIANGLE_MAX_H = 96;
 
 type Vec = [number, number];
@@ -1234,7 +1237,9 @@ function layoutTriangle(spec: TriangleSpec, scale: number) {
     if (dot(out, sub(P[i], q)) > 0) out = [e[1], -e[0]];
     const mid: Vec = [(q[0] + r[0]) / 2, (q[1] + r[1]) / 2];
     const half = box(c.opposite.text, TRIANGLE_LABEL_PT);
-    const at = add(mid, out, reach(half, out) + gap);
+    // A wider gap than at the corners: a side label runs along its edge, and
+    // at 2pt its halo seemed to touch the line.
+    const at = add(mid, out, reach(half, out) + 0.35 * TRIANGLE_LABEL_PT);
     const b = clear({ cx: at[0], cy: at[1], ...half }, out);
     labels.push({ box: b, text: c.opposite.text, size: TRIANGLE_LABEL_PT, answer: !!c.opposite.answer, name: false });
   });
