@@ -22,7 +22,7 @@ import { GENERATORS } from "../../engine/registry";
 import { QUADRATIC_FORMULA_ID } from "../../engine/generators/quadratics/quadraticFormula";
 import { QUADRATIC_FACTORING_ID } from "../../engine/generators/quadratics/quadraticFactoring";
 import { GRAPHING_QUADRATICS_ID } from "../../engine/generators/quadratics/graphingQuadratics";
-import { plot } from "../../engine/plot";
+import { plot, trigWindow, triangleFromSides, type TriangleSpec } from "../../engine/plot";
 import { TOPIC_SHARDS, topicsOfShard } from "./topicSmoke.testkit";
 
 const require = createRequire(import.meta.url);
@@ -170,6 +170,46 @@ describe("Typst engine (WASM)", () => {
       expect(pages.length).toBeGreaterThan(0);
       expect(engine.warnings).toEqual([]);
     }
+  });
+
+  it("compiles trig curves and triangle diagrams on a Worksheet's student copy and keys with no warnings", async () => {
+    const ws = buildWorksheet({ generatorId: GRAPHING_QUADRATICS_ID, baseSeed: 3, count: 8 });
+    const window = trigWindow([3, -1]);
+    const [A, B, C] = triangleFromSides(4, 9, 12);
+    const triangle = (answer: boolean): TriangleSpec => ({
+      kind: "triangle",
+      corners: [
+        { ...A, name: "A", angle: { text: "17°" }, opposite: { text: "4" } },
+        { ...B, name: "B", angle: { text: "θ" }, opposite: { text: "9 cm" } },
+        { ...C, name: "C", opposite: answer ? { text: "12", answer: true } : { text: "x" } },
+      ],
+    });
+    const fns = ["sin", "cos", "tan", "csc", "sec", "cot"] as const;
+    const problems = ws.sections[0].problems.map((p, i) =>
+      i < 6
+        ? { ...p, graph: window, answerGraph: { ...window, curves: [{ kind: "trig" as const, fn: fns[i], a: 2, b: 2, c: Math.PI / 6, d: -1 }] } }
+        : { ...p, graph: triangle(false), answerGraph: triangle(true) },
+    );
+    const sheet = { ...ws, sections: [{ ...ws.sections[0], problems }] };
+    for (const keyFormat of ANSWER_KEY_FORMATS) {
+      const doc = buildTypstDocument(sheet, { keyFormat });
+      const pages = await engine.svgPages(doc);
+      expect(pages.length).toBeGreaterThan(0);
+      expect(engine.warnings).toEqual([]);
+      const pdf = await engine.pdf(doc);
+      expect(pdf.length).toBeGreaterThan(0);
+      expect(engine.warnings).toEqual([]);
+    }
+    // a triangle's labels are outlines too: the graph alone needs no font
+    const svg = plot(triangle(true), { ink: "#c62828" });
+    const pdf = new TextDecoder("latin1").decode(
+      await engine.pdf({
+        source: `#set page(width: 200pt, height: 200pt, margin: 5pt)\n#image(bytes(${typstString(svg)}), format: "svg")`,
+        math: [],
+      }),
+    );
+    expect(engine.warnings).toEqual([]);
+    expect(pdf).not.toContain("/FontName");
   });
 
   it("reports Typst errors instead of returning output", async () => {

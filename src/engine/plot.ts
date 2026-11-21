@@ -8,12 +8,15 @@
 // (window, grid, curves, points, shading), never colours or page sizes: the
 // caller picks the ink (the Answer Key draws answers in its key colour).
 //
-// Two kinds of graph:
-// - a coordinate plane: x/y window, grid step, axis and tick labels, and
-//   optional parabolas, straight lines (any slope, vertical included), points
-//   (with labels) and dashed vertical lines (an axis of symmetry);
+// Three kinds of graph:
+// - a coordinate plane: x/y window, grid step, axis and tick labels (x ticks
+//   optionally as multiples of pi), and optional parabolas, straight lines
+//   (any slope, vertical included), trig curves (with their asymptotes),
+//   points (with labels) and dashed vertical lines (an axis of symmetry);
 // - a number line: range, ticks, open/closed endpoints and shaded intervals
-//   or rays.
+//   or rays;
+// - a triangle diagram, drawn to scale from its corners: corner names, side
+//   and angle labels (with an arc), right-angle marks.
 //
 // Output is deterministic (fixed rounding, fixed attribute order), uses single
 // quotes only and no backslashes or newlines, so it drops straight into a Typst
@@ -41,8 +44,27 @@ export type LineCurve =
   | { kind: "line"; form: "slopeIntercept"; m: number; b: number }
   | { kind: "line"; form: "vertical"; x: number };
 
+/** The six trig functions a TrigCurve can draw. */
+export type TrigFunction = "sin" | "cos" | "tan" | "csc" | "sec" | "cot";
+
+export const TRIG_FUNCTIONS: readonly TrigFunction[] = ["sin", "cos", "tan", "csc", "sec", "cot"];
+
+/**
+ * y = a·fn(b(x − c)) + d, in radians, drawn as smooth pieces broken at its
+ * vertical asymptotes (tan, sec, csc and cot), which are drawn dashed with it.
+ * a and b are nonzero; a negative b reflects the curve as usual.
+ */
+export interface TrigCurve {
+  kind: "trig";
+  fn: TrigFunction;
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+}
+
 /** Anything plot() can draw as a curve on a coordinate plane. */
-export type PlotCurve = ParabolaCurve | LineCurve;
+export type PlotCurve = ParabolaCurve | LineCurve | TrigCurve;
 
 export interface PlotPoint {
   x: number;
@@ -69,6 +91,12 @@ export interface CoordinatePlaneSpec {
   labelEvery?: number;
   /** Axis names printed at the positive ends (default "x" and "y"). */
   axisLabels?: { x: string; y: string };
+  /**
+   * "pi" prints the x tick labels as multiples of π (π/2, π, 3π/2, −π), for
+   * a trig window whose xStep is a fraction of π (see trigWindow). The window
+   * and curves stay in plain radians.
+   */
+  xTickLabels?: "pi";
   curves?: PlotCurve[];
   lines?: VerticalLine[];
   points?: PlotPoint[];
@@ -100,7 +128,45 @@ export interface NumberLineSpec {
   shaded?: ShadedInterval[];
 }
 
-export type GraphSpec = CoordinatePlaneSpec | NumberLineSpec;
+/**
+ * A label in a triangle diagram. With `answer` it is the Answer: drawn in the
+ * ink, on the content layer, and dropped by blankGraph (see TriangleSpec).
+ */
+export interface TriangleLabel {
+  /** Plain text, e.g. "12", "8.5 cm", "35°", "x", "θ" or "?". Empty: an arc with no label. */
+  text: string;
+  answer?: boolean;
+}
+
+/** One corner of a triangle diagram, and what is printed at it. */
+export interface TriangleCorner {
+  /** Position, in any units: only the shape counts (see TriangleSpec). */
+  x: number;
+  y: number;
+  /** Printed just outside the corner, e.g. "A". */
+  name?: string;
+  /** The angle at this corner, marked with an arc and labelled inside it. */
+  angle?: TriangleLabel;
+  /** A right-angle square at this corner (the angle must be 90°). */
+  rightAngle?: boolean;
+  /** The label of the side opposite this corner (side a opposite A), printed outside the side. */
+  opposite?: TriangleLabel;
+}
+
+/**
+ * A triangle diagram, drawn to scale from its three corners (y up), scaled to
+ * fit the column. Everything but the Answer's labels is its frame; labels
+ * marked `answer` are its content, in the ink. A Problem's student graph
+ * shows the givens and marks the unknown ("x", "θ" or "?"); its answer graph
+ * is the same triangle with the unknown's label replaced by the Answer,
+ * marked `answer`.
+ */
+export interface TriangleSpec {
+  kind: "triangle";
+  corners: [TriangleCorner, TriangleCorner, TriangleCorner];
+}
+
+export type GraphSpec = CoordinatePlaneSpec | NumberLineSpec | TriangleSpec;
 
 export interface PlotOptions {
   /** Colour of the graph's content (curves, points, shading). Grid and axes stay grey and black. */
@@ -165,6 +231,79 @@ export function numberLineWindow(values: readonly number[]): {
   return { range: { min: -r, max: r }, step, labelEvery };
 }
 
+/** Grid squares above and below the x-axis on a trig window. */
+export const TRIG_Y_SQUARES = 6;
+
+/**
+ * The blank plane every trig graph is drawn on, shared by the student's grid
+ * and the answer graph: x over [−xMaxPi·π, xMaxPi·π] (1 to 4) in steps of π/4
+ * (π/2 past 2π), tick labels as multiples of π every two squares; y
+ * TRIG_Y_SQUARES squares each way with the smallest step (1, 2, 5, ...) that
+ * keeps every value at least one square inside the edge (as symmetricWindow).
+ * Pass y-values that bound what the student draws, never the Answer's
+ * features alone: for y = a sin(b(x − c)) + d that is d + a and d − a; for
+ * tan, cot, sec and csc the same two values (the curve runs off the window
+ * at its asymptotes anyway). Pick xMaxPi from the Topic Options or from
+ * every possible period alike, not from this Problem's period, so the window
+ * never hints at it.
+ */
+export function trigWindow(yValues: readonly number[], xMaxPi = 2): CoordinatePlaneSpec {
+  if (!Number.isInteger(xMaxPi) || xMaxPi < 1 || xMaxPi > 4) {
+    throw new RangeError(`trigWindow: xMaxPi must be 1, 2, 3 or 4, not ${xMaxPi}`);
+  }
+  const { range, step } = symmetricWindow(yValues, TRIG_Y_SQUARES);
+  return {
+    kind: "plane",
+    x: { min: -xMaxPi * Math.PI, max: xMaxPi * Math.PI },
+    y: range,
+    xStep: xMaxPi <= 2 ? Math.PI / 4 : Math.PI / 2,
+    yStep: step,
+    labelEvery: 2,
+    xTickLabels: "pi",
+  };
+}
+
+/** A point of a triangle laid out by triangleFromSides or triangleFromAngles. */
+export interface PlotXY {
+  x: number;
+  y: number;
+}
+
+/**
+ * The corners A, B, C of the triangle with sides a = BC, b = CA, c = AB: A at
+ * the origin, B on the positive x-axis, C above. Throws if no such triangle.
+ */
+export function triangleFromSides(a: number, b: number, c: number): [PlotXY, PlotXY, PlotXY] {
+  if (!(a > 0 && b > 0 && c > 0 && a < b + c && b < a + c && c < a + b)) {
+    throw new RangeError(`triangleFromSides: no triangle has sides ${a}, ${b}, ${c}`);
+  }
+  const cosA = (b * b + c * c - a * a) / (2 * b * c);
+  const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+  return [
+    { x: 0, y: 0 },
+    { x: c, y: 0 },
+    { x: b * cosA, y: b * sinA },
+  ];
+}
+
+/**
+ * The corners A, B, C of the triangle with angles A and B (in degrees) and
+ * side c = AB between them: A at the origin, B on the positive x-axis, C above.
+ */
+export function triangleFromAngles(angleA: number, angleB: number, c: number): [PlotXY, PlotXY, PlotXY] {
+  const angleC = 180 - angleA - angleB;
+  if (!(angleA > 0 && angleB > 0 && angleC > 0 && c > 0)) {
+    throw new RangeError(`triangleFromAngles: no triangle has angles ${angleA}° and ${angleB}°`);
+  }
+  const rad = Math.PI / 180;
+  const b = (c * Math.sin(angleB * rad)) / Math.sin(angleC * rad);
+  return [
+    { x: 0, y: 0 },
+    { x: c, y: 0 },
+    { x: b * Math.cos(angleA * rad), y: b * Math.sin(angleA * rad) },
+  ];
+}
+
 /**
  * Whether a number line prints a tick label at `v`. A point anywhere else
  * (a fraction, a radical, or an integer between labelled ticks) needs its own
@@ -195,7 +334,7 @@ const MAX_DIVISIONS = 200;
 export function graphSpecProblem(spec: unknown): string | null {
   if (!isObj(spec)) return "is not an object";
   // plot() letters labels from a fixed set of glyphs (see Lettering).
-  const label = (v: unknown) => typeof v === "string" && canLetter(v);
+  const label = (v: unknown) => typeof v === "string" && canLetter(v, "math");
   const optionalArray = (key: string, ok: (v: unknown) => boolean): string | null => {
     const v = spec[key];
     if (v === undefined) return null;
@@ -217,6 +356,11 @@ export function graphSpecProblem(spec: unknown): string | null {
     if (al !== undefined && !(isObj(al) && name(al.x) && name(al.y))) {
       return "has invalid axisLabels";
     }
+    if (spec.xTickLabels !== undefined) {
+      if (spec.xTickLabels !== "pi") return "has invalid xTickLabels";
+      if (piFraction(spec.xStep) === null) return "has an x step that is not a simple fraction of π";
+    }
+    const xWidth = spec.x.max - spec.x.min;
     return (
       optionalArray(
         "curves",
@@ -229,7 +373,17 @@ export function graphSpecProblem(spec: unknown): string | null {
               (c.form === "standard" && isNum(c.b) && isNum(c.c)))) ||
             (c.kind === "line" &&
               ((c.form === "slopeIntercept" && isNum(c.m) && isNum(c.b)) ||
-                (c.form === "vertical" && isNum(c.x))))),
+                (c.form === "vertical" && isNum(c.x)))) ||
+            (c.kind === "trig" &&
+              TRIG_FUNCTIONS.includes(c.fn as TrigFunction) &&
+              isNum(c.a) &&
+              c.a !== 0 &&
+              isNum(c.b) &&
+              c.b !== 0 &&
+              isNum(c.c) &&
+              isNum(c.d) &&
+              // at most MAX_DIVISIONS half-periods across the window
+              (xWidth * Math.abs(c.b)) / Math.PI <= MAX_DIVISIONS)),
       ) ??
       optionalArray("lines", (l) => isObj(l) && isNum(l.x)) ??
       optionalArray(
@@ -256,6 +410,26 @@ export function graphSpecProblem(spec: unknown): string | null {
           (p.label === undefined || label(p.label)),
       ) ?? optionalArray("shaded", (s) => isObj(s) && end(s.from) && end(s.to))
     );
+  }
+  if (spec.kind === "triangle") {
+    const corners = spec.corners;
+    if (!Array.isArray(corners) || corners.length !== 3) return "has invalid corners";
+    for (const c of corners) {
+      if (!isObj(c) || !isNum(c.x) || !isNum(c.y)) return "has invalid corners";
+      const tl = (v: unknown) =>
+        v === undefined || (isObj(v) && label(v.text) && (v.answer === undefined || typeof v.answer === "boolean"));
+      if (c.name !== undefined && !label(c.name)) return "has an invalid corner name";
+      if (!tl(c.angle) || !tl(c.opposite)) return "has an invalid label";
+      if (c.rightAngle !== undefined && typeof c.rightAngle !== "boolean") return "has an invalid rightAngle";
+    }
+    const pts = corners as TriangleCorner[];
+    const angles = triangleAngles(pts);
+    // A sliver too thin to draw (or three points on a line).
+    if (angles.some((a) => !(a >= MIN_TRIANGLE_ANGLE))) return "is too thin to draw";
+    if (pts.some((c, i) => c.rightAngle && Math.abs(angles[i] - Math.PI / 2) > 1e-6)) {
+      return "marks a right angle that is not 90°";
+    }
+    return null;
   }
   return "has an unknown kind";
 }
@@ -298,17 +472,42 @@ interface LabelItem {
 
 type GlyphStyle = "regular" | "italic";
 
+/**
+ * How a label is lettered: all upright, all italic, or "math": letters as in
+ * a formula, each single letter and every Greek letter italic (x, θ, 3π/2,
+ * A) and runs of lowercase letters upright (units and names: cm, ft, sin),
+ * everything else upright.
+ */
+type LetterStyle = GlyphStyle | "math";
+
 const GLYPHS: Record<GlyphStyle, GlyphTable> = { regular: REGULAR, italic: ITALIC };
 
+/** The glyph style of each character of `text` (see LetterStyle). */
+function glyphStyles(text: string, style: LetterStyle): GlyphStyle[] {
+  const chars = [...text];
+  if (style !== "math") return chars.map(() => style);
+  const latin = (ch: string | undefined) => !!ch && /[A-Za-z]/.test(ch);
+  const lower = (ch: string | undefined) => !!ch && /[a-z]/.test(ch);
+  return chars.map((ch, i) => {
+    if (/[α-ω]/.test(ch)) return "italic";
+    if (!latin(ch)) return "regular";
+    // a lowercase letter in a run of two or more Latin letters is part of a word
+    const word = lower(ch) && (latin(chars[i - 1]) || latin(chars[i + 1]));
+    return word ? "regular" : "italic";
+  });
+}
+
 /** Whether plot() can letter `text` in `style` (every character has an outline). */
-export function canLetter(text: string, style: GlyphStyle = "regular"): boolean {
-  return [...text].every((ch) => ch in GLYPHS[style]);
+export function canLetter(text: string, style: LetterStyle = "regular"): boolean {
+  const styles = glyphStyles(text, style);
+  return [...text].every((ch, i) => ch in GLYPHS[styles[i]]);
 }
 
 /** Printed width of `text` at `size` points; a character with no outline counts as half an em. */
-export function letteringWidth(text: string, size = LABEL_PT, style: GlyphStyle = "regular"): number {
+export function letteringWidth(text: string, size = LABEL_PT, style: LetterStyle = "regular"): number {
+  const styles = glyphStyles(text, style);
   let units = 0;
-  for (const ch of text) units += GLYPHS[style][ch]?.[0] ?? UNITS_PER_EM / 2;
+  [...text].forEach((ch, i) => (units += GLYPHS[styles[i]][ch]?.[0] ?? UNITS_PER_EM / 2));
   return (units * size) / UNITS_PER_EM;
 }
 
@@ -344,7 +543,7 @@ class Lettering {
       size = LABEL_PT,
       style = "regular",
       halo = true,
-    }: { fill?: string; size?: number; style?: GlyphStyle; halo?: boolean } = {},
+    }: { fill?: string; size?: number; style?: LetterStyle; halo?: boolean } = {},
   ): string {
     if (!items.length) return "";
     const scale = size / UNITS_PER_EM;
@@ -353,13 +552,14 @@ class Lettering {
       .map(({ x, y, text }) => {
         const width = letteringWidth(text, size, style);
         const x0 = anchor === "start" ? x : anchor === "middle" ? x - width / 2 : x - width;
+        const styles = glyphStyles(text, style);
         let advance = 0;
         let uses = "";
-        for (const ch of text) {
-          const id = this.glyphId(ch, style);
+        [...text].forEach((ch, i) => {
+          const id = this.glyphId(ch, styles[i]);
           if (id) uses += `<use href='#${id}'${advance ? ` x='${advance}'` : ""}/>`;
-          advance += GLYPHS[style][ch]?.[0] ?? UNITS_PER_EM / 2;
-        }
+          advance += GLYPHS[styles[i]][ch]?.[0] ?? UNITS_PER_EM / 2;
+        });
         return `<g transform='matrix(${sc} 0 0 -${sc} ${n(x0)} ${n(y)})'>${uses}</g>`;
       })
       .join("");
@@ -480,6 +680,147 @@ export function lineSegment(
   ];
 }
 
+/** f(u) and f'(u) of each trig function, and where its asymptotes fall (u = first + kπ). */
+const TRIG: Record<TrigFunction, { f: (u: number) => number; df: (u: number) => number; poles: number | null }> = {
+  sin: { f: Math.sin, df: Math.cos, poles: null },
+  cos: { f: Math.cos, df: (u) => -Math.sin(u), poles: null },
+  tan: { f: Math.tan, df: (u) => 1 / Math.cos(u) ** 2, poles: Math.PI / 2 },
+  sec: { f: (u) => 1 / Math.cos(u), df: (u) => Math.sin(u) / Math.cos(u) ** 2, poles: Math.PI / 2 },
+  csc: { f: (u) => 1 / Math.sin(u), df: (u) => -Math.cos(u) / Math.sin(u) ** 2, poles: 0 },
+  cot: { f: (u) => Math.cos(u) / Math.sin(u), df: (u) => -1 / Math.sin(u) ** 2, poles: 0 },
+};
+
+/** y = a·fn(b(x − c)) + d and its derivative, as functions of x. */
+function trigFn(curve: TrigCurve): { f: (x: number) => number; df: (x: number) => number } {
+  const { a, b, c, d } = curve;
+  const t = TRIG[curve.fn];
+  return { f: (x) => a * t.f(b * (x - c)) + d, df: (x) => a * b * t.df(b * (x - c)) };
+}
+
+/**
+ * The x of every vertical asymptote of a trig curve strictly inside the
+ * x-range, left to right (none for sin and cos). plot() draws them dashed.
+ */
+export function trigAsymptotes(curve: TrigCurve, x: PlotRange): number[] {
+  const first = TRIG[curve.fn].poles;
+  if (first === null) return [];
+  const { b, c } = curve;
+  // u = b(x - c) over the window, and the poles u = first + k pi in it.
+  const u0 = Math.min(b * (x.min - c), b * (x.max - c));
+  const u1 = Math.max(b * (x.min - c), b * (x.max - c));
+  const out: number[] = [];
+  for (let k = Math.ceil((u0 - first) / Math.PI); k <= Math.floor((u1 - first) / Math.PI); k++) {
+    const at = c + (first + k * Math.PI) / b;
+    if (at > x.min + 1e-9 && at < x.max - 1e-9) out.push(at);
+  }
+  return out.sort((p, q) => p - q);
+}
+
+/**
+ * The pieces of a trig curve inside the window, as [x0, x1] spans: between
+ * its asymptotes, split where it crosses y = min or y = max. Each piece
+ * between two asymptotes is sampled 32 times a period and every crossing
+ * found by bisection, so a span ends exactly on the window's edge.
+ */
+export function trigSpans(curve: TrigCurve, x: PlotRange, y: PlotRange): [number, number][] {
+  const { f } = trigFn(curve);
+  const inside = (v: number) => v >= y.min && v <= y.max;
+  const breaks = [x.min, ...trigAsymptotes(curve, x), x.max];
+  const dx = Math.PI / Math.abs(curve.b) / 16;
+  const spans: [number, number][] = [];
+  for (let i = 0; i + 1 < breaks.length; i++) {
+    // Stay a hair off the asymptotes, where the curve is infinite.
+    const eps = 1e-9 * (breaks[i + 1] - breaks[i]);
+    const lo = breaks[i] + (i > 0 ? eps : 0);
+    const hi = breaks[i + 1] - (i + 2 < breaks.length ? eps : 0);
+    const count = Math.max(8, Math.ceil((hi - lo) / dx));
+    const at = (j: number) => lo + ((hi - lo) * j) / count;
+    // The x where the curve leaves (or enters) the window between p and q.
+    const edge = (p: number, q: number): number => {
+      const inP = inside(f(p));
+      for (let k = 0; k < 60; k++) {
+        const m = (p + q) / 2;
+        if (inside(f(m)) === inP) p = m;
+        else q = m;
+      }
+      return inP ? p : q;
+    };
+    let start: number | null = inside(f(lo)) ? lo : null;
+    for (let j = 1; j <= count; j++) {
+      const p = at(j - 1);
+      const q = at(j);
+      const inQ = inside(f(q));
+      if (start === null && inQ) start = edge(p, q);
+      else if (start !== null && !inQ) {
+        spans.push([start, edge(p, q)]);
+        start = null;
+      }
+    }
+    if (start !== null) spans.push([start, hi]);
+  }
+  return spans.filter(([u, v]) => v - u > 1e-9);
+}
+
+/**
+ * SVG path data for a trig curve: each visible span as cubic Béziers, every
+ * piece matching the curve's value and slope at both its ends (Hermite), cut
+ * in half until it is within 0.05pt of the curve.
+ */
+function trigPath(
+  curve: TrigCurve,
+  x: PlotRange,
+  y: PlotRange,
+  px: (v: number) => number,
+  py: (v: number) => number,
+): string {
+  const { f, df } = trigFn(curve);
+  const sx = px(1) - px(0);
+  const sy = py(0) - py(1);
+  const start = Math.PI / Math.abs(curve.b) / 8;
+  let d = "";
+  const piece = (u: number, v: number, depth: number): string => {
+    const h = v - u;
+    const [f0, f1, d0, d1] = [f(u), f(v), df(u), df(v)];
+    const c1 = f0 + (d0 * h) / 3;
+    const c2 = f1 - (d1 * h) / 3;
+    const bez = (t: number) => (1 - t) ** 3 * f0 + 3 * (1 - t) ** 2 * t * c1 + 3 * (1 - t) * t * t * c2 + t ** 3 * f1;
+    const off = Math.max(...[0.25, 0.5, 0.75].map((t) => Math.abs(bez(t) - f(u + t * h)) * sy));
+    if (depth < 12 && (off > 0.05 || h * sx > 40)) {
+      const m = (u + v) / 2;
+      return piece(u, m, depth + 1) + piece(m, v, depth + 1);
+    }
+    return `C${n(px(u + h / 3))} ${n(py(c1))} ${n(px(v - h / 3))} ${n(py(c2))} ${n(px(v))} ${n(py(f1))}`;
+  };
+  for (const [u, v] of trigSpans(curve, x, y)) {
+    d += `M${n(px(u))} ${n(py(f(u)))}`;
+    const count = Math.max(1, Math.ceil((v - u) / start));
+    for (let i = 0; i < count; i++) d += piece(u + ((v - u) * i) / count, u + ((v - u) * (i + 1)) / count, 0);
+  }
+  return d;
+}
+
+/**
+ * A multiple of π as a reduced fraction p/q (q at most 12), or null when
+ * `v` is not one.
+ */
+function piFraction(v: number): [number, number] | null {
+  const r = v / Math.PI;
+  for (let q = 1; q <= 12; q++) {
+    const p = Math.round(r * q);
+    if (Math.abs(r * q - p) < 1e-6) return [p, q];
+  }
+  return null;
+}
+
+/** A multiple of π as printed on an axis: 0, π, −π, 3π, π/2, −3π/4. */
+function piText(v: number): string {
+  const [p, q] = piFraction(v) ?? [Math.round(v / Math.PI), 1];
+  if (p === 0) return "0";
+  const sign = p < 0 ? MINUS : "";
+  const num = `${Math.abs(p) === 1 ? "" : Math.abs(p)}π`;
+  return sign + (q === 1 ? num : `${num}/${q}`);
+}
+
 /** One layer of a drawing: its SVG elements and the glyphs its labels use. */
 class Layer {
   readonly parts: string[] = [];
@@ -568,13 +909,20 @@ function planeDrawing(spec: CoordinatePlaneSpec, ink: string): Drawing {
       `<path d='M${n(px(line.x))} ${n(padT)}V${n(padT + gridH)}' stroke='${ink}' stroke-width='0.9'${dash}/>`,
     );
   }
+  // A trig curve's asymptotes, dashed, under the curves.
+  const asymptotes = (spec.curves ?? []).flatMap((c) => (c.kind === "trig" ? trigAsymptotes(c, spec.x) : []));
+  if (asymptotes.length) {
+    content.push(
+      `<path d='${asymptotes.map((v) => `M${n(px(v))} ${n(padT)}V${n(padT + gridH)}`).join("")}' stroke='${ink}' stroke-width='0.9' stroke-dasharray='3 2'/>`,
+    );
+  }
 
   // Tick labels every `labelEvery` squares (never 0: the axes meet there).
   const every = spec.labelEvery ?? 2;
   const xLabels = xs
     .filter((v) => v !== 0 && isMultiple(v, spec.xStep * every))
     .filter((v) => v > spec.x.min && v < spec.x.max)
-    .map((v) => ({ x: px(v), y: axisY + 7.5, text: tickText(v) }));
+    .map((v) => ({ x: px(v), y: axisY + 7.5, text: spec.xTickLabels === "pi" ? piText(v) : tickText(v) }));
   const yLabels = ys
     .filter((v) => v !== 0 && isMultiple(v, spec.yStep * every))
     .filter((v) => v > spec.y.min && v < spec.y.max)
@@ -583,9 +931,14 @@ function planeDrawing(spec: CoordinatePlaneSpec, ink: string): Drawing {
     xs.filter((v) => isMultiple(v, spec.xStep * every)).map((v) => `M${n(px(v))} ${n(axisY - 1.5)}v3`).join("") +
     ys.filter((v) => isMultiple(v, spec.yStep * every)).map((v) => `M${n(axisX - 1.5)} ${n(py(v))}h3`).join("");
   if (tickMarks) frame.push(`<path d='${tickMarks}' stroke='#000' stroke-width='0.6'/>`);
-  frame.push(frame.letters.group("middle", xLabels), frame.letters.group("end", yLabels));
+  frame.push(frame.letters.group("middle", xLabels, { style: "math" }), frame.letters.group("end", yLabels));
 
   for (const curve of spec.curves ?? []) {
+    if (curve.kind === "trig") {
+      const d = trigPath(curve, spec.x, spec.y, px, py);
+      if (d) content.push(`<path d='${d}' fill='none' stroke='${ink}' stroke-width='1.2' stroke-linejoin='round'/>`);
+      continue;
+    }
     if (curve.kind === "line") {
       const seg = lineSegment(curve, spec.x, spec.y);
       if (!seg) continue;
@@ -613,7 +966,7 @@ function planeDrawing(spec: CoordinatePlaneSpec, ink: string): Drawing {
     const labels = shown
       .filter((p) => p.label)
       .map((p) => ({ x: px(p.x) + 3.5, y: py(p.y) - 3.5, text: p.label! }));
-    content.push(content.letters.group("start", labels, { fill: ink }));
+    content.push(content.letters.group("start", labels, { fill: ink, style: "math" }));
   }
 
   return { width, height, frame, content };
@@ -705,8 +1058,239 @@ function numberLineDrawing(spec: NumberLineSpec, ink: string): Drawing {
       content.letters.group(
         "middle",
         placed.map((l) => ({ x: l.x, y: lineY - 6 - l.row * LABEL_ROW, text: l.text })),
-        { fill: ink, halo: false },
+        { fill: ink, halo: false, style: "math" },
       ),
+    );
+  }
+  return { width, height, frame, content };
+}
+
+/** Smallest angle a triangle diagram may have (1°): anything thinner cannot be labelled. */
+const MIN_TRIANGLE_ANGLE = Math.PI / 180;
+
+/** The angle at each corner of a triangle, in radians (NaN for a degenerate one). */
+function triangleAngles(pts: readonly PlotXY[]): number[] {
+  return pts.map((p, i) => {
+    const q = pts[(i + 1) % 3];
+    const r = pts[(i + 2) % 3];
+    const [ux, uy, vx, vy] = [q.x - p.x, q.y - p.y, r.x - p.x, r.y - p.y];
+    const lu = Math.hypot(ux, uy);
+    const lv = Math.hypot(vx, vy);
+    if (!(lu > 0 && lv > 0)) return NaN;
+    return Math.acos(Math.min(1, Math.max(-1, (ux * vx + uy * vy) / (lu * lv))));
+  });
+}
+
+/** Size of side and angle labels on a triangle diagram, and of its corner names. */
+const TRIANGLE_LABEL_PT = 7.5;
+const TRIANGLE_NAME_PT = 8.5;
+/** Most of the column a triangle's own outline may take: room is left round it for labels. */
+const TRIANGLE_MAX_W = PLOT_WIDTH_PT - 56;
+const TRIANGLE_MAX_H = 96;
+
+type Vec = [number, number];
+const sub = (p: Vec, q: Vec): Vec => [p[0] - q[0], p[1] - q[1]];
+const add = (p: Vec, q: Vec, k = 1): Vec => [p[0] + q[0] * k, p[1] + q[1] * k];
+const unit = (v: Vec): Vec => {
+  const l = Math.hypot(v[0], v[1]);
+  return [v[0] / l, v[1] / l];
+};
+const dot = (p: Vec, q: Vec) => p[0] * q[0] + p[1] * q[1];
+
+/** A label's box, by its centre and half-sizes, in points. */
+interface Box {
+  cx: number;
+  cy: number;
+  hw: number;
+  hh: number;
+}
+/** How far a box reaches from its centre in direction `u` (a unit vector). */
+const reach = (b: Pick<Box, "hw" | "hh">, u: Vec) => Math.abs(u[0]) * b.hw + Math.abs(u[1]) * b.hh;
+const overlaps = (a: Box, b: Box, gap = 1) =>
+  Math.abs(a.cx - b.cx) < a.hw + b.hw + gap && Math.abs(a.cy - b.cy) < a.hh + b.hh + gap;
+
+/**
+ * A triangle laid out at a scale, in points (y down), with every label
+ * placed: side labels just outside their side's midpoint (clear of it by
+ * construction, since the triangle lies wholly on its inner side), angle
+ * labels inside their arc along the bisector and far enough in to clear both
+ * sides, corner names outside the corner. A label that would hit one placed
+ * before it moves further out.
+ */
+function layoutTriangle(spec: TriangleSpec, scale: number) {
+  const cs = spec.corners;
+  const minX = Math.min(...cs.map((c) => c.x));
+  const maxY = Math.max(...cs.map((c) => c.y));
+  const P: Vec[] = cs.map((c) => [(c.x - minX) * scale, (maxY - c.y) * scale]);
+  const centroid: Vec = [(P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3];
+  const labels: { box: Box; text: string; size: number; answer: boolean; name: boolean }[] = [];
+  const boxes = () => labels.map((l) => l.box);
+  const box = (text: string, size: number): Pick<Box, "hw" | "hh"> => ({
+    hw: letteringWidth(text, size, "math") / 2,
+    hh: 0.36 * size,
+  });
+  // Move a box along `dir` until it clears every label placed so far.
+  const clear = (b: Box, dir: Vec): Box => {
+    for (let i = 0; i < 60 && boxes().some((o) => overlaps(o, b)); i++) {
+      b = { ...b, cx: b.cx + dir[0], cy: b.cy + dir[1] };
+    }
+    return b;
+  };
+  const marks: string[] = [];
+  const gap = 2;
+
+  // Angles: an arc (or a right-angle square) and the label inside it.
+  cs.forEach((c, i) => {
+    if (!c.angle && !c.rightAngle) return;
+    const p = P[i];
+    const q = P[(i + 1) % 3];
+    const r = P[(i + 2) % 3];
+    const e1 = unit(sub(q, p));
+    const e2 = unit(sub(r, p));
+    const theta = Math.acos(Math.max(-1, Math.min(1, dot(e1, e2))));
+    const shortest = Math.min(Math.hypot(...sub(q, p)), Math.hypot(...sub(r, p)));
+    const u = unit(add(e1, e2));
+    const half = c.angle?.text ? box(c.angle.text, TRIANGLE_LABEL_PT) : null;
+    let radius: number;
+    if (c.rightAngle) {
+      radius = Math.min(6, shortest * 0.3);
+      const a = add(p, e1, radius);
+      const b = add(a, e2, radius);
+      const d = add(p, e2, radius);
+      marks.push(`M${n(a[0])} ${n(a[1])}L${n(b[0])} ${n(b[1])}L${n(d[0])} ${n(d[1])}`);
+      radius *= Math.SQRT2;
+    } else {
+      radius = Math.min(9, shortest * 0.4);
+    }
+    let placed: Box | null = null;
+    if (half) {
+      // Inside, along the bisector, far enough in to clear both sides.
+      const n1: Vec = dot([-e1[1], e1[0]], u) > 0 ? [-e1[1], e1[0]] : [e1[1], -e1[0]];
+      const n2: Vec = dot([-e2[1], e2[0]], u) > 0 ? [-e2[1], e2[0]] : [e2[1], -e2[0]];
+      const sin = Math.sin(theta / 2);
+      const t = Math.max(
+        radius + gap + reach(half, u),
+        (reach(half, n1) + gap) / sin,
+        (reach(half, n2) + gap) / sin,
+      );
+      // ...and of the opposite side, near its own arc, and clear of other labels.
+      const oe = unit(sub(r, q));
+      let on: Vec = [-oe[1], oe[0]];
+      if (dot(on, sub(centroid, q)) < 0) on = [oe[1], -oe[0]];
+      const at = add(p, u, t);
+      const inside = { cx: at[0], cy: at[1], ...half };
+      const moved = clear(inside, u);
+      const ok =
+        t <= Math.min(40, shortest * 0.7) &&
+        Math.hypot(moved.cx - inside.cx, moved.cy - inside.cy) <= 4 &&
+        dot(sub([moved.cx, moved.cy], q), on) >= reach(half, on) + gap;
+      if (ok) {
+        placed = moved;
+        // A sharp angle's arc widens to meet its label.
+        if (!c.rightAngle) radius = Math.max(radius, Math.min(t - reach(half, u) - gap, shortest * 0.7));
+      } else {
+        // Too sharp or too crowded: just outside the corner, beside the arc,
+        // across whichever side leaves the label more room sideways.
+        const sides: [Vec, Vec][] = [
+          [e1, [-n1[0], -n1[1]]],
+          [e2, [-n2[0], -n2[1]]],
+        ];
+        const [e, out] = Math.abs(sides[0][1][0]) >= Math.abs(sides[1][1][0]) ? sides[0] : sides[1];
+        const o = add(add(p, e, radius + reach(half, e)), out, reach(half, out) + gap);
+        placed = clear({ cx: o[0], cy: o[1], ...half }, out);
+      }
+    }
+    if (!c.rightAngle) {
+      const a = add(p, e1, radius);
+      const b = add(p, e2, radius);
+      const sweep = e1[0] * e2[1] - e1[1] * e2[0] > 0 ? 1 : 0;
+      marks.push(`M${n(a[0])} ${n(a[1])}A${n(radius)} ${n(radius)} 0 0 ${sweep} ${n(b[0])} ${n(b[1])}`);
+    }
+    if (!placed || !c.angle) return;
+    const b = placed;
+    const size = TRIANGLE_LABEL_PT;
+    labels.push({ box: b, text: c.angle.text, size, answer: !!c.angle.answer, name: false });
+  });
+
+  // Corner names, outside each corner along its bisector.
+  cs.forEach((c, i) => {
+    if (!c.name) return;
+    const p = P[i];
+    const u = unit(add(unit(sub(P[(i + 1) % 3], p)), unit(sub(P[(i + 2) % 3], p))));
+    const out: Vec = [-u[0], -u[1]];
+    const half = box(c.name, TRIANGLE_NAME_PT);
+    const at = add(p, out, reach(half, out) + gap + 0.5);
+    const b = clear({ cx: at[0], cy: at[1], ...half }, out);
+    labels.push({ box: b, text: c.name, size: TRIANGLE_NAME_PT, answer: false, name: true });
+  });
+
+  // Side labels, outside the midpoint of the side opposite each corner.
+  cs.forEach((c, i) => {
+    if (!c.opposite?.text) return;
+    const q = P[(i + 1) % 3];
+    const r = P[(i + 2) % 3];
+    const e = unit(sub(r, q));
+    let out: Vec = [-e[1], e[0]];
+    if (dot(out, sub(P[i], q)) > 0) out = [e[1], -e[0]];
+    const mid: Vec = [(q[0] + r[0]) / 2, (q[1] + r[1]) / 2];
+    const half = box(c.opposite.text, TRIANGLE_LABEL_PT);
+    const at = add(mid, out, reach(half, out) + gap);
+    const b = clear({ cx: at[0], cy: at[1], ...half }, out);
+    labels.push({ box: b, text: c.opposite.text, size: TRIANGLE_LABEL_PT, answer: !!c.opposite.answer, name: false });
+  });
+
+  const xs = [...P.map((p) => p[0]), ...labels.flatMap((l) => [l.box.cx - l.box.hw, l.box.cx + l.box.hw])];
+  const ys = [...P.map((p) => p[1]), ...labels.flatMap((l) => [l.box.cy - l.box.hh, l.box.cy + l.box.hh])];
+  return {
+    P,
+    labels,
+    marks,
+    bounds: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) },
+  };
+}
+
+function triangleDrawing(spec: TriangleSpec, ink: string): Drawing {
+  const cs = spec.corners;
+  const w0 = Math.max(...cs.map((c) => c.x)) - Math.min(...cs.map((c) => c.x));
+  const h0 = Math.max(...cs.map((c) => c.y)) - Math.min(...cs.map((c) => c.y));
+  // The outline's scale depends on its corners alone, so the student's
+  // triangle and the answer graph's are drawn the same size; only labels too
+  // wide for the column shrink it.
+  let scale = Math.min(TRIANGLE_MAX_W / w0, TRIANGLE_MAX_H / h0);
+  let lay = layoutTriangle(spec, scale);
+  for (let i = 0; i < 4; i++) {
+    const over = lay.bounds.maxX - lay.bounds.minX - (PLOT_WIDTH_PT - 4);
+    if (over <= 0) break;
+    scale *= Math.max(0.2, (w0 * scale - over) / (w0 * scale));
+    lay = layoutTriangle(spec, scale);
+  }
+  const { P, labels, marks, bounds } = lay;
+  const margin = 3;
+  const width = PLOT_WIDTH_PT;
+  const height = bounds.maxY - bounds.minY + 2 * margin;
+  const ox = (width - (bounds.maxX - bounds.minX)) / 2 - bounds.minX;
+  const oy = margin - bounds.minY;
+  const X = (v: number) => n(v + ox);
+  const Y = (v: number) => n(v + oy);
+
+  const frame = new Layer();
+  const content = new Layer();
+  frame.push(
+    `<path d='M${X(P[0][0])} ${Y(P[0][1])}L${X(P[1][0])} ${Y(P[1][1])}L${X(P[2][0])} ${Y(P[2][1])}Z' fill='none' stroke='#000' stroke-width='1' stroke-linejoin='round'/>`,
+  );
+  if (marks.length) {
+    // Marks were laid out at the origin; shift them like everything else.
+    frame.push(
+      `<g transform='translate(${n(ox)} ${n(oy)})'><path d='${marks.join("")}' fill='none' stroke='#000' stroke-width='0.6'/></g>`,
+    );
+  }
+  // Labels sit on their baselines: 0.34 em below the middle of their box.
+  const item = (l: (typeof labels)[number]) => ({ x: l.box.cx + ox, y: l.box.cy + oy + 0.34 * l.size, text: l.text });
+  for (const size of [TRIANGLE_NAME_PT, TRIANGLE_LABEL_PT]) {
+    const ofSize = labels.filter((l) => l.size === size);
+    frame.push(frame.letters.group("middle", ofSize.filter((l) => !l.answer).map(item), { size, style: "math" }));
+    content.push(
+      content.letters.group("middle", ofSize.filter((l) => l.answer).map(item), { size, style: "math", fill: ink }),
     );
   }
   return { width, height, frame, content };
@@ -714,6 +1298,7 @@ function numberLineDrawing(spec: NumberLineSpec, ink: string): Drawing {
 
 function draw(spec: GraphSpec, opts: PlotOptions): Drawing {
   const ink = opts.ink ?? DEFAULT_INK;
+  if (spec.kind === "triangle") return triangleDrawing(spec, ink);
   return spec.kind === "plane" ? planeDrawing(spec, ink) : numberLineDrawing(spec, ink);
 }
 
@@ -745,8 +1330,22 @@ export function plotLayers(spec: GraphSpec, opts: PlotOptions = {}): { frame: st
   return { frame: svgOf(d, [d.frame]), content: d.content.parts.length ? svgOf(d, [d.content]) : null };
 }
 
-/** The same graph with nothing drawn on it: only its grid or line, axes and labels. */
+/**
+ * The same graph with nothing drawn on it: only its grid or line, axes and
+ * labels; for a triangle, the triangle without its Answer's labels.
+ */
 export function blankGraph(spec: GraphSpec): GraphSpec {
+  if (spec.kind === "triangle") {
+    const corners = spec.corners.map((c) => {
+      const { angle, opposite, ...rest } = c;
+      return {
+        ...rest,
+        ...(angle && !angle.answer ? { angle } : {}),
+        ...(opposite && !opposite.answer ? { opposite } : {}),
+      };
+    }) as TriangleSpec["corners"];
+    return { kind: "triangle", corners };
+  }
   if (spec.kind === "plane") {
     const { curves: _c, lines: _l, points: _p, ...frame } = spec;
     return frame;
