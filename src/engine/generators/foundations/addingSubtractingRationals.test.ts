@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -110,6 +111,9 @@ describe("adding-subtracting-rationals: Distractors", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
+        // 1 + 1 + 1 (or 2 + 2 + 2) on a whole-number, no-negatives sheet is the natural limit: the slips coincide
+        const sameTerms = /^(\d+)( \+ \1){2}$/.test(p.prompt);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBeGreaterThanOrEqual(sameTerms ? 3 : 4);
         const values = p.distractorHints.map(answerNumber);
         for (const v of values) expect(close(v, answerNumber(p.answer))).toBe(false);
         expect(new Set(values.map((v) => v.toFixed(9))).size).toBe(values.length);
@@ -132,6 +136,7 @@ describe("adding-subtracting-rationals: Distractors", () => {
     // \frac{1}{2} + \frac{1}{3}: across gives \frac{2}{5}, unscaled numerators \frac{2}{6} = \frac{1}{3}
     const sum = distractors({ ...base, terms: [rat(1, 2), rat(1, 3)], ops: ["+"], answer: rat(5, 6) }, false);
     expect(sum).toContain("\\frac{2}{5}");
+    expect(sum).toContain("\\frac{1}{6}"); // multiplied the fractions
     // no negative numbers on the sheet: no negative choices either
     for (const d of sum) expect(d).not.toContain("-");
     // 3 - (-4) worked as 3 - 4

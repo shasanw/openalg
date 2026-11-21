@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -97,14 +98,17 @@ describe("distributive-property: Topic Options", () => {
 });
 
 describe("distributive-property: Distractors", () => {
-  it("are distinct, never equal to the Answer, and at least two", () => {
+  it("are distinct, never equal to the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
         const k = construct(params, createRng(seed));
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        for (const d of p.distractorHints) expect(sameExpression(d, p.answer, k.v), d).toBe(false);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        for (const [i, d] of choices.entries()) {
+          for (const earlier of choices.slice(0, i)) expect(sameExpression(d, earlier, k.v), d).toBe(false);
+        }
       }),
     );
   });
@@ -128,6 +132,7 @@ describe("distributive-property: Distractors", () => {
       answer: [{ coef: rat(2), deg: 2 }, { coef: rat(3), deg: 1 }],
     };
     expect(distractors(v)).toContain("5x");
+    expect(distractors(v)).toContain("2x + 3"); // omitted the outside factor
   });
 });
 

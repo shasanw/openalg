@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -105,7 +106,10 @@ describe("solving-proportions: Distractors", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const values = p.distractorHints.map((d) => answerValues(d).values[0]);
+        expect(new Set(values).size).toBeGreaterThanOrEqual(4);
+        expect(new Set(values).size).toBe(values.length);
         const answer = answerValues(p.answer).values[0];
         for (const d of p.distractorHints) expect(close(answerValues(d).values[0], answer)).toBe(false);
       }),
@@ -122,6 +126,7 @@ describe("solving-proportions: Distractors", () => {
       style: "fraction",
     };
     const hints = distractors(k);
+    expect(hints).toContain("x = 24"); // stopped at 3x = 24
     expect(hints[0]).toBe("x = \\frac{9}{2}");
     expect(hints).toContain("x = 7");
     // \frac{x + 2}{5} = \frac{6}{3}: x = 8; stopped at x + 2 = 10, or moved the 2 with its sign (12)

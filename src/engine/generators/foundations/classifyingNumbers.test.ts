@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { classifyingNumbers } from "./classifyingNumbers.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -58,7 +59,7 @@ describe("classifying-numbers: Distractors", () => {
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
         expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
         expect(p.distractorHints).not.toContain(p.answer);
         for (const d of p.distractorHints) expect(d).toMatch(/^\\text\{[a-z]+(, [a-z]+)*\}$/);
       }),

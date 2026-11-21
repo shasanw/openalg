@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -129,8 +130,10 @@ describe("order-of-operations: Distractors", () => {
       fc.property(anySeed, anyParams, (seed, params) => {
         const k = construct(params, createRng(seed));
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(1);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        // an expression made only of 2s, like (2^2)^2 or 2 - 2 \\div 2, is the natural limit: the slips coincide
+        const allTwos = /^[^0-9]*2([^0-9]+2)*[^0-9]*$/.test(p.prompt);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(allTwos ? 3 : 4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
         for (const d of p.distractorHints) {
           expect(d).toMatch(/^-?\d+$/);
           expect(d).not.toBe(p.answer);
@@ -147,6 +150,7 @@ describe("order-of-operations: Distractors", () => {
   it("model the real mistakes", () => {
     // 2 + 3 \times 4 = 14: left to right gives 20
     const k: OrderConstruction = { tree: bin("+", num(2), bin("*", num(3), num(4), 12), 14), answer: 14 };
+    expect(distractors(k)).toContain("9"); // added 3 and 4, then added 2
     expect(distractors(k)[0]).toBe("20");
     // 12 - 2 + 3 = 13: "addition before subtraction" gives 7
     const pemdas: OrderConstruction = { tree: bin("+", bin("-", num(12), num(2), 10), num(3), 13), answer: 13 };
