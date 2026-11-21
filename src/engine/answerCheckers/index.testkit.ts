@@ -1,3 +1,6 @@
+import { trigAnyAngle } from "../generators/trig/trigAnyAngle.answer.testkit";
+import { radiansDegrees } from "../generators/trig/radiansDegrees.answer.testkit";
+import { angleMeasure } from "../generators/trig/angleMeasure.answer.testkit";
 import { evalLatex } from "../generators/shared/latexEval.testkit";
 import { equal } from "./math.testkit";
 import { counting } from "./counting.testkit";
@@ -25,6 +28,9 @@ import { graphingTrig } from "../generators/trig/graphingTrig.answer.testkit";
 import type { Problem } from "../types";
 
 export const checkers: Record<string, (p: Problem) => void> = {
+  "angle-measure": angleMeasure,
+  "radians-degrees": radiansDegrees,
+  "trig-any-angle": trigAnyAngle,
   "graphing-trig": graphingTrig,
   "arithmetic-sequences": arithmeticSequences,
   "arithmetic-series": arithmeticSeries,
