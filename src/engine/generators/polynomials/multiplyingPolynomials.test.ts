@@ -72,9 +72,32 @@ describe("multiplying-polynomials: distractors", () => {
     fc.assert(
       fc.property(anySeed, params, (seed, ps) => {
         const p = generator.generate(ps, seed);
-        expectGoodHints(p, 3);
+        expectGoodHints(p, 4);
         expectHintsWrongInValue(p);
       }),
+      { numRuns: 1500 },
+    );
+  });
+
+  it("offers four value-distinct Distractors for a monomial times a binomial in two variables (seed 12)", () => {
+    const p = generator.generate(
+      { factors: "monomial", maxCoefficient: 12, leadingCoefficients: true, twoVariables: true, varyVariable: false },
+      12,
+    );
+    expectGoodHints(p, 4);
+    expectHintsWrongInValue(p);
+  });
+
+  it("offers four Distractors for every option combination, with a lone variable factor too", () => {
+    fc.assert(
+      fc.property(anySeed, params, (seed, ps) => {
+        for (const factors of ["monomial", "binomials", "binomialTrinomial"] as const) {
+          const p = generator.generate({ ...ps, factors }, seed);
+          expectGoodHints(p, 4);
+          expectHintsWrongInValue(p);
+        }
+      }),
+      { numRuns: 500 },
     );
   });
 
@@ -90,5 +113,21 @@ describe("multiplying-polynomials: distractors", () => {
   it("offers the sign slip on the last product and the flipped middle", () => {
     expect(distractors(k)).toContain("2x^{2} - x + 15");
     expect(distractors(k)).toContain("2x^{2} + x - 15");
+  });
+
+  it("offers the numbers multiplied with the second factor's variables copied", () => {
+    // (x - 3)(2x + 5): 2x + 5 - 6x - 15
+    expect(distractors(k)).toContain("-4x - 10");
+  });
+
+  it("offers a binomial's second term distributed with the first copied down", () => {
+    // x + (-3)(2x + 5)
+    expect(distractors(k)).toContain("-5x - 15");
+  });
+
+  it("offers a monomial distributed to the last term only", () => {
+    // 3x(x + 2) = 3x^2 + 6x, with only the last term multiplied: x + 6x
+    const m = { kind: "monomial" as const, vars: ["x", "y"] as [string, string], left: [mono(3, 1)], right: [mono(1, 1), mono(2)], answer: mul([mono(3, 1)], [mono(1, 1), mono(2)]) };
+    expect(distractors(m)).toContain("7x");
   });
 });

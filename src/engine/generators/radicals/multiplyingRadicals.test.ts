@@ -69,6 +69,13 @@ describe("multiplying-radicals: distractors", () => {
     expectValueDistractors(p.answer, p.distractorHints, 4);
   });
 
+  it("still supplies four wrong values for the product of equal square roots with a variable and a 2 under the root", () => {
+    for (const seed of [1534026198, 1845774268, 1312890010]) {
+      const p = generator.generate({ form: "monomial", cubeRoots: false, variables: true }, seed);
+      expectValueDistractors(p.answer, p.distractorHints, 4);
+    }
+  });
+
   it("include the binomial square missing its middle term", () => {
     for (let s = 0; s < 300; s++) {
       const k = construct({ form: "binomial" }, createRng(s));

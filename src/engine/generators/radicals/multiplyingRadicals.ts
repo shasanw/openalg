@@ -189,6 +189,12 @@ export function distractors(k: MultiplyConstruction): string[] {
     // multiplied the numbers in front and kept one radical: \sqrt{5} \cdot \sqrt{5} = \sqrt{5}
     if (!isRational(a) && a.rad.n === b.rad.n && a.rad.vars.length === 0 && b.rad.vars.length === 0)
       more.push(combine([term(a.coef.n * b.coef.n, n, a.rad)]));
+    // multiplied the variables but added the numbers under the root: \sqrt{11x} \cdot \sqrt{11x} = \sqrt{22x^{2}}
+    if (!isRational(a) && !isRational(b) && (a.rad.vars.length > 0 || b.rad.vars.length > 0))
+      more.push(combine([term(product.coef.n, n, mono(a.rad.n + b.rad.n, [...a.rad.vars, ...b.rad.vars]))]));
+    // multiplied the numbers under the root but left the variables as they were: \sqrt{3x} \cdot \sqrt{3x} = \sqrt{9x}
+    if (a.rad.vars.length > 0 && b.rad.vars.length > 0)
+      more.push(combine([term(product.coef.n, n, mono(a.rad.n * b.rad.n, a.rad.vars))]));
     // treated equal radicals as like terms to add: \sqrt{2} \cdot \sqrt{2} = 2\sqrt{2}
     if (!isRational(a) && a.rad.n === b.rad.n && a.rad.vars.length === 0 && b.rad.vars.length === 0)
       more.push(combine([term(2 * a.coef.n * b.coef.n, n, a.rad)]));
