@@ -125,8 +125,8 @@ export function determinants(k: CramerConstruction): { D: Rat; Di: Rat[] } {
  * Mistake-based Distractors, most common first: the coordinates swapped (the
  * constants put in the wrong column, so D_y / D lands on x); D divided by
  * D_i instead (the fraction upside down); the determinants left undivided
- * (D_x, D_y); the sign of D dropped (every coordinate negated); and in three
- * variables, the coordinates rotated.
+ * (D_x, D_y); the sign of D dropped (every coordinate negated); in three
+ * variables, the coordinates rotated; in two, D found as ad + bc.
  */
 export function distractors(k: CramerConstruction): string[] {
   const s = k.solution;
@@ -138,6 +138,13 @@ export function distractors(k: CramerConstruction): string[] {
   candidates.push(tupleLatex(s.map((v) => mul(rat(-1), v))));
   if (s.length === 3) candidates.push(tupleLatex([s[1], s[2], s[0]]), tupleLatex([s[0], s[2], s[1]]));
   candidates.push(tupleLatex([mul(rat(-1), s[0]), ...s.slice(1)]));
+  if (s.length === 2) {
+    // D found as ad + bc (the sign slip in a 2 × 2 determinant), the D_i right:
+    // still a different point when a coordinate is 0 and the slips above coincide
+    const [[p, q], [r, t]] = k.a;
+    const wrongD = p * t + q * r;
+    if (wrongD !== 0) candidates.push(tupleLatex(Di.map((d) => mul(d, rat(1, wrongD)))));
+  }
   return distinctHints(answerLatex(k), candidates);
 }
 
