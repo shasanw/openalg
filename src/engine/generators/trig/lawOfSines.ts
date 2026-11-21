@@ -445,13 +445,14 @@ export function distractors(k: LawOfSinesConstruction): string[] {
 function ambiguousDistractors(k: LawOfSinesConstruction & AmbiguousConstruction): string[] {
   const { Ag, sg, sh, places: p, whole } = k;
   const answer = answerLatex(k);
-  const sol = (H: number): SsaSolution => {
-    const W = 180 - Ag - H;
-    return { H, W, sw: (sg * sinD(W)) / sinD(Ag) };
-  };
+  const sol = (H: number, third = 180 - Ag - H, sideOf = (W: number) => (sg * sinD(W)) / sinD(Ag)): SsaSolution => ({
+    H,
+    W: third,
+    sw: sideOf(third),
+  });
   const ok = (s: SsaSolution) => !whole || s.W > 0;
-  const show = (Hs: number[]) => {
-    const sols = Hs.map(sol);
+  const show = (Hs: number[], third?: (H: number) => number, sideOf?: (W: number) => number) => {
+    const sols = Hs.map((H) => sol(H, third?.(H), sideOf));
     return sols.every(ok) ? ambiguousLatex(k, sols, p, whole) : null;
   };
   const sinH = (sh * sinD(Ag)) / sg;
@@ -497,6 +498,16 @@ function ambiguousDistractors(k: LawOfSinesConstruction & AmbiguousConstruction)
     // cos of the given angle in place of its sine
     Math.abs((sh * cosD(Ag)) / sg) <= 1 ? show([asinD((sh * cosD(Ag)) / sg)]) : null,
   ];
+  // Still later: sin of the given angle left out (sin H = side h / side g), and, once H is found,
+  // the third angle taken as 180 degrees minus H (the given angle forgotten), or the third side
+  // found from the inverted ratio.
+  if (sh / sg <= 1) later.push(show([asinD(sh / sg)]));
+  if (whole && !Number.isNaN(H1)) {
+    later.push(
+      show([H1], (H) => 180 - H),
+      show([H1], undefined, (W) => (sg * sinD(Ag)) / sinD(W)),
+    );
+  }
   return distinctHints(answer, [...distinctHints(answer, cands).slice(0, 6), ...later]);
 }
 

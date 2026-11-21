@@ -97,6 +97,8 @@ function shape(rng: Rng, max: number): [number, number] {
   }
 }
 
+const isZero = (m: Matrix) => m.every((row) => row.every((x) => x.n === 0));
+
 const signed = (rng: Rng, lo: number, hi: number) => (rng.bool() ? 1 : -1) * rng.int(lo, hi);
 
 /** Pure construction from params + an RNG. */
@@ -121,11 +123,18 @@ export function construct(params: ParamValues, rng: Rng): MatrixOpConstruction {
       if (m * n === 1 || bRows * q === 1 || n + q > 5) continue;
       const a = randomMatrix(rng, m, n, 5, neg);
       const b = randomMatrix(rng, bRows, q, 5, neg);
+      // an all-zero factor makes a degenerate product (every entry 0, nothing to compute)
+      if (isZero(a) || isZero(b)) continue;
       return { operation, a, b, s1: 1, s2: 1 };
     }
   }
-  const [r, c] = shape(rng, max);
-  const a = randomMatrix(rng, r, c, 9, neg);
+  let [r, c] = shape(rng, max);
+  let a = randomMatrix(rng, r, c, 9, neg);
+  // a scalar times the zero matrix is degenerate (the Answer is the matrix itself): draw again
+  while (operation === "scalar" && isZero(a)) {
+    [r, c] = shape(rng, max);
+    a = randomMatrix(rng, r, c, 9, neg);
+  }
   if (operation === "scalar") return { operation, a, s1: signed(rng, 2, 6), s2: 0 };
   // an undefined sum pairs A with a matrix of the transposed shape
   const [br, bc] = undefinedOne && r !== c ? [c, r] : [r, c];
@@ -163,7 +172,8 @@ function combine(k: MatrixOpConstruction, s1: number, s2: number, b: Matrix = k.
  * - Combinations: one scalar left off (2A - B, A - 3B), and the second
  *   term's sign flipped.
  * - Products: BA, the entry-by-entry product, the transposed product, and
- *   rows times rows (AB^T) or columns times columns (A^TB).
+ *   rows times rows (AB^T) or columns times columns (A^TB); entry pairs
+ *   subtracted; a non-square product written with rows and columns swapped.
  * - Undefined: lining the shapes up anyway (A^T + B, A + B^T; for a product,
  *   BA or AB^T when those exist).
  */
@@ -212,6 +222,13 @@ export function distractors(k: MatrixOpConstruction): string[] {
       dotSlip((x, y, i) => (i % 2 === 0 ? 1 : -1) * x * y), // alternate signs as in a determinant
       dotSlip((x, y) => x + y), // add entries in place of multiplying
       dotSlip((x, y) => x * y), // ignore any unpaired entries
+    );
+    // Later mistakes, after every one above so their order is kept: subtracting the entry pairs
+    // in place of multiplying them, and the product written with its rows and columns swapped
+    // (a 2 by 3 answer as 3 by 2).
+    out.push(
+      dotSlip((x, y) => x - y),
+      ab && rows(ab) !== cols(ab) ? transpose(ab) : null,
     );
     // a row times a column: the products written out as a row without adding them up
     if (rows(a) === 1 && cols(b!) === 1 && paired > 1) out.push([a[0].slice(0, paired).map((x, i) => rat(x.n * b![i][0].n))]);

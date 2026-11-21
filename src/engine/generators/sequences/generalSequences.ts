@@ -239,12 +239,14 @@ function explicitRule(rng: Rng, negOk: boolean): Rule {
               (n) => r(sign(n) * n), // n^2 read as n
               (n) => r(sign(n) * body(n + 1)), // body evaluated one index ahead
               (n) => r(sign(n) * 2 * n), // n^2 read as 2n
+              (n) => r(sign(n) * body(n - 1)), // body evaluated one index behind
             ]
           : [
               (n) => r(sign(n) * p * n + q), // the sign applied to the first term only
               (n) => r(p * n + sign(n) * q), // the sign applied to the last term only
               (n) => r(-body(n)), // (-1)^n read as -1
               (n) => r(sign(n) * body(n + 1)), // body evaluated one index ahead
+              (n) => r(sign(n) * body(n - 1)), // body evaluated one index behind
             ],
       };
     }
@@ -361,6 +363,8 @@ function acceptable(k: SequenceConstruction, negOk: boolean): boolean {
     if (!printable(v)) return false;
     if (!negOk && v.n <= 0) return false;
   }
+  // a single term that is 0 is a weak Problem (a_5 = 0 for (-1)^{n+1}(n - 5)): ask for another
+  if (k.ask === "term" && k.seq(k.k)!.n === 0) return false;
   // not a constant sequence (a recursive rule started at its fixed point)
   const opening = [1, 2, 3, 4, 5].map((i) => k.seq(i));
   return opening.some((v) => v && opening[0] && !ratEq(v, opening[0]));

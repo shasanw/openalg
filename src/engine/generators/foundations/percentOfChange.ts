@@ -143,8 +143,9 @@ const flip = (d: Direction): Direction => (d === "increase" ? "decrease" : "incr
  *   taken as the percent, the new amount as a percent of the original
  *   (130% for a 30% increase), and forgetting to multiply by 100;
  * - new amount: just the change (not added on), the wrong direction, the
- *   percent added on as a number (40 + 30), and the decimal point one place
- *   off in the percent.
+ *   percent added on as a number (40 + 30), the decimal point one place
+ *   off in the percent, the original divided by the percent, the decimal moved
+ *   one place too few, and 100 changed by the percent.
  */
 export function distractors(k: ChangeConstruction, decimals = true): string[] {
   const { original, updated, percent, direction } = k;
@@ -188,6 +189,12 @@ export function distractors(k: ChangeConstruction, decimals = true): string[] {
     div(original, factor(direction, percent)),
     // Added the percent as a number whichever way the change went: 16 decreased by 50% as 16 + 50.
     add(original, percent),
+    // Divided by the percent as a decimal instead of multiplying by it: 80 decreased by 25% as 80 \div 0.25.
+    div(original, div(percent, rat(100))!),
+    // Moved the decimal point only one place (30% as 3.0 instead of 0.3), for the change.
+    mul(original, factor(direction, mul(percent, rat(10)))),
+    // Took the percent of 100 (the base of every percent) instead of of the original: 100 \pm p.
+    (direction === "increase" ? add : sub)(rat(100), percent),
   ];
   return distinctHints(
     answerLatex(k),

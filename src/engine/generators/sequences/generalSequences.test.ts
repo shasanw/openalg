@@ -124,3 +124,29 @@ describe("general-sequences: generate()", () => {
     }
   });
 });
+
+describe("general-sequences: soak regressions", () => {
+  it("never asks for a single term that is 0", () => {
+    fc.assert(
+      fc.property(anySeed, fc.constantFrom("explicit", "recursive", "mixed"), (seed, rule) => {
+        const p = generator.generate({ rule, ask: "term", allowNegatives: true }, seed);
+        expect(p.answer, p.prompt).not.toBe("0");
+      }),
+    );
+  });
+
+  it("asks for another term instead of a_5 = 0 in (-1)^{n+1}(n - 5) (seed 1825414503)", () => {
+    const p = generator.generate({ rule: "explicit", ask: "term", allowNegatives: true }, 1825414503);
+    expect(p.answer).not.toBe("0");
+    expectDistinctDistractors(p, (a, b) => sameList(parseList(a), parseList(b)));
+  });
+
+  it("models the body evaluated one index behind, for a_4 of (-1)^n (n - 5) (seed 1210413030)", () => {
+    const p = generator.generate({ rule: "mixed", ask: "mixed", allowNegatives: true }, 1210413030);
+    expect(p.prompt).toContain("(-1)^{n}(n - 5)");
+    expect(p.answer).toBe("-1");
+    // a_4 = -1; the body at n = 3 is -2, with the sign of a_4
+    expect(p.distractorHints).toContain("-2");
+    expectDistinctDistractors(p, (a, b) => sameList(parseList(a), parseList(b)));
+  });
+});

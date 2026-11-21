@@ -162,6 +162,46 @@ describe("percent-of-change: Distractors", () => {
   });
 });
 
+describe("percent-of-change: soak regressions", () => {
+  const exactCase = (find: "amount", direction: "increase" | "decrease", percent: number, original: number, updated: number): Change.ChangeConstruction => ({
+    find,
+    direction,
+    percent: rat(percent),
+    original: rat(original),
+    updated: rat(updated),
+  });
+
+  it("keeps four Distractors for 50 increased by 50% (seed 2141231556)", () => {
+    const p = Change.generator.generate({ find: "amount", direction: "both", percents: "whole", decimals: false, maxAmount: 497 }, 2141231556);
+    expect(p.prompt).toBe("50 \\text{ increased by } 50\\%");
+    expect(p.answer).toBe("75");
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+  });
+
+  it("models the decimal moved one place too few, dividing by the decimal, and 100 changed by the percent", () => {
+    // 80 decreased by 25% = 60: 80 / 0.25 = 320, and 100 - 25 = 75
+    const down = Change.distractors(exactCase("amount", "decrease", 25, 80, 60));
+    expect(down).toContain("320");
+    expect(down).toContain("75");
+    // 50 increased by 50% = 75: 50 (1 + 5) = 300, and 100 + 50 = 150
+    const up = Change.distractors(exactCase("amount", "increase", 50, 50, 75));
+    expect(up).toContain("300");
+    expect(up).toContain("150");
+  });
+
+  it("only the exact 100-decreased-by family stays short of four, across option combinations", () => {
+    fc.assert(
+      fc.property(anySeed, changeParams, (seed, params) => {
+        const p = Change.generator.generate(params, seed);
+        const hundredDown = /^100 \\text\{ decreased by \}/.test(p.prompt);
+        expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(hundredDown ? 3 : 4);
+      }),
+      { numRuns: 400 },
+    );
+  });
+});
+
 describe("percents and percent of change: generate()", () => {
   it("are deterministic and varied", () => {
     fc.assert(
