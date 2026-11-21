@@ -27,6 +27,10 @@ import { binomialTheorem } from "../generators/counting/binomialTheorem.answer.t
 import { graphingTrig } from "../generators/trig/graphingTrig.answer.testkit";
 import { rightTriangleRatios } from "../generators/trig/rightTriangleRatios.answer.testkit";
 import { rightTriangleSolving } from "../generators/trig/rightTriangleSolving.answer.testkit";
+import { fundamentalIdentities } from "../generators/trig/fundamentalIdentities.answer.testkit";
+import { sumDifferenceIdentities } from "../generators/trig/sumDifferenceIdentities.answer.testkit";
+import { multipleAngleIdentities } from "../generators/trig/multipleAngleIdentities.answer.testkit";
+import { productToSum } from "../generators/trig/productToSum.answer.testkit";
 import type { Problem } from "../types";
 
 export const checkers: Record<string, (p: Problem) => void> = {
@@ -36,6 +40,10 @@ export const checkers: Record<string, (p: Problem) => void> = {
   "right-triangle-ratios": rightTriangleRatios,
   "right-triangle-solving": rightTriangleSolving,
   "graphing-trig": graphingTrig,
+  "fundamental-identities": fundamentalIdentities,
+  "sum-difference-identities": sumDifferenceIdentities,
+  "multiple-angle-identities": multipleAngleIdentities,
+  "product-to-sum": productToSum,
   "arithmetic-sequences": arithmeticSequences,
   "arithmetic-series": arithmeticSeries,
   "general-sequences": generalSequences,

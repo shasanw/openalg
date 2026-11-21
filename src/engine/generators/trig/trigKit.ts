@@ -710,3 +710,224 @@ export function rightTriangleCorners(run: number, rise: number, flip = false): [
     { x: 0, y: rise },
   ];
 }
+
+// ------------------------------------------------------------------ sums of surds
+//
+// Added for the identity Topics (sum and difference, multiple-angle and
+// product-to-sum): exact values that are sums of radicals, like
+// sin 75° = (√6 + √2)/4 and tan 15° = 2 - √3, and nested radicals like
+// sin 22.5° = √(2 - √2)/2. Purely additive; nothing above changes.
+
+/** An exact value (Σ nᵢ√rᵢ) / d: each rᵢ square-free and distinct, nᵢ ≠ 0, d > 0, lowest terms. */
+export interface SurdSum {
+  /** sorted by radicand, ascending (the rational term, r = 1, first) */
+  terms: { n: number; r: number }[];
+  d: number;
+}
+
+/** Collect rational coefficients by radicand into a normalized SurdSum. */
+function normalizeSum(coefs: Map<number, Rat>): SurdSum {
+  const entries = [...coefs.entries()].filter(([, c]) => c.n !== 0).sort((a, b) => a[0] - b[0]);
+  if (entries.length === 0) return { terms: [], d: 1 };
+  const lcm = (a: number, b: number) => (a / gcd(a, b)) * b;
+  const d = entries.reduce((l, [, c]) => lcm(l, c.d), 1);
+  const terms = entries.map(([r, c]) => ({ n: (c.n * d) / c.d, r }));
+  const g = terms.reduce((acc, t) => gcd(acc, t.n), d);
+  return { terms: terms.map((t) => ({ n: t.n / g, r: t.r })), d: d / g };
+}
+
+function sumCoefs(s: SurdSum): Map<number, Rat> {
+  const m = new Map<number, Rat>();
+  for (const t of s.terms) m.set(t.r, add(m.get(t.r) ?? rat(0), rat(t.n, s.d)));
+  return m;
+}
+
+/** The sum of the given surds (none: 0). */
+export function surdSum(...parts: Surd[]): SurdSum {
+  const m = new Map<number, Rat>();
+  for (const p of parts) if (p.n !== 0) m.set(p.r, add(m.get(p.r) ?? rat(0), rat(p.n, p.d)));
+  return normalizeSum(m);
+}
+
+export const sumAdd = (a: SurdSum, b: SurdSum): SurdSum => {
+  const m = sumCoefs(a);
+  for (const [r, c] of sumCoefs(b)) m.set(r, add(m.get(r) ?? rat(0), c));
+  return normalizeSum(m);
+};
+
+export const sumScale = (a: SurdSum, k: Rat): SurdSum =>
+  normalizeSum(new Map([...sumCoefs(a)].map(([r, c]) => [r, mul(c, k)])));
+
+export const sumNeg = (a: SurdSum): SurdSum => sumScale(a, rat(-1));
+export const sumSub = (a: SurdSum, b: SurdSum): SurdSum => sumAdd(a, sumNeg(b));
+
+/** a · b, with √p·√q simplified. */
+export function sumMul(a: SurdSum, b: SurdSum): SurdSum {
+  const m = new Map<number, Rat>();
+  for (const s of a.terms)
+    for (const t of b.terms) {
+      const p = surd(s.n * t.n, s.r * t.r, a.d * b.d);
+      if (p.n !== 0) m.set(p.r, add(m.get(p.r) ?? rat(0), rat(p.n, p.d)));
+    }
+  return normalizeSum(m);
+}
+
+const primesOf = (n: number): number[] => {
+  const out: number[] = [];
+  for (let p = 2; p * p <= n; p++) if (n % p === 0) {
+    out.push(p);
+    while (n % p === 0) n /= p;
+  }
+  if (n > 1) out.push(n);
+  return out;
+};
+
+/** a with every √r whose radicand contains the prime p negated (a Galois conjugate). */
+const conjugate = (a: SurdSum, p: number): SurdSum => ({
+  terms: a.terms.map((t) => (t.r % p === 0 ? { n: -t.n, r: t.r } : t)),
+  d: a.d,
+});
+
+/** a / b with the denominator rationalized (by conjugates); null when b is 0. */
+export function sumDiv(a: SurdSum, b: SurdSum): SurdSum | null {
+  if (b.terms.length === 0) return null;
+  let top = a;
+  let bottom = b;
+  for (;;) {
+    const p = bottom.terms.map((t) => primesOf(t.r)).flat()[0];
+    if (p === undefined) break;
+    const c = conjugate(bottom, p);
+    top = sumMul(top, c);
+    bottom = sumMul(bottom, c);
+  }
+  // bottom is now a single rational term n/d
+  const q = bottom.terms[0];
+  return sumScale(top, rat(bottom.d, q.n));
+}
+
+export const surdToSum = (s: Surd): SurdSum => surdSum(s);
+export const sumValue = (s: SurdSum): number => s.terms.reduce((v, t) => v + t.n * Math.sqrt(t.r), 0) / s.d;
+export const sumEq = (a: SurdSum, b: SurdSum): boolean =>
+  a.d === b.d && a.terms.length === b.terms.length && a.terms.every((t, i) => t.n === b.terms[i].n && t.r === b.terms[i].r);
+/** The single surd a one-term (or zero) sum is, else null. */
+export const sumAsSurd = (s: SurdSum): Surd | null =>
+  s.terms.length === 0 ? surd(0) : s.terms.length === 1 ? surd(s.terms[0].n, s.terms[0].r, s.d) : null;
+
+/**
+ * Canonical printing: the rational term first, then radicals by decreasing
+ * radicand; when every term is negative the minus sign goes in front of the
+ * fraction, otherwise the positive terms lead. "\frac{\sqrt{6} + \sqrt{2}}{4}",
+ * "\frac{\sqrt{2} - \sqrt{6}}{4}", "2 - \sqrt{3}", "\sqrt{3} - 2",
+ * "-\frac{\sqrt{6} + \sqrt{2}}{4}", "-2 - \sqrt{3}" (d = 1 is printed with a
+ * leading minus, like any sum). A single term prints as surdLatex does.
+ */
+export function sumLatex(s: SurdSum): string {
+  const single = sumAsSurd(s);
+  if (single) return surdLatex(single);
+  const ordered = [...s.terms].sort((a, b) => (a.r === 1 ? -1 : b.r === 1 ? 1 : b.r - a.r));
+  const allNeg = ordered.every((t) => t.n < 0);
+  const factorOut = allNeg && s.d !== 1;
+  const terms = factorOut
+    ? ordered.map((t) => ({ n: -t.n, r: t.r }))
+    : [...ordered.filter((t) => t.n > 0), ...ordered.filter((t) => t.n < 0)];
+  const body = terms
+    .map((t, i) => {
+      const m = Math.abs(t.n);
+      const tex = t.r === 1 ? String(m) : `${m === 1 ? "" : m}\\sqrt{${t.r}}`;
+      return i === 0 ? (t.n < 0 ? "-" : "") + tex : ` ${t.n < 0 ? "-" : "+"} ${tex}`;
+    })
+    .join("");
+  const frac = s.d === 1 ? body : `\\frac{${body}}{${s.d}}`;
+  return factorOut ? `-${frac}` : frac;
+}
+
+/** A sum-valued trig value, or "undefined". */
+export type SumValue = SurdSum | "undefined";
+
+export const sumValueLatex = (v: SumValue): string => (v === "undefined" ? UNDEFINED_LATEX : sumLatex(v));
+
+/** Whether a is coterminal with a multiple of π/12 (15°): the standard angles plus 15°, 75°, ... */
+export const isTwelfth = (a: Angle): boolean => 12 % coterminal(a).d === 0;
+
+/**
+ * sin, cos or tan at any multiple of π/12 as an exact sum: a standard angle
+ * by table, and an odd multiple kπ/12 as π/4 + (k - 3)π/12 by the sum
+ * identities (sin 75° = (√6 + √2)/4, tan 15° = 2 - √3).
+ */
+export function twelfthValue(fn: "sin" | "cos" | "tan", a: Angle): SumValue {
+  if (!isTwelfth(a)) throw new Error(`twelfthValue: ${a.n}/${a.d}·π is not a multiple of π/12`);
+  if (isStandard(a)) {
+    const v = exactValue(fn, a);
+    return v === "undefined" ? v : surdToSum(v);
+  }
+  const p = rat(1, 4);
+  const q = sub(a, p);
+  const S = (f: TrigFn, x: Angle) => surdToSum(exactValue(f, x) as Surd);
+  const sin = sumAdd(sumMul(S("sin", p), S("cos", q)), sumMul(S("cos", p), S("sin", q)));
+  const cos = sumSub(sumMul(S("cos", p), S("cos", q)), sumMul(S("sin", p), S("sin", q)));
+  if (fn === "sin") return sin;
+  if (fn === "cos") return cos;
+  return sumDiv(sin, cos) ?? "undefined";
+}
+
+/** s·√(a + b√r) / d: a nested radical (half-angle values at 22.5°, or 15° written as the formula gives it). */
+export interface NestedRadical {
+  s: 1 | -1;
+  a: number;
+  b: number;
+  r: number;
+  d: number;
+}
+
+export const nestedValue = (x: NestedRadical): number => (x.s * Math.sqrt(x.a + x.b * Math.sqrt(x.r))) / x.d;
+
+/** "\frac{\sqrt{2 - \sqrt{3}}}{2}", "-\frac{\sqrt{2 + \sqrt{2}}}{2}". */
+export function nestedLatex(x: NestedRadical): string {
+  const b = Math.abs(x.b);
+  const inner = `${x.a} ${x.b < 0 ? "-" : "+"} ${b === 1 ? "" : b}\\sqrt{${x.r}}`;
+  const root = `\\sqrt{${inner}}`;
+  return (x.s < 0 ? "-" : "") + (x.d === 1 ? root : `\\frac{${root}}{${x.d}}`);
+}
+
+export const nestedNeg = (x: NestedRadical): NestedRadical => ({ ...x, s: x.s === 1 ? -1 : 1 });
+
+/** A half-angle value: a single surd, or a nested radical (√(2 ± √3)/2). */
+export type HalfValue = { kind: "surd"; v: SurdSum } | { kind: "nested"; v: NestedRadical };
+
+export const halfValueLatex = (h: HalfValue): string => (h.kind === "surd" ? sumLatex(h.v) : nestedLatex(h.v));
+export const halfValueNumber = (h: HalfValue): number => (h.kind === "surd" ? sumValue(h.v) : nestedValue(h.v));
+
+/**
+ * sin, cos or tan of the angle h by the half-angle identities from the
+ * standard angle 2h, exactly as the formulas give them:
+ * sin h = ±√((1 - cos 2h)/2), cos h = ±√((1 + cos 2h)/2) (a nested radical
+ * when cos 2h is ±√2/2 or ±√3/2, else a surd), tan h = (1 - cos 2h)/sin 2h,
+ * with the sign of h's quadrant. Throws when 2h is not standard or tan h is
+ * undefined.
+ */
+export function halfAngleValue(fn: "sin" | "cos" | "tan", h: Angle): HalfValue {
+  const full = mul(h, rat(2));
+  const c = exactValue("cos", full) as Surd;
+  if (fn === "tan") {
+    const s = exactValue("sin", full) as Surd;
+    const top = sumSub(surdSum(surd(1)), surdToSum(c));
+    if (s.n === 0) {
+      if (top.terms.length === 0) return { kind: "surd", v: surdSum() };
+      throw new Error("halfAngleValue: tan undefined");
+    }
+    return { kind: "surd", v: sumDiv(top, surdToSum(s))! };
+  }
+  const pos = location(h);
+  const negative = fn === "sin" ? pos === 3 || pos === 4 || pos === "-y" : pos === 2 || pos === 3 || pos === "-x";
+  const sign = negative ? -1 : 1;
+  // (1 ∓ c)/2 with c = n√r/d is (d ∓ n√r)/(2d)
+  const n = fn === "sin" ? -c.n : c.n;
+  if (c.r === 1) {
+    // a rational radicand: √(p/q) = √(pq)/q
+    const v = rat(c.d + n, 2 * c.d);
+    return { kind: "surd", v: surdToSum(surd(sign, v.n * v.d, v.d)) };
+  }
+  // √((d + n√r)/(2d)): here d = 2, so √((2 ± √r)/4) = √(2 ± √r)/2
+  if (c.d !== 2) throw new Error("halfAngleValue: unexpected cosine");
+  return { kind: "nested", v: { s: sign as 1 | -1, a: c.d, b: n, r: c.r, d: 2 } };
+}
