@@ -189,3 +189,27 @@ describe("order-of-operations: generate()", () => {
     expect(prompts.size).toBeGreaterThan(180);
   });
 });
+
+describe("order-of-operations: soak regressions", () => {
+  it.each([
+    [{ operations: 5, exponents: false, parentheses: false, allowNegatives: false, maxNumber: 3 }, 2503905099],
+    [{ operations: 6, exponents: false, parentheses: true, allowNegatives: false, maxNumber: 3 }, 3321403652],
+  ])("keeps four distinct Distractors for a sheet of 2s with a stray 3 or 4 (seed %#)", (params, seed) => {
+    const p = generator.generate(params, seed);
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+    expect(p.distractorHints).not.toContain(p.answer);
+  });
+
+  it("small-number sheets keep four Distractors unless every number is a 2, across option combinations", () => {
+    const small = fc.record({ operations: fc.integer({ min: 2, max: 6 }), exponents: fc.boolean(), parentheses: fc.boolean(), allowNegatives: fc.boolean(), maxNumber: fc.integer({ min: 3, max: 4 }) });
+    fc.assert(
+      fc.property(anySeed, small, (seed, params) => {
+        const p = generator.generate(params, seed);
+        const allTwos = !/[013-9]/.test(p.prompt);
+        expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(allTwos ? 3 : 4);
+      }),
+      { numRuns: 400 },
+    );
+  });
+});

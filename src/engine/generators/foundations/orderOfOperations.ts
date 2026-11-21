@@ -248,6 +248,9 @@ export function construct(params: ParamValues, rng: Rng): OrderConstruction {
     // student something went wrong), and an asked-for feature should usually
     // show up
     if (coreDistractors(k).length < (attempt < 200 ? 2 : 1) && attempt < 500) continue;
+    // fewer than four distinct mistake-based Distractors (expressions of 2s
+    // with a stray 3 or 4): draw another one while there is time
+    if (distractors(k).length < 4 && attempt < 100) continue;
     if (lim.parentheses && !hasGroup(tree) && rng.bool(0.7) && attempt < 400) continue;
     if (lim.exponents && !hasPow(tree) && rng.bool(0.8) && attempt < 400) continue;
     return k;

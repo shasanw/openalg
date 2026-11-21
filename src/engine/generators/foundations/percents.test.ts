@@ -102,6 +102,31 @@ const changeParams = fc.record({
   maxAmount: fc.integer({ min: 20, max: 1000 }),
 });
 
+describe("percents: soak regressions", () => {
+  it.each([
+    [1612015036, 192],
+    [3241041729, 220],
+  ])("keeps four Distractors for 175% of 100 (seed %i)", (seed, maxWhole) => {
+    const p = generator.generate({ find: "part", percents: "any", decimals: false, maxWhole }, seed);
+    expect(p.prompt).toMatch(/175\\% \\text\{ of \} 100/);
+    expect(p.answer).toBe("175");
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+    // counted only the part above 100%: 175% of 100 as 75
+    expect(p.distractorHints).toContain("75");
+  });
+
+  it("keeps four Distractors for every percent of a whole, over seeds and options", () => {
+    fc.assert(
+      fc.property(anySeed, fc.constantFrom("whole", "any"), fc.boolean(), fc.integer({ min: 20, max: 1000 }), (seed, percents, decimals, maxWhole) => {
+        const p = generator.generate({ find: "part", percents, decimals, maxWhole }, seed);
+        expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(4);
+      }),
+      { numRuns: 400 },
+    );
+  });
+});
+
 describe("percent-of-change: answers", () => {
   it("the Answer is the percent of change, or the new amount, of the printed numbers", () => {
     fc.assert(
