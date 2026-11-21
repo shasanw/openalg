@@ -275,8 +275,62 @@ function productDenominator(k: AddSubConstruction): Rat | null {
   return foldWith(k, (acc, op, t) => rat(op === "+" ? acc.n + t.n : acc.n - t.n, acc.d * t.d));
 }
 
+function moreMistakes(k: AddSubConstruction): Rat[] {
+  const out: (Rat | null)[] = [];
+  // Reversed the operands of subtraction, or subtracted every term.
+  if (k.ops.includes("-")) out.push(foldWith(k, (acc, op, t) => op === "+" ? add(acc, t) : sub(t, acc)));
+  if (k.ops.includes("+")) out.push(foldWith(k, (acc, _op, t) => sub(acc, t)));
+  const contributions = k.terms.map((t, i) => k.ops[i - 1] === "-" ? neg(t) : t);
+  // Reversed the sign of one term, omitted it, or counted it twice.
+  for (const term of contributions) {
+    out.push(sub(k.answer, mul(term, rat(2))), sub(k.answer, term), add(k.answer, term));
+  }
+  if (k.style === "fraction" || k.style === "mixed") {
+    // multiplied the fractions instead of adding or subtracting
+    out.push(k.terms.reduce((acc, t) => mul(acc, t), rat(1)));
+    // numerators combined, one denominator kept
+    const sumNumerators = contributions.reduce((acc, t) => acc + t.n, 0);
+    out.push(rat(sumNumerators, k.terms[0].d), rat(sumNumerators, k.terms[k.terms.length - 1].d));
+    // the denominators multiplied even when they already match: 1/8 + 3/8 as 4/64
+    if (k.terms.every((t) => t.d === k.terms[0].d)) {
+      out.push(foldWith(k, (acc, op, t) => rat(op === "+" ? acc.n + t.n : acc.n - t.n, acc.d * t.d)));
+    }
+    // common denominator found, but only one of the two numerators scaled up to it
+    else {
+      for (const scaleFirst of [true, false]) {
+        out.push(
+          foldWith(k, (acc, op, t) => {
+            const L = lcm(acc.d, t.d);
+            const a = scaleFirst ? acc.n * (L / acc.d) : acc.n;
+            const b = scaleFirst ? t.n : t.n * (L / t.d);
+            return rat(op === "+" ? a + b : a - b, L);
+          }),
+        );
+      }
+    }
+  }
+  if (k.style === "mixed") {
+    // Each mixed number read as (whole + numerator)/denominator
+    const wrong = k.terms.map((t) => {
+      const w = Math.floor(Math.abs(t.n) / t.d);
+      return rat(Math.sign(t.n) * (w + (Math.abs(t.n) - w * t.d)), t.d);
+    });
+    out.push(foldWith({ ...k, terms: wrong }, signed));
+  }
+  // Placed the decimal point one digit off in the sum.
+  if (k.style === "decimal") out.push(mul(k.answer, rat(10)), mul(k.answer, rat(1, 10)));
+  if (k.style === "integer") {
+    // Multiplied the operands instead of adding or subtracting them.
+    out.push(k.terms.reduce(mul, rat(1)));
+    // the sizes added, with either sign on the total
+    const total = k.terms.reduce((acc, t) => add(acc, t.n < 0 ? neg(t) : t), rat(0));
+    out.push(total, neg(total));
+  }
+  return out.filter((r): r is Rat => r !== null);
+}
+
 /** Will r print as the same kind of number as the Answer (so it does not give itself away)? */
-function plausible(k: AddSubConstruction, r: Rat | null): r is Rat {
+function plausible(k: AddSubConstruction, r: Rat | null, maxDenominator = 30): r is Rat {
   if (!r || r.n === 0) return false;
   if (k.style === "integer") return isInt(r);
   if (k.style === "decimal") {
@@ -284,7 +338,7 @@ function plausible(k: AddSubConstruction, r: Rat | null): r is Rat {
     // (a whole number is fair: decimals often add up to one)
     return pl !== null && pl <= 3;
   }
-  return r.d <= 30;
+  return r.d <= maxDenominator;
 }
 
 /**
@@ -306,10 +360,12 @@ export function distractors(k: AddSubConstruction, negativesOnSheet = true): str
   values.push(combinedSizes(k), droppedFirstSign(k), droppedAllSigns(k), allAdded(k));
   // a negative choice on a sheet with no negative numbers gives itself away
   const signs = negativesOnSheet || promptLatex(k).includes("-");
-  return distinctHints(
-    answerLatex(k),
-    values.filter((r): r is Rat => plausible(k, r) && (signs || r.n > 0)).map((r) => answerLatex(k, r)),
-  );
+  const extra = moreMistakes(k);
+  return distinctHints(answerLatex(k), [
+    ...values.filter((r): r is Rat => plausible(k, r) && (signs || r.n > 0)).map((r) => answerLatex(k, r)),
+    // the new mistakes may print over a larger denominator (1/36 from 1/3 times 1/12, 27/100 from 3/10 times 9/10)
+    ...extra.filter((r) => (r.n === 0 || plausible(k, r, 150)) && (signs || r.n >= 0)).map((r) => answerLatex(k, r)),
+  ]);
 }
 
 export const generator: Generator = {

@@ -157,6 +157,15 @@ export function distractors(k: ChangeConstruction, decimals = true): string[] {
       [size, direction],
       [mul(div(updated, original)!, rat(100)), direction],
       [div(percent, rat(100)), direction],
+      // Converted the ratio to percent by moving the decimal only one place.
+      [div(percent, rat(10)), direction],
+      // Moved it three places instead of two.
+      [mul(percent, rat(10)), direction],
+      // Gave what is left of the original (100% minus the change), in either direction.
+      [sub(rat(100), percent), direction],
+      [sub(rat(100), percent), flip(direction)],
+      // Calculated the reverse change, using the new amount as the starting amount.
+      [mul(div(size, updated)!, rat(100)), flip(direction)],
     ];
     return distinctHints(
       answerLatex(k),
@@ -171,6 +180,14 @@ export function distractors(k: ChangeConstruction, decimals = true): string[] {
     mul(original, factor(flip(direction), percent)),
     (direction === "increase" ? add : sub)(original, percent),
     mul(original, factor(direction, div(percent, rat(10))!)),
+    // Applied the change a second time to the new amount.
+    (direction === "increase" ? add : sub)(updated, size),
+    // Treated a percent as a whole-number multiplier.
+    mul(original, percent),
+    // Divided by the growth factor instead of multiplying by it.
+    div(original, factor(direction, percent)),
+    // Added the percent as a number whichever way the change went: 16 decreased by 50% as 16 + 50.
+    add(original, percent),
   ];
   return distinctHints(
     answerLatex(k),

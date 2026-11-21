@@ -244,8 +244,69 @@ export function distractors(k: ProductConstruction, negativesOnSheet = true): st
   const signs = negativesOnSheet || factors.some((f) => f.n < 0);
   return distinctHints(
     answerLatex(k, answer),
-    values.filter((r): r is Rat => plausible(k.style, r) && (signs || r.n > 0)).map((r) => answerLatex(k, r)),
+    [
+      ...values.filter((r): r is Rat => plausible(k.style, r) && (signs || r.n > 0)),
+      ...moreMistakes(k).filter((r) => ((k.style === "integer" && r.n === 0) || plausible(k.style, r)) && (signs || r.n >= 0)),
+    ].map((r) => answerLatex(k, r)),
   );
+}
+
+function moreMistakes(k: ProductConstruction): Rat[] {
+  const { factors, answer } = k;
+  const out: (Rat | null)[] = [];
+  const sum = factors.reduce(add, rat(0));
+  const tops = factors.reduce((acc, f) => acc * f.n, 1);
+  if (k.style === "fraction" || k.style === "mixed") {
+    const top = factors.reduce((acc, f) => acc + f.n, 0);
+    const bottom = factors.reduce((acc, f) => acc + f.d, 0);
+    // (a + c)/(b + d)
+    out.push(rat(top, bottom));
+    // ac/(b + d)
+    out.push(rat(tops, bottom));
+    // added the fractions instead of multiplying them
+    out.push(sum);
+    // multiplied the numerators and kept only the first, or only the last, denominator
+    out.push(rat(tops, factors[0].d), rat(tops, factors[factors.length - 1].d));
+    // flipped both fractions
+    out.push(div(rat(1), answer));
+    // flipped just one fraction (any one of the three, when there are three)
+    for (let i = 0; i < factors.length; i++) {
+      out.push(product(factors.map((f, j) => (j === i ? div(rat(1), f)! : f))));
+    }
+    if (k.style === "mixed") {
+      // 2\frac{1}{3} read as \frac{2 + 1}{3}, then multiplied
+      const wrong = factors.map((f, i) => {
+        if (i !== 0) return f;
+        const m = mixedParts(f);
+        return rat(m.whole.n + m.part.n, f.d);
+      });
+      out.push(product(wrong));
+    }
+  }
+  if (k.style === "decimal") {
+    // the point two or three places off, and added instead of multiplied
+    out.push(mul(answer, rat(1000)), mul(answer, rat(1, 1000)), sum);
+  }
+  if (k.style === "integer") {
+    const [first, ...rest] = factors;
+    const second = rest[0];
+    const others = product(rest.slice(1));
+    // Slipped to a neighbouring fact in the times table: 7 \cdot 8 as 7 \cdot 9 or 7 \cdot 7, or 6 \cdot 8 as 7 \cdot 8.
+    for (const step of [1, -1]) {
+      out.push(mul(mul(first, add(second, rat(step))), others), mul(mul(add(first, rat(step)), second), others));
+    }
+    if (factors.length === 3) {
+      // left a factor out: only the first two, or the last two, were multiplied
+      out.push(mul(first, second), product(factors.slice(1)));
+      // added the first two, then multiplied by the third
+      out.push(mul(add(first, second), factors[2]));
+    }
+    // subtracted instead of multiplying
+    out.push(mul(sub(first, second), others));
+    // Divided the first pair instead of multiplying them.
+    out.push(mul(div(first, second)!, others));
+  }
+  return out.filter((r): r is Rat => r !== null);
 }
 
 export function lcm(a: number, b: number): number {

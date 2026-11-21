@@ -317,9 +317,21 @@ export function distractors(k: DistributiveConstruction): string[] {
   const candidates = wrongs.map((w) => withGroupMistake(k, w)).filter((ts) => ts.some((t) => t.coef.n !== 0));
   // the opposite of every term (a sign slip throughout), when signs are in play
   if (promptLatex(k).includes("-")) candidates.push(k.answer.map((t) => ({ ...t, coef: neg(t.coef) })));
+  // Dropped the multiplier, or dropped one term while copying the expansion.
+  candidates.push(withGroupMistake(k, (g) => g.inner));
+  candidates.push(withGroupMistake(k, (g) => expand(g).slice(0, 1)));
+  candidates.push(withGroupMistake(k, (g) => expand(g).slice(-1)));
+  // Read juxtaposition as addition: 2(9x + 6) becomes 2 + 9x + 6.
+  candidates.push(withGroupMistake(k, (g) => [g.mult, ...g.inner]));
+  const seen = new Set([termsLatex(combine(k.answer), k.v)]);
   return distinctHints(
     answerLatex(k),
-    candidates.map((ts) => answerLatex(k, ts)),
+    candidates.filter((ts) => {
+      const key = termsLatex(combine(ts), k.v);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).map((ts) => answerLatex(k, ts)),
   );
 }
 

@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -62,7 +63,8 @@ for (const { name, g, params: anyParams } of topics) {
         fc.property(anySeed, anyParams, (seed, params) => {
           const p = g.generate(params as never, seed);
           const numbers = (params as { numbers: RationalStyle }).numbers;
-          const values = p.distractorHints.map(answerNumber);
+          expect(new Set(p.distractorHints.map(choiceKey)).size).toBeGreaterThanOrEqual(4);
+        const values = p.distractorHints.map(answerNumber);
           for (const v of values) expect(close(v, answerNumber(p.answer))).toBe(false);
           expect(new Set(values.map((v) => v.toFixed(9))).size).toBe(values.length);
           if (numbers === "integer") for (const v of values) expect(Number.isInteger(v)).toBe(true);
@@ -111,6 +113,7 @@ describe("multiplying-rationals", () => {
     const k = { style: "fraction" as const, form: "improper" as const, factors: [rat(-2, 3), rat(3, 4)], answer: rat(-1, 2) };
     const hints = M.distractors(k);
     expect(hints[0]).toBe("\\frac{1}{2}");
+    expect(hints).toContain("\\frac{1}{7}"); // added across
     // flipped the second fraction (divided instead)
     expect(hints).toContain("-\\frac{8}{9}");
     // no negative numbers on the sheet: no negative choices either
@@ -126,6 +129,8 @@ describe("dividing-rationals", () => {
     // \frac{2}{3} \div \frac{4}{5} = \frac{5}{6}
     const k = { style: "fraction" as const, form: "improper" as const, dividend: rat(2, 3), divisor: rat(4, 5), answer: rat(5, 6) };
     const hints = D.distractors(k);
+    expect(hints).toContain("\\frac{1}{6}"); // divided by the divisor's numerator alone
+    expect(hints).toContain("\\frac{6}{5}"); // divided the divisor by the dividend
     expect(hints.slice(0, 2)).toEqual(["\\frac{8}{15}", "\\frac{6}{5}"]);
     expect(hints).toContain("\\frac{15}{8}");
   });

@@ -354,6 +354,15 @@ export function distractors(k: ProportionConstruction, negativesOnSheet = true):
     // divided the wrong way at the last step: 6x = 4 answered \frac{6}{4}
     Math.abs(k.x.n) === 1 && k.x.d === 1 ? null : div(rat(1), k.x),
   ];
+  // After collecting ax = b, stopped at b, subtracted a, or multiplied by a.
+  const left = times(k.slots[0], k.slots[3]);
+  const right = times(k.slots[1], k.slots[2]);
+  let a = sub(left.m, right.m);
+  let b = sub(right.q, left.q);
+  if (a.n < 0) { a = neg(a); b = neg(b); }
+  values.push(b, sub(b, a), mul(b, a));
+  // Copied a given as the missing term, without scaling to the other ratio.
+  for (const slot of k.slots) if (!isExpr(slot)) values.push(rat(slot.given));
   return distinctHints(
     solutionLatex(k.v, k.x, k.style),
     // a negative choice on a sheet with no negative numbers gives itself away
