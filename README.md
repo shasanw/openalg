@@ -50,7 +50,10 @@ pnpm dev               # http://localhost:1420
 ## Testing
 
 ```bash
-pnpm test              # engine unit & property-based tests (Vitest), incl. a Typst-WASM smoke test
+pnpm test              # engine and UI tests (Vitest, watch mode); fast, for everyday use
+pnpm test:typst        # every Topic compiled by the real Typst compiler (slower; run before a PR)
+pnpm test:all          # both, once
+pnpm test:soak         # opt-in: 100,000 random Problems per Topic, checking each has 4 real Distractors (~3 min)
 pnpm build && pnpm check:typst   # browser check: Preview, Print, PDF and ADR 0002 timings (Playwright)
 ```
 

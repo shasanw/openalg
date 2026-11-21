@@ -8,7 +8,7 @@ import { expect } from "vitest";
 import { ANSWER_PART_SEPARATOR } from "../../format";
 import type { TrigCurve } from "../../plot";
 import type { Problem } from "../../types";
-import { evalLatex, splitEquation } from "../shared/latexEval.testkit";
+import { evalLatex, prepareLatex, splitEquation } from "../shared/latexEval.testkit";
 
 const PI = Math.PI;
 
@@ -39,10 +39,13 @@ export function readPrompt(prompt: string): Printed {
   const m = rhs.match(/\\(sin|cos|tan|cot|sec|csc)(?:\\left\((.*)\\right\)| (\d*x))/);
   expect(m, prompt).not.toBeNull();
   const argTex = m![2] ?? m![3];
+  // Tokenized once: the checks evaluate these hundreds of times per Problem.
+  const g = prepareLatex(rhs);
+  const arg = prepareLatex(argTex);
   return {
     fn: m![1] as Fn,
-    g: (x) => evalLatex(rhs, { x }),
-    arg: (x) => evalLatex(argTex, { x }),
+    g: (x) => g({ x }),
+    arg: (x) => arg({ x }),
   };
 }
 
