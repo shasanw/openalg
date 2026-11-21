@@ -20,7 +20,10 @@ export const precalculus: CourseOutline = {
         { topic: "logarithmic-equations" },
       ],
     },
-    { name: "Trigonometry", topics: [{ topic: "graphing-trig" }] },
+    {
+      name: "Trigonometry",
+      topics: [{ topic: "angle-measure" }, { topic: "radians-degrees" }, { topic: "trig-any-angle" }, { topic: "graphing-trig" }],
+    },
     { name: "Parametric Equations", topics: [] },
     { name: "Polar Coordinates", topics: [] },
     { name: "Vectors", topics: [] },

@@ -58,6 +58,10 @@ import {
   writtenValue,
   type Angle,
   type TrigFn,
+  degreesToDms,
+  pointValue,
+  pointValueMistakes,
+  trigValueEq,
 } from "./trigKit";
 import {
   anySeed,
@@ -424,5 +428,62 @@ describe("trigKit: rounding", () => {
     expect(dmsLatex(40, 0)).toBe("40^{\\circ}");
     expect(dmsToDegrees(25, 30)).toEqual(rat(51, 2));
     expectRenders(dmsLatex(25, 30, 15));
+  });
+});
+
+describe("trigKit: degreesToDms", () => {
+  it("inverts dmsToDegrees for whole seconds, and is null otherwise", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 359 }), fc.integer({ min: 0, max: 59 }), fc.integer({ min: 0, max: 59 }), (d, m, s) => {
+        expect(degreesToDms(dmsToDegrees(d, m, s))).toEqual({ deg: d, min: m, sec: s });
+      }),
+    );
+    expect(degreesToDms(rat(5101, 200))).toEqual({ deg: 25, min: 30, sec: 18 });
+    expect(degreesToDms(rat(1, 7))).toBeNull();
+  });
+});
+
+describe("trigKit: points on the terminal side", () => {
+  const FNS: TrigFn[] = ["sin", "cos", "tan", "csc", "sec", "cot"];
+  const anyPoint = fc
+    .tuple(fc.integer({ min: -30, max: 30 }), fc.integer({ min: -30, max: 30 }))
+    .filter(([x, y]) => x !== 0 || y !== 0);
+
+  it("pointValue matches the angle through the point", () => {
+    fc.assert(
+      fc.property(anyPoint, fc.constantFrom(...FNS), ([x, y], fn) => {
+        const v = pointValue(fn, x, y);
+        const t = Math.atan2(y, x);
+        const expected = { sin: Math.sin(t), cos: Math.cos(t), tan: Math.tan(t), csc: 1 / Math.sin(t), sec: 1 / Math.cos(t), cot: 1 / Math.tan(t) }[fn];
+        if (v === "undefined") expect(Math.abs(expected)).toBeGreaterThan(1e12);
+        else {
+          expect(close(evalLatex(trigValueLatex(v)), expected, 1e-9)).toBe(true);
+          expect(trigValueLatex(v)).not.toMatch(/\\frac\{[^}]*\}\{[^}]*\\sqrt/);
+        }
+      }),
+    );
+    expect(trigValueLatex(pointValue("sin", -3, 4))).toBe("\\frac{4}{5}");
+    expect(trigValueLatex(pointValue("cos", 2, -3))).toBe("\\frac{2\\sqrt{13}}{13}");
+    expect(pointValue("tan", 0, 5)).toBe("undefined");
+  });
+
+  it("pointValueMistakes are distinct and never the right value", () => {
+    fc.assert(
+      fc.property(anyPoint, fc.constantFrom(...FNS), ([x, y], fn) => {
+        const right = pointValue(fn, x, y);
+        const wrong = pointValueMistakes(fn, x, y);
+        for (const [i, w] of wrong.entries()) {
+          expect(trigValueEq(w, right)).toBe(false);
+          for (const o of wrong.slice(i + 1)) expect(trigValueEq(w, o)).toBe(false);
+        }
+      }),
+    );
+    // (-3, 4): cos = -3/5; sign ignored, x and y swapped, reciprocal, r as 3 + 4
+    expect(pointValueMistakes("cos", -3, 4).map(trigValueLatex).slice(0, 4)).toEqual([
+      "\\frac{3}{5}",
+      "\\frac{4}{5}",
+      "-\\frac{5}{3}",
+      "-\\frac{3}{7}",
+    ]);
   });
 });

@@ -597,3 +597,76 @@ export const PYTHAGOREAN_TRIPLES: readonly (readonly [number, number, number])[]
   [20, 21, 29],
   [9, 40, 41],
 ];
+
+/**
+ * Exact degrees as degrees, minutes and seconds, or null when the seconds are
+ * not whole: 25.505 -> {deg: 25, min: 30, sec: 18}. A non-negative angle only.
+ * (Whole seconds give an exact decimal of at most 4 places exactly when the
+ * seconds past the degree are a multiple of 9, since 3600 = 9 * 400.)
+ */
+export function degreesToDms(deg: Rat): { deg: number; min: number; sec: number } | null {
+  if (deg.n < 0) throw new Error("degreesToDms: negative angle");
+  const seconds = mul(deg, rat(3600));
+  if (seconds.d !== 1) return null;
+  const s = seconds.n;
+  return { deg: Math.floor(s / 3600), min: Math.floor((s % 3600) / 60), sec: s % 60 };
+}
+
+// ------------------------------------------------------------------ points on the terminal side
+
+/**
+ * fn at an angle whose terminal side passes through the point (x, y) (not the
+ * origin), from r = √(x² + y²): sin = y/r, cos = x/r, tan = y/x and their
+ * reciprocals, rationalized; "undefined" on an axis where it divides by zero.
+ */
+export function pointValue(fn: TrigFn, x: number, y: number): TrigValue {
+  if (x === 0 && y === 0) throw new Error("pointValue: the origin is on every terminal side");
+  const r = surd(1, x * x + y * y);
+  const X = surd(x);
+  const Y = surd(y);
+  switch (fn) {
+    case "sin":
+      return ratio(Y, r);
+    case "cos":
+      return ratio(X, r);
+    case "tan":
+      return ratio(Y, X);
+    case "cot":
+      return ratio(X, Y);
+    case "sec":
+      return ratio(r, X);
+    case "csc":
+      return ratio(r, Y);
+  }
+}
+
+/**
+ * Wrong values of fn for a point (x, y) on the terminal side, most common
+ * first: the quadrant's sign ignored, x and y swapped, the reciprocal
+ * function, r taken as |x| + |y| instead of √(x² + y²), swapped with the wrong
+ * sign, and (for tan and cot) divided by r. Distinct and never the right value.
+ */
+export function pointValueMistakes(fn: TrigFn, x: number, y: number): TrigValue[] {
+  const right = pointValue(fn, x, y);
+  const sumR = Math.abs(x) + Math.abs(y);
+  // with r replaced by |x| + |y|, which is a perfect square only by accident
+  const wrongR = (): TrigValue | null => {
+    if (fn === "tan" || fn === "cot") return null;
+    const top = fn === "sin" ? y : fn === "cos" ? x : sumR;
+    const bottom = fn === "sin" || fn === "cos" ? sumR : fn === "sec" ? x : y;
+    return bottom === 0 ? null : surd(top, 1, bottom);
+  };
+  return distinctBy(
+    right,
+    [
+      oppositeValue(right),
+      pointValue(fn, y, x),
+      pointValue(reciprocalFn(fn), x, y),
+      wrongR(),
+      oppositeValue(pointValue(fn, y, x)),
+      // tan and cot taken over r, like sin and cos
+      fn === "tan" ? pointValue("sin", x, y) : fn === "cot" ? pointValue("cos", x, y) : null,
+    ],
+    trigValueEq,
+  );
+}

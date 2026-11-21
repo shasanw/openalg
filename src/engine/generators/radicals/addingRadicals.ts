@@ -183,6 +183,11 @@ export function distractors(k: AddConstruction): string[] {
   }
   candidates.push(perGroup((a) => -a.k * a.s));
   candidates.push(perGroup((a) => a.k * a.s + (a === last ? 1 : 0)));
+  // fallbacks for when nothing needs simplifying and the coefficients are small (everything above coincides):
+  // signs ignored, the last term dropped, and a coefficient one too small
+  candidates.push(perGroup((a) => Math.abs(a.k) * a.s));
+  candidates.push(perGroup((a) => (a === last ? 0 : a.k * a.s)));
+  candidates.push(perGroup((a) => a.k * a.s + (a === last ? -1 : 0)));
   return distinctValued(
     valuedSum(answerTerms(k)),
     candidates.filter((c) => c.length > 0).map(valuedSum),

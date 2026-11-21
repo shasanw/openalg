@@ -6,6 +6,7 @@
 import { expect } from "vitest";
 import fc from "fast-check";
 import katex from "katex";
+import type { ParamSchema, ParamValues } from "../../types";
 import { gcd } from "../../format";
 import { NO_SOLUTION } from "../shared/equationKit";
 import { answerValues, close, evalLatex, type Env } from "../shared/latexEval.testkit";
@@ -51,4 +52,15 @@ export function expectRationalized(latex: string): void {
 
 export function expectRenders(tex: string): void {
   expect(() => katex.renderToString(tex, { throwOnError: true }), tex).not.toThrow();
+}
+
+/** Check printed output for every combination, including mixed settings. */
+export function forEachOptionSeed(schema: ParamSchema, check: (seed: number, params: ParamValues) => void): void {
+  let combinations: ParamValues[] = [{}];
+  for (const f of schema) {
+    const values = f.type === "enum" ? f.options.map(o => o.value) : f.type === "boolean" ? [true, false]
+      : Array.from({ length: f.max - f.min + 1 }, (_, i) => f.min + i);
+    combinations = combinations.flatMap(p => values.map(value => ({ ...p, [f.key]: value })));
+  }
+  for (const params of combinations) fc.assert(fc.property(anySeed, seed => check(seed, params)), { numRuns: 30 });
 }
