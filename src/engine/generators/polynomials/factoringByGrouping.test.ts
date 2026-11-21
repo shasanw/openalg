@@ -17,6 +17,12 @@ import {
 const params = anyParams(schema);
 
 describe("factoring-by-grouping: answers", () => {
+  it("finishes a difference of squares exposed by grouping", () => {
+    const p = generator.generate({ form: "cubic" }, 51);
+    expect(p.prompt).toBe("x^{3} - 3x^{2} - 4x + 12");
+    expect(p.answer).toBe("(x + 2)(x - 2)(x - 3)");
+  });
+
   it("the Answer multiplies back out to the Problem", () => {
     fc.assert(
       fc.property(anySeed, params, (seed, ps) => {

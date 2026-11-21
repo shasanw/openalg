@@ -121,7 +121,17 @@ export function construct(params: ParamValues, rng: Rng): GroupingConstruction {
   return { form, vars, g, p: 1, q: 2, r: 1, s: 3 };
 }
 
-export const answerLatex = (k: GroupingConstruction) => factoredLatex(factoredOf(k), k.vars);
+export function answerLatex(k: GroupingConstruction): string {
+  const grouped = factoredOf(k);
+  // The chosen cubic factors can include (a²x² - b²).
+  const a = Math.sqrt(k.p);
+  const b = Math.sqrt(-k.q);
+  if (k.form === "cubic" && Number.isInteger(a) && Number.isInteger(b)) {
+    const linear = (constant: number) => [mono(a, 1), mono(constant)];
+    return factoredLatex({ g: grouped.g, factors: [linear(b), linear(-b), grouped.factors[1]] }, k.vars);
+  }
+  return factoredLatex(grouped, k.vars);
+}
 
 /**
  * Mistake-based Distractors, most diagnostic first:
