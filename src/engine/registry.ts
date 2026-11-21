@@ -20,6 +20,7 @@ import { generators as matrices } from "./generators/matrices";
 import { generators as polynomials } from "./generators/polynomials";
 import { generators as radicals } from "./generators/radicals";
 import { generators as foundations } from "./generators/foundations";
+import { generators as trig } from "./generators/trig";
 
 export const GENERATORS: readonly Generator[] = [
   ...quadratics,
@@ -34,6 +35,7 @@ export const GENERATORS: readonly Generator[] = [
   ...polynomials,
   ...radicals,
   ...foundations,
+  ...trig,
 ];
 
 const byId: Record<string, Generator> = Object.fromEntries(
