@@ -3,6 +3,7 @@
 // them, and classify the system from the printed equations alone.
 
 import { evalLatex, splitEquation } from "../shared/latexEval.testkit";
+
 /** The equations of a printed system, as plain "lhs = rhs". */
 export function equations(prompt: string): string[] {
   const m = prompt.match(/^\\left\\\{ \\begin\{aligned\} (.*) \\end\{aligned\} \\right\.$/);
@@ -19,7 +20,9 @@ export function coefficients(eq: string): [number, number, number] {
 }
 
 export function printedSystem(prompt: string): [[number, number, number], [number, number, number]] {
-  const [e1, e2] = equations(prompt);
+  const rows = equations(prompt);
+  if (rows.length !== 2) throw new Error("expected two system equations");
+  const [e1, e2] = rows;
   return [coefficients(e1), coefficients(e2)];
 }
 
