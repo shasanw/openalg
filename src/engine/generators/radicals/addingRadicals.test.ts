@@ -49,13 +49,26 @@ describe("adding-radicals: Topic Options", () => {
 });
 
 describe("adding-radicals: distractors", () => {
-  it("are distinct wrong values, at least three", () => {
+  it("are distinct wrong values, at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expectValueDistractors(p.answer, p.distractorHints);
+        expectValueDistractors(p.answer, p.distractorHints, 4);
       }),
+      { numRuns: 1500 },
     );
+  });
+
+  it("offers four value-distinct Distractors for four like terms with variables and nothing to simplify (seed 16)", () => {
+    const p = generator.generate({ terms: 4, simplifyFirst: false, unlike: false, cubeRoots: false, variables: true }, 16);
+    expectValueDistractors(p.answer, p.distractorHints, 4);
+  });
+
+  it("offers the minus sign carried on to every later term", () => {
+    // 2 - 5 + 3 + 1 = 1, but with the minus carried on, 2 - 5 - 3 - 1 = -7
+    const p = generator.generate({ terms: 4, simplifyFirst: false, unlike: false, cubeRoots: false, variables: true }, 16);
+    expect(p.prompt).toBe("2\\sqrt{6x} - 5\\sqrt{6x} + 3\\sqrt{6x} + \\sqrt{6x}");
+    expect(p.distractorHints).toContain("-7\\sqrt{6x}");
   });
 
   it("lead with adding the radicands as well as the coefficients", () => {

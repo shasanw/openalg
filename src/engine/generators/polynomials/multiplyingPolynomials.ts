@@ -143,6 +143,11 @@ export function promptLatex(k: MultiplyingConstruction): string {
  * - a sign slip on the last partial product (negative times negative)
  * - added the leading coefficients instead of multiplying them
  * - left out the last partial product
+ * - signs of the middle partial products flipped
+ * - multiplied only the numbers and left the variables of the second factor
+ *   as they were (3x(x + 2) = 3x + 6)
+ * - distributed to the last term only, the first copied unchanged
+ *   (or: the second term of a binomial left out of the distributing)
  */
 export function distractors(k: MultiplyingConstruction): string[] {
   const { left, right, answer, vars } = k;
@@ -176,6 +181,13 @@ export function distractors(k: MultiplyingConstruction): string[] {
   c.push(norm(flat.slice(0, -1)));
   // signs of the whole middle flipped (inner and outer products)
   c.push(norm(flat.map((m, i) => (i === 0 || i === flat.length - 1 ? m : mono(-m.c, ...m.e)))));
+  // multiplied the numbers but copied the variables of the second factor's
+  // term, forgetting to multiply the variables in
+  c.push(norm(left.flatMap((m) => right.map((u) => mono(m.c * u.c, ...u.e)))));
+  // a monomial distributed to the last term only; or a binomial's second term
+  // distributed and its first term just copied down
+  if (k.kind === "monomial") c.push(norm([...right.slice(0, -1), parts[0][right.length - 1]]));
+  else c.push(norm([left[0], ...parts[1]]));
   return polyHints(answer, c, vars);
 }
 

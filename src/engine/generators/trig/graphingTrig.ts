@@ -252,6 +252,13 @@ export function answerLatex(f: TrigFacts): string {
  * a negative a; the vertical shift's sign flipped; the amplitude as the full
  * height 2|a|; the asymptotes of the cofunction (tangent's where cotangent's
  * are) or with the phase shift left out; b itself given as the period.
+ *
+ * Then, appended so earlier Distractors keep their place: secant and
+ * cosecant asymptotes spaced a full period apart (they are half a period
+ * apart); the asymptotes moved the wrong way by the phase shift; the period
+ * and the asymptote spacing both multiplied by b instead of divided; and, last,
+ * pairs of the slips above in two different parts at once (a period slip with
+ * an amplitude slip, and so on), each part still really wrong.
  */
 export function distractorsOf(k: TrigConstruction): string[] {
   const f = factsOf(k);
@@ -273,9 +280,48 @@ export function distractorsOf(k: TrigConstruction): string[] {
     );
   }
   const answer = answerLatex(f);
-  const candidates = variants.filter((v) => Object.keys(v).length > 0).map((v) => answerLatex({ ...f, ...v }));
+  const singles = variants.filter((v) => Object.keys(v).length > 0);
+  const candidates = singles.map((v) => answerLatex({ ...f, ...v }));
   // b as the period: printed as a plain number, not a multiple of π.
   candidates.push(answer.replace(`\\text{Period: } ${piRat(f.period)}`, `\\text{Period: } ${numLatex(k.b)}`));
+  if (f.asymptotes) {
+    const { start, spacing } = f.asymptotes;
+    const u0 = k.fn === "tan" || k.fn === "sec" ? rat(1, 2) : rat(0);
+    const inWindow = (fam: { start: Rat; spacing: Rat }): number[] => {
+      const xs: number[] = [];
+      for (let x = ratValue(fam.start) - 8 * ratValue(fam.spacing); x < X_MAX_PI + 1e-9; x += ratValue(fam.spacing)) {
+        if (x > -X_MAX_PI + 1e-9 && x < X_MAX_PI - 1e-9) xs.push(Math.round(x * 1e6) / 1e6);
+      }
+      return xs;
+    };
+    const extra: Partial<TrigFacts>[] = [];
+    // secant and cosecant: asymptotes a whole period apart, not half a period
+    if (isSineLike(k.fn)) extra.push({ asymptotes: { start, spacing: f.period } });
+    // the phase shift applied the wrong way to the asymptotes
+    extra.push({ asymptotes: { start: ratMod(add(rat(-k.c.n, k.c.d), div(u0, k.b)!), spacing), spacing } });
+    // b multiplied instead of divided, in the period and in the asymptote spacing
+    extra.push({
+      period: mul(one, k.b),
+      asymptotes: { start: ratMod(add(k.c, mul(u0, k.b)), k.b), spacing: k.b },
+    });
+    for (const v of extra) {
+      const a = v.asymptotes!;
+      // not the same asymptotes within the window the Answer is checked on
+      if (inWindow(a).join() !== inWindow({ start, spacing }).join()) {
+        candidates.push(answerLatex({ ...f, ...v }));
+        singles.push(v);
+      }
+    }
+  }
+  // two slips at once, in different parts of the Answer
+  const keysOf = (v: Partial<TrigFacts>) => Object.keys(v);
+  for (let i = 0; i < singles.length; i++) {
+    for (let j = i + 1; j < singles.length; j++) {
+      const union = new Set([...keysOf(singles[i]), ...keysOf(singles[j])]);
+      if (union.size !== keysOf(singles[i]).length + keysOf(singles[j]).length || union.size > 2) continue;
+      candidates.push(answerLatex({ ...f, ...singles[i], ...singles[j] }));
+    }
+  }
   return distinctHints(answer, candidates);
 }
 
