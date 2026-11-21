@@ -238,20 +238,41 @@ export function distractors(k: TriangleAreaConstruction): string[] {
   const S = t.sides;
   const A = t.angles;
   const cands: (number | null)[] = [];
+  const later: (number | null)[] = [];
   if (k.given === "sas") {
     const [x, y] = others(k.v);
     const G = A[k.v];
     const ab = S[x] * S[y];
     cands.push(ab * sinD(G), 0.5 * ab * cosD(G), 0.5 * ab * Math.sin(G), 0.5 * ab, 0.5 * ab * r2(sinD(G)), ab);
+    later.push(
+      // tan C for sin C
+      0.5 * ab * Math.tan((G * Math.PI) / 180),
+      // added the two sides instead of multiplying them: ½(a + b) sin C
+      0.5 * (S[x] + S[y]) * sinD(G),
+      // forgot the ½ and used cos C: ab cos C
+      ab * cosD(G),
+    );
   } else if (k.given === "sss") {
     const [a, b, c] = S;
     const s = (a + b + c) / 2;
     const P = a + b + c;
     const prod = s * (s - a) * (s - b) * (s - c);
     const S2 = Math.round(s);
+    const wrongS = a + b + c / 2;
     const sorted = [...S].sort((m, n) => m - n);
     cands.push(prod, Math.sqrt(P * (P - a) * (P - b) * (P - c)), 0.5 * Math.sqrt(prod));
     cands.push(Math.sqrt(S2 * (S2 - a) * (S2 - b) * (S2 - c)), 0.5 * sorted[0] * sorted[1]);
+    later.push(
+      // s = a + b + c / 2 (order of operations)
+      Math.sqrt(wrongS * (wrongS - a) * (wrongS - b) * (wrongS - c)),
+      // left out the factor s
+      Math.sqrt((s - a) * (s - b) * (s - c)),
+      // left out the last difference s - c
+      Math.sqrt(s * (s - a) * (s - b)),
+      // used two sides as base and height: ½ab with the longer pair
+      0.5 * sorted[1] * sorted[2],
+      0.5 * sorted[0] * sorted[2],
+    );
   } else {
     const kv = k.v;
     const j = others(kv)[0];
@@ -264,11 +285,35 @@ export function distractors(k: TriangleAreaConstruction): string[] {
     cands.push(area(Math.round(S[j])));
     cands.push(area(S[j], A[j]));
     cands.push(0.5 * sk * ((sk * Math.sin(A[j])) / Math.sin(K)) * Math.sin(between));
+    later.push(
+      // used the given side twice: ½ s² sin(between)
+      0.5 * sk * sk * sinD(between),
+      // sin of the known side's own angle in place of the angle between
+      area(S[j], K),
+      // the sine left out: ½ s t
+      0.5 * sk * S[j],
+      // cos for sin of the angle between
+      area(S[j], 90 - between),
+      // second side from the wrong pair of the Law of Sines: sin(between) / sin K
+      area((sk * sinD(between)) / sinD(K)),
+      // cos of the known side's angle in place of sin of the angle between
+      area(S[j], 90 - K),
+      // the calculator in radians mode, on a given angle
+      0.5 * sk * S[j] * Math.sin(K),
+      // the ½ and the sine both left out: the product of the two sides
+      sk * S[j],
+      // tan for sin of the angle between
+      0.5 * sk * S[j] * Math.tan((between * Math.PI) / 180),
+      // the Law of Sines ratio inverted: the third angle's sine under the other angle's
+      area((sk * sinD(A[j])) / sinD(between)),
+    );
   }
-  return distinctHints(
+  const first = distinctHints(
     answerLatex(k),
     cands.map((x) => (x === null ? null : show(x))),
   ).slice(0, 6);
+  // new mistakes go after the old ones
+  return distinctHints(answerLatex(k), [...first, ...later.map((x) => (x === null ? null : show(x)))]);
 }
 
 export const generator: Generator = {

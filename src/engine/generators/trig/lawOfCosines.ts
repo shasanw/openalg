@@ -322,6 +322,8 @@ function marksOf(k: LawOfCosinesConstruction): Marks {
  *   the numerator), cos θ rounded to two places before cos⁻¹;
  * - solving: the next angle by sin⁻¹ when it is obtuse (the acute one taken),
  *   found angles swapped, the side rounded to a whole number before going on;
+ *   from three sides, two angles paired with the wrong vertices, tan⁻¹ in place
+ *   of cos⁻¹, an unsquared side, the factor 2 dropped;
  * - the calculator in radians mode.
  */
 export function distractors(k: LawOfCosinesConstruction): string[] {
@@ -330,6 +332,8 @@ export function distractors(k: LawOfCosinesConstruction): string[] {
   const A = k.t.angles;
   const g = k.g;
   const cands: (string | null)[] = [];
+  /** later mistakes, after the ones above so their order is kept */
+  const later: (string | null)[] = [];
   const show = (angles: readonly number[], sides: readonly number[]) => solvedLatex(k, angles, sides);
   if (k.kind === "side") {
     const [u, v] = others(g);
@@ -364,6 +368,28 @@ export function distractors(k: LawOfCosinesConstruction): string[] {
       cands.push(solveFrom(Math.round(S[g]), angleOpposite(p, Math.round(S[g]), q)));
     }
     cands.push(solveFrom(side(p * p + q * q - 2 * p * q * r2(cosD(G)))));
+    later.push(
+      // the 2 forgotten: p² + q² − pq cos G
+      solveFrom(side(p * p + q * q - p * q * cosD(G))),
+      // added the sides, then squared: (p + q)² − 2pq cos G
+      solveFrom(side((p + q) ** 2 - 2 * p * q * cosD(G))),
+      // p² − q² in place of p² + q²
+      solveFrom(side(p * p - q * q - 2 * p * q * cosD(G))),
+      // the root taken of only part of it: √(p² + q²) − 2pq cos G
+      solveFrom(Math.sqrt(p * p + q * q) - 2 * p * q * cosD(G)),
+      // divided by cos G instead of multiplying
+      solveFrom(side(p * p + q * q - (2 * p * q) / cosD(G))),
+    );
+    if (k.whole) {
+      // the third angle taken from the one angle found only: C = 180° − B
+      const wrongThird = [...A];
+      wrongThird[v] = 180 - A[u];
+      if (wrongThird[v] > 0) later.push(show(wrongThird, S));
+      // the third angle taken as 90° − B, as if the triangle were right-angled
+      const rightThird = [...A];
+      rightThird[v] = 90 - A[u];
+      if (rightThird[v] > 0) later.push(show(rightThird, S));
+    }
   } else {
     const angle = (x: number, y: number, z: number, f = acosD) => f((y * y + z * z - x * x) / (2 * y * z));
     const at = (v: Vertex, f = acosD) => {
@@ -381,15 +407,50 @@ export function distractors(k: LawOfCosinesConstruction): string[] {
       const sup = 180 - A[big];
       const [y] = others(big);
       cands.push(withAngles((v) => (v === big ? sup : v === y ? A[y] : 180 - sup - A[y])));
+      // Each of these rules out the Answer even for a right triangle (where the supplement mistake coincides with it).
+      const around = (v: Vertex) => {
+        const [y, z] = others(v);
+        return { numerator: S[y] * S[y] + S[z] * S[z] - S[v] * S[v], denominator: 2 * S[y] * S[z], y, z, v };
+      };
+      const each = (f: (o: ReturnType<typeof around>) => number) => withAngles((v) => f(around(v)));
+      later.push(
+        // Paired two of the angles with the wrong vertices (a swap of two, not a rotation of all three).
+        ...([[0, 1], [0, 2], [1, 2]] as const).map(([i, j]) => {
+          const swapped = [...A];
+          [swapped[i], swapped[j]] = [A[j], A[i]];
+          return show(swapped, S);
+        }),
+        // Used inverse tangent instead of inverse cosine.
+        each((o) => (Math.atan(o.numerator / o.denominator) * 180) / Math.PI),
+        // Forgot to square the opposite side.
+        each((o) => acosD((S[o.y] ** 2 + S[o.z] ** 2 - S[o.v]) / o.denominator)),
+        // Dropped the factor of two from the denominator.
+        each((o) => acosD(o.numerator / (S[o.y] * S[o.z]))),
+      );
     } else {
       for (const v of others(g)) cands.push(degTex(A[v], k.places));
       cands.push(degTex(180 - A[g], k.places));
       const rad = at(g, (c) => Math.acos(c));
       cands.push(degTex(rad, k.places));
       cands.push(degTex(at(g, (c) => acosD(r2(c))), k.places));
+      const [y, z] = others(g);
+      const [a, b, c] = [S[g], S[y], S[z]];
+      const numerator = b * b + c * c - a * a;
+      const denominator = 2 * b * c;
+      const angleHint = (degrees: number) =>
+        plausible(degrees) && rounded(degrees, k.places) > 0 ? degTex(degrees, k.places) : null;
+      later.push(
+        // Used inverse tangent instead of inverse cosine.
+        angleHint((Math.atan(numerator / denominator) * 180) / Math.PI),
+        // Forgot to square the opposite side, or all three sides.
+        angleHint(acosD((b * b + c * c - a) / denominator)),
+        angleHint(acosD((b + c - a) / denominator)),
+        // Dropped the factor of two from the denominator.
+        angleHint(acosD(numerator / (b * c))),
+      );
     }
   }
-  return distinctHints(answer, cands).slice(0, 6);
+  return distinctHints(answer, [...distinctHints(answer, cands).slice(0, 6), ...later]);
 }
 
 function sidesWith(S: readonly number[], v: Vertex, x: number): number[] {

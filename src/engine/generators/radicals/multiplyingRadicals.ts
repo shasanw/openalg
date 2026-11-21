@@ -13,6 +13,7 @@
 import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
 import {
+  appendDistinct,
   combine,
   cubeRootsField,
   distinctValued,
@@ -21,6 +22,7 @@ import {
   isRational,
   mono,
   mulSums,
+  negTerm,
   mulTerms,
   pickIndex,
   simplifyMistakes,
@@ -172,6 +174,8 @@ export function distractors(k: MultiplyConstruction): string[] {
   const [A, B] = k.factors;
   const n = k.index;
   const c: RadTerm[][] = [];
+  /** Later mistakes: appended after the ones above so their order is kept. */
+  const more: RadTerm[][] = [];
   if (k.form === "monomial") {
     const [a] = A;
     const [b] = B;
@@ -180,6 +184,14 @@ export function distractors(k: MultiplyConstruction): string[] {
     if (a.rad.vars.length === 0 && b.rad.vars.length === 0)
       c.push(combine([term(product.coef.n, n, a.rad.n + b.rad.n)]));
     for (const m of simplifyMistakes(product)) c.push(combine([m]));
+    // added the two terms instead of multiplying them: \sqrt{6} \cdot \sqrt{3} = \sqrt{6} + \sqrt{3}
+    more.push(combine([a, b]));
+    // multiplied the numbers in front and kept one radical: \sqrt{5} \cdot \sqrt{5} = \sqrt{5}
+    if (!isRational(a) && a.rad.n === b.rad.n && a.rad.vars.length === 0 && b.rad.vars.length === 0)
+      more.push(combine([term(a.coef.n * b.coef.n, n, a.rad)]));
+    // treated equal radicals as like terms to add: \sqrt{2} \cdot \sqrt{2} = 2\sqrt{2}
+    if (!isRational(a) && a.rad.n === b.rad.n && a.rad.vars.length === 0 && b.rad.vars.length === 0)
+      more.push(combine([term(2 * a.coef.n * b.coef.n, n, a.rad)]));
   } else if (k.form === "distribute") {
     const [t] = A;
     const [u, v] = B;
@@ -194,6 +206,15 @@ export function distractors(k: MultiplyConstruction): string[] {
       if (isRational(x)) continue;
       for (const m of simplifyMistakes(raw)) c.push(combine([m, mulTerms(t, y)]));
     }
+    // forgot to distribute to the first term: \sqrt{7}(\sqrt{7} - 3) = \sqrt{7} - 3\sqrt{7}
+    more.push(combine([u, mulTerms(t, v)]));
+    // dropped the number in front of the second factor's radical: \sqrt{2} \cdot 2\sqrt{2} = 2
+    if (!isRational(u) && Math.abs(u.coef.n) !== 1) more.push(combine([mulTerms(t, term(Math.sign(u.coef.n), n, u.rad)), mulTerms(t, v)]));
+    // a sign slip on the first product only
+    more.push(combine([negTerm(mulTerms(t, u)), mulTerms(t, v)]));
+    // multiplied the radicands by adding them: \sqrt{7} \cdot \sqrt{7} = \sqrt{14}
+    if (!isRational(u) && t.rad.vars.length === 0 && u.rad.vars.length === 0)
+      more.push(combine([term(t.coef.n * u.coef.n, n, t.rad.n + u.rad.n), mulTerms(t, v)]));
   } else {
     const [a1, a2] = A;
     const [b1, b2] = B;
@@ -202,17 +223,30 @@ export function distractors(k: MultiplyConstruction): string[] {
     c.push(combine([mulTerms(a1, b1), mulTerms(a1, b2), mulTerms(a2, b1), mulTerms(a2, b2)].map((x, i) => (i === 3 ? { ...x, coef: mono(-x.coef.n, x.coef.vars) } : x))));
     c.push(combine([mulTerms(a1, b1), mulTerms(a1, b2), mulTerms(a2, b2)]));
     c.push(combine([mulTerms(a1, b1), mulTerms(a2, b1), mulTerms(a2, b2)]));
+    if (!isRational(a2) && !isRational(b2) && a2.rad.vars.length === 0 && b2.rad.vars.length === 0) {
+      const lead = [mulTerms(a1, b1), mulTerms(a1, b2), mulTerms(a2, b1)];
+      const cf = a2.coef.n * b2.coef.n;
+      // multiplied the radicands by adding them: \sqrt{r} \cdot \sqrt{r} = \sqrt{2r}
+      more.push(combine([...lead, term(cf, n, a2.rad.n + b2.rad.n)]));
+      if (a2.rad.n === b2.rad.n) {
+        // kept one radical: \sqrt[3]{r} \cdot \sqrt[3]{r} = \sqrt[3]{r}
+        more.push(combine([...lead, term(cf, n, a2.rad)]));
+        // the square-root habit: \sqrt[3]{r} \cdot \sqrt[3]{r} = r
+        if (n === 3) more.push(combine([...lead, term(cf * a2.rad.n)]));
+      }
+    }
   }
   const answer = answerTerms(k);
   c.push(answer.map((t, i) => (i === answer.length - 1 ? { ...t, coef: mono(-t.coef.n, t.coef.vars) } : t)));
   const correct = valuedSum(answer);
   const candidates = c.filter((terms) => terms.length > 0).map(valuedSum);
+  const extra = more.filter((terms) => terms.length > 0).map(valuedSum);
   const hints = distinctValued(correct, candidates);
   // With equal small roots several mistakes coincide. Omitting one factor
   // is another distinct mistake for these short lists.
   if (hints.length < 3)
-    return distinctValued(correct, [...candidates, valuedSum(A), valuedSum(B)]).slice(0, 3);
-  return hints.slice(0, 6);
+    return appendDistinct(correct, [...candidates, valuedSum(A), valuedSum(B)], extra, 3);
+  return appendDistinct(correct, candidates, extra);
 }
 
 export const generator: Generator = {

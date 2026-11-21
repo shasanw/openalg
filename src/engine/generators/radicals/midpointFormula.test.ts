@@ -41,14 +41,16 @@ describe("midpoint-formula: Topic Options", () => {
 });
 
 describe("midpoint-formula: distractors", () => {
-  it("are distinct points, never the Answer, and at least three", () => {
+  it("are distinct points, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
         expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
         expect(p.distractorHints).not.toContain(p.answer);
-        for (const d of p.distractorHints) expect(points(d)).toHaveLength(1);
+        const choices = [p.answer, ...p.distractorHints].map(s => points(s));
+        for (const choice of choices) expect(choice).toHaveLength(1);
+        expect(new Set(choices.map(choice => JSON.stringify(choice[0]))).size).toBe(choices.length);
       }),
     );
   });
@@ -58,4 +60,9 @@ describe("midpoint-formula: generate()", () => {
   it("is deterministic, renders, and has variety", () => {
     commonChecks(generator, anyParams, [{}, { task: "endpoint" }, { fractions: true }], 150);
   });
+});
+
+it("offers the mistake of averaging x but copying the first y coordinate", () => {
+  const p = generator.generate({}, 0);
+  expect(p.distractorHints).toContain("(-5, -9)");
 });

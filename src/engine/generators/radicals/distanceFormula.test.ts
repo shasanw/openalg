@@ -48,13 +48,14 @@ describe("distance-formula: Topic Options", () => {
 });
 
 describe("distance-formula: distractors", () => {
-  it("are distinct, never the Answer's value, and at least three", () => {
+  it("are distinct, never the Answer's value, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
         expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        for (const d of p.distractorHints) expect(Math.abs(valueOf(d) - valueOf(p.answer)), d).toBeGreaterThan(1e-9);
+        const values = [p.answer, ...p.distractorHints].map(valueOf).sort((a, b) => a - b);
+        for (let i = 1; i < values.length; i++) expect(values[i] - values[i - 1]).toBeGreaterThan(1e-9);
       }),
     );
   });
@@ -69,4 +70,9 @@ describe("distance-formula: generate()", () => {
   it("is deterministic, renders, and has variety", () => {
     commonChecks(generator, anyParams, [{}, { distances: "whole" }, { distances: "radical", answerForm: "rounded" }], 100);
   });
+});
+
+it("offers the mistake of halving the diagonal distance as in the midpoint formula", () => {
+  const p = generator.generate({ distances: "radical" }, 7);
+  expect(p.distractorHints).toContain("\\frac{\\sqrt{2}}{2}");
 });

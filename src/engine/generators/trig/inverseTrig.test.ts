@@ -89,11 +89,11 @@ describe("inverse-trig: Topic Options", () => {
 });
 
 describe("inverse-trig: distractors", () => {
-  it("are at least three, distinct in value, and never the Answer's value", () => {
+  it("are at least four, distinct in value, and never the Answer's value", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
         const all = [p.answer, ...p.distractorHints];
         for (let i = 0; i < all.length; i++)
           for (let j = i + 1; j < all.length; j++) expect(sameTrigValue(all[i], all[j]), `${all[i]} vs ${all[j]}`).toBe(false);
@@ -125,4 +125,9 @@ describe("inverse-trig: generate()", () => {
     const prompts = new Set(Array.from({ length: 200 }, (_, s) => generator.generate({}, s).prompt));
     expect(prompts.size).toBeGreaterThan(80);
   });
+});
+
+it("offers the mistake of taking sine instead of cotangent in the 5-12-13 triangle", () => {
+  const p = generator.generate({ functions: "all" }, 22);
+  expect(p.distractorHints).toContain("-\\frac{5}{13}");
 });

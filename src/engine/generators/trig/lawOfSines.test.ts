@@ -98,7 +98,7 @@ describe("law-of-sines", () => {
       fc.property(anyParams, anySeed, (params, seed) => {
         const p = generator.generate(params, seed);
         expectGoodDistractors(p, choiceKey);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(params.problems === "ambiguous" ? 1 : 2);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
         for (const d of p.distractorHints) for (const part of d.split(ANSWER_PART_SEPARATOR)) expectRenders(part);
       }),
       { numRuns: 600 },
@@ -134,4 +134,18 @@ describe("law-of-sines", () => {
     expect(kinds("mixed")).toEqual(["angle", "side"]);
     expect(kinds("all")).toEqual(["ambiguous", "angle", "side"]);
   });
+});
+
+it("offers the mistake of using inverse cosine to recover the angle opposite side 16", () => {
+  const p = generator.generate({}, 6);
+  expect(p.distractorHints).toContain("50.2^{\\circ}");
+});
+
+it("keeps four Distractors for the ambiguous case when solving the whole triangle", () => {
+  for (const rounding of ["tenth", "hundredth"] as const) {
+    for (let seed = 0; seed < 300; seed++) {
+      const p = generator.generate({ problems: "ambiguous", solveTriangle: true, rounding }, seed);
+      expect(p.distractorHints.length, `${rounding} seed ${seed}`).toBeGreaterThanOrEqual(4);
+    }
+  }
 });
