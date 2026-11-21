@@ -75,6 +75,8 @@ export interface RadicalEquationConstruction {
   extraneous: number[];
   /** the Distractors, most common mistake first */
   hints: (string | null)[];
+  /** used only when fewer than three distinct hints remain */
+  spare?: (string | null)[];
 }
 
 // ------------------------------------------------------------------ printing
@@ -140,6 +142,9 @@ function numberForm(rng: Rng, index: RootIndex, o: Opts): RadicalEquationConstru
     solutions: bad ? [] : [x],
     extraneous: bad ? [x] : [],
     hints: list,
+    // With the radical equal to -1, forgetting to square can land on x + 1,
+    // so the opposite sign, then x - 1, fill the third place.
+    spare: bad ? [hint(rat(-x)), hint(rat(x - 1))] : [],
   };
 }
 
@@ -175,6 +180,9 @@ function bothSidesForm(rng: Rng, index: RootIndex, o: Opts): RadicalEquationCons
     solutions: bad ? [] : [x],
     extraneous: bad ? [x] : [],
     hints: list,
+    // when the sign slips coincide (and cube roots offer no "no solution"),
+    // x off by one the other way, then the radicands equated without d^n
+    spare: [hint(rat(x - 1)), a1 === a2 ? null : hint(div(rat(b2 - b1), rat(a1 - a2)))],
   };
 }
 
@@ -246,7 +254,8 @@ export function answerLatex(k: RadicalEquationConstruction): string {
  * - the opposite sign.
  */
 export function distractors(k: RadicalEquationConstruction): string[] {
-  return distinctHints(answerLatex(k), k.hints).slice(0, 6);
+  const out = distinctHints(answerLatex(k), k.hints).slice(0, 6);
+  return out.length >= 3 ? out : distinctHints(answerLatex(k), [...k.hints, ...(k.spare ?? [])]).slice(0, 6);
 }
 
 export const generator: Generator = {
