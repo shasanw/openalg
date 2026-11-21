@@ -8,6 +8,10 @@ import { generator as rightTriangleRatios } from "./rightTriangleRatios";
 import { generator as rightTriangleSolving } from "./rightTriangleSolving";
 import { generator as trigAnyAngle } from "./trigAnyAngle";
 import { generator as graphingTrig } from "./graphingTrig";
+import { generator as fundamentalIdentities } from "./fundamentalIdentities";
+import { generator as sumDifferenceIdentities } from "./sumDifferenceIdentities";
+import { generator as multipleAngleIdentities } from "./multipleAngleIdentities";
+import { generator as productToSum } from "./productToSum";
 
 export const generators: readonly Generator[] = [
   angleMeasure,
@@ -16,4 +20,8 @@ export const generators: readonly Generator[] = [
   rightTriangleSolving,
   trigAnyAngle,
   graphingTrig,
+  fundamentalIdentities,
+  sumDifferenceIdentities,
+  multipleAngleIdentities,
+  productToSum,
 ];
