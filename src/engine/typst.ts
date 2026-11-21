@@ -251,6 +251,14 @@ const numberedCell = (n: number, body: string): string =>
  * left as one breakable equation.
  */
 export function answerMath(latex: string, placeholder: Placeholder): string {
+  // Keep each angle (including its periodic term) together, while allowing
+  // a long list of exact solutions to wrap at its commas.
+  if (/^(x|\\theta) = /.test(latex) && /\\pi|\\circ/.test(latex) && !latex.includes(ANSWER_PART_SEPARATOR)) {
+    const angles = latex.split(", ");
+    if (angles.length > 1 && angles.every((angle) => !/[()[\]]/.test(angle))) {
+      return angles.map((angle) => `#box[${mathRun(angle, placeholder)}]`).join("#[,] ");
+    }
+  }
   const parts = latex.split(ANSWER_PART_SEPARATOR);
   if (parts.length === 1) return mathRun(latex, placeholder);
   return parts
