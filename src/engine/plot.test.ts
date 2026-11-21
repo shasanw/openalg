@@ -14,7 +14,15 @@ import {
   plotLayers,
   PLOT_WIDTH_PT,
   symmetricWindow,
+  trigAsymptotes,
+  trigSpans,
+  trigWindow,
+  triangleFromAngles,
+  triangleFromSides,
+  TRIG_FUNCTIONS,
   type CoordinatePlaneSpec,
+  type TriangleSpec,
+  type TrigCurve,
   type LineCurve,
   type NumberLineSpec,
   type ParabolaCurve,
@@ -392,6 +400,273 @@ describe("graphSpecProblem", () => {
     ["a number line with too many ticks", { ...blankLine, step: 0.0001 }],
     ["a label plot() has no glyphs for", { ...blankPlane, points: [{ x: 1, y: 1, label: "<script>" }] }],
     ["an axis name plot() has no glyphs for", { ...blankPlane, axisLabels: { x: "x", y: "Y!" } }],
+  ])("rejects %s", (_, spec) => {
+    expect(graphSpecProblem(spec)).not.toBeNull();
+  });
+});
+
+// ------------------------------------------------- trig curves and triangles
+
+const trigCurves: TrigCurve[] = TRIG_FUNCTIONS.map((fn, i) => ({
+  kind: "trig",
+  fn,
+  a: [3, -2, 1, 2, 1, -2][i],
+  b: [2, 0.5, 1, 1, 2, 0.5][i],
+  c: [Math.PI / 4, 0, Math.PI / 4, 0, 0, Math.PI / 2][i],
+  d: [1, -1, 0, 1, -2, 0][i],
+}));
+const trigPlanes: CoordinatePlaneSpec[] = trigCurves.map((c) => ({
+  ...trigWindow([c.d + c.a, c.d - c.a]),
+  curves: [c],
+}));
+
+/** A right triangle (C), a skinny obtuse one and an equilateral one, with every kind of label. */
+const rightTriangle: TriangleSpec = {
+  kind: "triangle",
+  corners: [
+    { x: 0, y: 0, name: "C", rightAngle: true, opposite: { text: "x" } },
+    { x: 4, y: 0, name: "A", angle: { text: "37°" }, opposite: { text: "3" } },
+    { x: 0, y: 3, name: "B", opposite: { text: "4 cm" } },
+  ],
+};
+const [sA, sB, sC] = triangleFromAngles(8, 12, 20);
+const skinnyTriangle: TriangleSpec = {
+  kind: "triangle",
+  corners: [
+    { ...sA, name: "A", angle: { text: "8°" }, opposite: { text: "a" } },
+    { ...sB, name: "B", angle: { text: "12°" }, opposite: { text: "b" } },
+    { ...sC, name: "C", angle: { text: "θ" }, opposite: { text: "20" } },
+  ],
+};
+const answeredSkinny: TriangleSpec = {
+  ...skinnyTriangle,
+  corners: [
+    skinnyTriangle.corners[0],
+    skinnyTriangle.corners[1],
+    { ...skinnyTriangle.corners[2], angle: { text: "160°", answer: true } },
+  ],
+};
+const [eA, eB, eC] = triangleFromSides(5, 5, 5);
+const equilateral: TriangleSpec = {
+  kind: "triangle",
+  corners: [
+    { ...eA, name: "P", angle: { text: "" }, opposite: { text: "5" } },
+    { ...eB, name: "Q", angle: { text: "" }, opposite: { text: "5" } },
+    { ...eC, name: "R", angle: { text: "?" }, opposite: { text: "5" } },
+  ],
+};
+const newSpecs = [...trigPlanes, trigWindow([4, -4]), rightTriangle, skinnyTriangle, answeredSkinny, equilateral];
+
+describe("plot: trig curves and triangles", () => {
+  it("snapshots", async () => {
+    await expect(plot(trigPlanes[0], { ink: "#c62828" })).toMatchFileSnapshot("__snapshots__/plot-trig-sin.svg");
+    await expect(plot(trigPlanes[2], { ink: "#c62828" })).toMatchFileSnapshot("__snapshots__/plot-trig-tan.svg");
+    await expect(plot(rightTriangle)).toMatchFileSnapshot("__snapshots__/plot-triangle-right.svg");
+    await expect(plot(answeredSkinny, { ink: "#c62828" })).toMatchFileSnapshot(
+      "__snapshots__/plot-triangle-answer.svg",
+    );
+  });
+
+  it("is deterministic, self-contained, and drops into a Typst string as is", () => {
+    for (const s of newSpecs) {
+      const svg = plot(s, { ink: "#c62828" });
+      expect(svg).toBe(plot(structuredClone(s), { ink: "#c62828" }));
+      expect(svg.startsWith("<svg xmlns='http://www.w3.org/2000/svg'")).toBe(true);
+      expect(svg).not.toMatch(/["\\\n\r]/);
+      expect(svg).not.toMatch(/NaN|Infinity|<text/);
+      const defined = [...svg.matchAll(/<path id='([^']+)'/g)].map((m) => m[1]);
+      for (const [, id] of svg.matchAll(/href='#([^']+)'/g)) expect(defined).toContain(id);
+      expect(svg).toContain(`width='${PLOT_WIDTH_PT}pt'`);
+    }
+  });
+
+  it("is valid, also after a trip through JSON", () => {
+    for (const s of newSpecs) expect(graphSpecProblem(JSON.parse(JSON.stringify(s)))).toBeNull();
+  });
+
+  it("plotLayers stack into exactly plot()", () => {
+    const body = (svg: string) => svg.replace(/^<svg[^>]*>(<defs>.*?<\/defs>)?/, "").replace(/<\/svg>$/, "");
+    for (const s of newSpecs) {
+      const full = plot(s, { ink: "#c62828" });
+      const { frame, content } = plotLayers(s, { ink: "#c62828" });
+      expect(body(frame) + (content ? body(content) : "")).toBe(body(full));
+    }
+  });
+
+  it("trig: the window's blank grid is the answer graph's frame, with π tick labels", () => {
+    for (const s of trigPlanes) {
+      expect(plotLayers(s, { ink: "#c62828" }).frame).toBe(plot(blankGraph(s)));
+      expect(plot(blankGraph(s), { ink: "#c62828" })).not.toContain("#c62828");
+    }
+    const svg = plot(trigWindow([1, -1]));
+    expect(svg).toContain(`id='i${(0x3c0).toString(16)}'`); // italic π
+    expect(svg).toContain(`id='r2f'`); // the slash of π/2
+  });
+
+  it("trigWindow: x over ±xMaxPi·π, y keeps every value a square inside, steps are fractions of π", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.double({ min: -60, max: 60, noNaN: true }), { maxLength: 4 }),
+        fc.integer({ min: 1, max: 4 }),
+        (values, k) => {
+          const w = trigWindow(values, k);
+          expect(w.x).toEqual({ min: -k * Math.PI, max: k * Math.PI });
+          expect(w.y.max / w.yStep).toBe(6);
+          for (const v of values) expect(Math.abs(v)).toBeLessThanOrEqual(w.y.max - w.yStep);
+          expect(graphSpecProblem(JSON.parse(JSON.stringify(w)))).toBeNull();
+        },
+      ),
+    );
+    expect(() => trigWindow([1], 5)).toThrow(RangeError);
+  });
+
+  const trig: fc.Arbitrary<TrigCurve> = fc.record({
+    kind: fc.constant("trig" as const),
+    fn: fc.constantFrom(...TRIG_FUNCTIONS),
+    a: fc.constantFrom(-3, -2, -1, -0.5, 0.5, 1, 2, 3),
+    b: fc.constantFrom(-2, -1, 0.5, 1, 2, 3, 4),
+    c: fc.constantFrom(0, Math.PI / 6, -Math.PI / 4, Math.PI / 2, -Math.PI),
+    d: fc.integer({ min: -3, max: 3 }),
+  });
+
+  it("trigSpans: every piece lies inside the window and between asymptotes; every inside point is drawn", () => {
+    const x = { min: -2 * Math.PI, max: 2 * Math.PI };
+    const y = { min: -6, max: 6 };
+    const value = (c: TrigCurve, t: number) => {
+      const u = c.b * (t - c.c);
+      const f = { sin: Math.sin(u), cos: Math.cos(u), tan: Math.tan(u), csc: 1 / Math.sin(u), sec: 1 / Math.cos(u), cot: 1 / Math.tan(u) }[c.fn];
+      return c.a * f + c.d;
+    };
+    fc.assert(
+      fc.property(trig, fc.double({ min: x.min, max: x.max, noNaN: true }), (c, t) => {
+        const spans = trigSpans(c, x, y);
+        const asym = trigAsymptotes(c, x);
+        for (const [u, v] of spans) {
+          for (let i = 0; i <= 10; i++) {
+            const s = u + ((v - u) * i) / 10;
+            expect(value(c, s)).toBeGreaterThanOrEqual(y.min - 1e-6);
+            expect(value(c, s)).toBeLessThanOrEqual(y.max + 1e-6);
+          }
+          expect(asym.some((p) => p > u && p < v)).toBe(false);
+        }
+        const f = value(c, t);
+        const nearPole = asym.some((p) => Math.abs(p - t) < 1e-6);
+        if (!nearPole && f > y.min + 1e-6 && f < y.max - 1e-6) {
+          expect(spans.some(([u, v]) => t >= u - 1e-9 && t <= v + 1e-9)).toBe(true);
+        }
+      }),
+    );
+  });
+
+  it("trigAsymptotes: where cos (tan, sec) or sin (csc, cot) of b(x − c) is zero; none for sin and cos", () => {
+    const x = { min: -2 * Math.PI, max: 2 * Math.PI };
+    expect(trigAsymptotes({ kind: "trig", fn: "sin", a: 1, b: 1, c: 0, d: 0 }, x)).toEqual([]);
+    const tan = trigAsymptotes({ kind: "trig", fn: "tan", a: 1, b: 1, c: 0, d: 0 }, x).map((v) => v / Math.PI);
+    expect(tan.map((v) => Math.round(v * 2) / 2)).toEqual([-1.5, -0.5, 0.5, 1.5]);
+    const cot = trigAsymptotes({ kind: "trig", fn: "cot", a: 1, b: 2, c: Math.PI / 4, d: 0 }, x);
+    for (const v of cot) expect(Math.abs(Math.sin(2 * (v - Math.PI / 4)))).toBeLessThan(1e-9);
+    expect(cot).toHaveLength(8);
+    // drawn dashed, in the ink
+    expect(plot(trigPlanes[2], { ink: "#c62828" })).toContain(`stroke='#c62828' stroke-width='0.9' stroke-dasharray='3 2'`);
+  });
+
+  it("triangles: the answer's label is the only content, and blankGraph drops it", () => {
+    expect(plotLayers(skinnyTriangle).content).toBeNull();
+    expect(plotLayers(answeredSkinny, { ink: "#c62828" }).content).toContain("#c62828");
+    expect(plotLayers(answeredSkinny, { ink: "#c62828" }).frame).not.toContain("#c62828");
+    const blank = blankGraph(answeredSkinny) as TriangleSpec;
+    expect(blank.corners[2].angle).toBeUndefined();
+    expect(blank.corners[2].name).toBe("C");
+    expect(blankGraph(skinnyTriangle)).toEqual(skinnyTriangle);
+  });
+
+  it("triangles: the outline's size depends on its corners only, so the key's triangle matches the student's", () => {
+    const outline = (svg: string) => svg.match(/<path d='M[^']*Z'/)![0];
+    const a = plot(skinnyTriangle);
+    const b = plot(answeredSkinny);
+    const dims = (s: string) => outline(s).match(/[\d.]+/g)!.map(Number);
+    const [da, db] = [dims(a), dims(b)];
+    // same shape and size (the drawing may shift to centre its labels)
+    for (let i = 2; i < 6; i++) expect(da[i] - da[i % 2]).toBeCloseTo(db[i] - db[i % 2], 1);
+  });
+
+  it("triangles: labels never overlap each other and stay inside the column", () => {
+    const sides = fc.tuple(
+      fc.integer({ min: 1, max: 30 }),
+      fc.integer({ min: 1, max: 30 }),
+      fc.integer({ min: 1, max: 30 }),
+    ).filter(([a, b, c]) => a < b + c && b < a + c && c < a + b && Math.min(a, b, c) * 8 > Math.max(a, b, c));
+    fc.assert(
+      fc.property(sides, ([a, b, c]) => {
+        const [A, B, C] = triangleFromSides(a, b, c);
+        const spec: TriangleSpec = {
+          kind: "triangle",
+          corners: [
+            { ...A, name: "A", angle: { text: "35.5°" }, opposite: { text: `${a} cm` } },
+            { ...B, name: "B", angle: { text: "θ" }, opposite: { text: `${b}` } },
+            { ...C, name: "C", angle: { text: "x" }, opposite: { text: "x", answer: true } },
+          ],
+        };
+        if (graphSpecProblem(spec)) return;
+        const svg = plot(spec);
+        const [w] = svg.match(/viewBox='0 0 ([\d.]+)/)!.slice(1).map(Number);
+        expect(w).toBe(PLOT_WIDTH_PT);
+        // every glyph run starts inside the drawing
+        for (const [, x] of svg.matchAll(/matrix\([\d.]+ 0 0 -[\d.]+ (-?[\d.]+) /g)) {
+          expect(Number(x)).toBeGreaterThanOrEqual(0);
+          expect(Number(x)).toBeLessThan(PLOT_WIDTH_PT);
+        }
+      }),
+      { numRuns: 60 },
+    );
+  });
+
+  it("triangleFromSides and triangleFromAngles lay out the triangle asked for", () => {
+    const [A, B, C] = triangleFromSides(5, 4, 3);
+    const d = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y);
+    expect(d(B, C)).toBeCloseTo(5, 9);
+    expect(d(C, A)).toBeCloseTo(4, 9);
+    expect(d(A, B)).toBeCloseTo(3, 9);
+    expect(() => triangleFromSides(1, 2, 3)).toThrow(RangeError);
+    const [P, Q, R] = triangleFromAngles(30, 60, 10);
+    expect(d(P, Q)).toBeCloseTo(10, 9);
+    expect(d(Q, R)).toBeCloseTo(5, 9); // opposite 30° in a 30-60-90 with hypotenuse 10
+    expect(() => triangleFromAngles(100, 80, 1)).toThrow(RangeError);
+    // a right angle laid out this way passes the 90° check
+    expect(graphSpecProblem({ kind: "triangle", corners: [{ ...A, rightAngle: true }, B, C] })).toBeNull();
+  });
+
+  it("letters math labels: single letters and Greek italic, unit words and digits upright", () => {
+    expect(canLetter("8.5 cm", "math")).toBe(true);
+    expect(canLetter("35°", "math")).toBe(true);
+    expect(canLetter("3π/2", "math")).toBe(true);
+    expect(canLetter("θ", "regular")).toBe(false);
+    const svg = plot(rightTriangle);
+    expect(svg).toContain(`id='i78'`); // italic x
+    expect(svg).toContain(`id='r63'`); // upright c of cm
+    expect(svg).toContain(`id='rb0'`); // degree sign
+    expect(svg).toContain(`id='i41'`); // italic A
+  });
+});
+
+describe("graphSpecProblem: trig and triangles", () => {
+  const tri = rightTriangle;
+  it.each([
+    ["a trig curve of an unknown function", { ...blankPlane, curves: [{ kind: "trig", fn: "sinh", a: 1, b: 1, c: 0, d: 0 }] }],
+    ["a flat trig curve", { ...blankPlane, curves: [{ kind: "trig", fn: "sin", a: 0, b: 1, c: 0, d: 0 }] }],
+    ["a trig curve with b = 0", { ...blankPlane, curves: [{ kind: "trig", fn: "tan", a: 1, b: 0, c: 0, d: 0 }] }],
+    ["a trig curve without d", { ...blankPlane, curves: [{ kind: "trig", fn: "cos", a: 1, b: 1, c: 0 }] }],
+    ["a trig curve too dense to draw", { ...blankPlane, curves: [{ kind: "trig", fn: "sin", a: 1, b: 1000, c: 0, d: 0 }] }],
+    ["unknown xTickLabels", { ...blankPlane, xTickLabels: "degrees" }],
+    ["π labels on a step that is not a fraction of π", { ...blankPlane, xTickLabels: "pi" }],
+    ["a triangle with two corners", { kind: "triangle", corners: tri.corners.slice(0, 2) }],
+    ["a triangle with a corner without y", { kind: "triangle", corners: [{ x: 0 }, tri.corners[1], tri.corners[2]] }],
+    ["three corners on a line", { kind: "triangle", corners: [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }] }],
+    ["two corners at one point", { kind: "triangle", corners: [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 2, y: 1 }] }],
+    ["a right-angle mark on an angle that is not 90°", { kind: "triangle", corners: [{ ...tri.corners[0] }, { ...tri.corners[1], rightAngle: true }, tri.corners[2]] }],
+    ["a label plot() cannot letter", { kind: "triangle", corners: [{ ...tri.corners[0], opposite: { text: "<b>" } }, tri.corners[1], tri.corners[2]] }],
+    ["a label that is not text", { kind: "triangle", corners: [{ ...tri.corners[0], angle: { text: 35 } }, tri.corners[1], tri.corners[2]] }],
+    ["a corner name plot() cannot letter", { kind: "triangle", corners: [{ ...tri.corners[0], name: "A!" }, tri.corners[1], tri.corners[2]] }],
   ])("rejects %s", (_, spec) => {
     expect(graphSpecProblem(spec)).not.toBeNull();
   });

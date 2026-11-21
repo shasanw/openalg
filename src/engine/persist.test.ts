@@ -15,6 +15,7 @@ import {
   type Worksheet,
 } from "./worksheet";
 import { buildTypstDocument } from "./typst";
+import { trigWindow, triangleFromSides, type TriangleSpec } from "./plot";
 import { QUADRATIC_FACTORING_ID } from "./generators/quadratics/quadraticFactoring";
 import { QUADRATIC_FORMULA_ID } from "./generators/quadratics/quadraticFormula";
 import { GRAPHING_QUADRATICS_ID } from "./generators/quadratics/graphingQuadratics";
@@ -417,6 +418,50 @@ describe("graphs (#9)", () => {
     expect(loaded.version).toBe(2);
     expect(loaded.sections[0].problems[0].graph).toBeUndefined();
     expect(() => buildTypstDocument(loaded, { keyFormat: "in-context" })).not.toThrow();
+  });
+
+  /** The graph sheet with trig curves and triangle diagrams (student and answer) in place of its first graphs. */
+  function trigWorksheet(): Worksheet {
+    const ws = graphWorksheet();
+    const window = trigWindow([3, -1]);
+    const [A, B, C] = triangleFromSides(7, 9, 12);
+    const triangle = (answer: boolean): TriangleSpec => ({
+      kind: "triangle",
+      corners: [
+        { ...A, name: "A", angle: { text: "35°" }, opposite: { text: "7" } },
+        { ...B, name: "B", angle: answer ? { text: "48.2°", answer: true } : { text: "θ" }, opposite: { text: "9 cm" } },
+        { ...C, name: "C", opposite: { text: "12" } },
+      ],
+    });
+    const problems = ws.sections[0].problems.map((p, i) =>
+      i === 0
+        ? { ...p, graph: window, answerGraph: { ...window, curves: [{ kind: "trig" as const, fn: "tan" as const, a: 2, b: 0.5, c: Math.PI / 3, d: 1 }] } }
+        : i === 1
+          ? { ...p, graph: triangle(false), answerGraph: triangle(true) }
+          : p,
+    );
+    return { ...ws, sections: [{ ...ws.sections[0], problems }, ...ws.sections.slice(1)] };
+  }
+
+  it("round-trips trig curves and triangle diagrams byte-identically, drawing the same in every key format", () => {
+    const ws = trigWorksheet();
+    const json = serializeWorksheet(ws);
+    const loaded = deserializeWorksheet(json);
+    expect(loaded).toEqual(ws);
+    expect(serializeWorksheet(loaded)).toBe(json);
+    for (const keyFormat of ANSWER_KEY_FORMATS) {
+      expect(buildTypstDocument(loaded, { keyFormat })).toEqual(buildTypstDocument(ws, { keyFormat }));
+    }
+  });
+
+  it("rejects a damaged trig curve or triangle", () => {
+    const data = JSON.parse(serializeWorksheet(trigWorksheet()));
+    data.sections[0].problems[0].answerGraph.curves[0].fn = "sinh";
+    expect(() => deserializeWorksheet(JSON.stringify(data))).toThrow(/problem 0 answerGraph has invalid curves/);
+    data.sections[0].problems[0].answerGraph = undefined;
+    data.sections[0].problems[1].graph.corners[2].x = data.sections[0].problems[1].graph.corners[0].x;
+    data.sections[0].problems[1].graph.corners[2].y = data.sections[0].problems[1].graph.corners[0].y;
+    expect(() => deserializeWorksheet(JSON.stringify(data))).toThrow(/problem 1 graph is too thin to draw/);
   });
 
   it("rejects a damaged graph instead of breaking the Preview", () => {

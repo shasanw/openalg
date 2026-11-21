@@ -4,7 +4,9 @@
 // the Answer away. A Problem with an answer graph prints a BLANK student graph
 // on that very frame (the student draws the Answer); a Problem without one may
 // print a graph that is the question itself (a given line to find the slope
-// of), which states nothing the Answer does.
+// of), which states nothing the Answer does. A triangle diagram is always the
+// question itself: its answer graph only swaps the unknown's label for the
+// Answer.
 
 import { describe, expect, it } from "vitest";
 import { GENERATORS } from "./registry";
@@ -29,6 +31,22 @@ describe("graphs across every Topic", () => {
           const p = g.generate(params, seed);
           for (const spec of [p.graph, p.answerGraph].filter((s): s is GraphSpec => !!s)) {
             expect(graphSpecProblem(JSON.parse(JSON.stringify(spec)))).toBeNull();
+          }
+          if (p.graph?.kind === "triangle") {
+            // no label on the student's triangle is marked as the Answer
+            expect(p.graph).toEqual(blankGraph(p.graph));
+            // a triangle's student graph is the question (givens, the unknown
+            // marked); its answer graph is that same triangle with the
+            // unknown's label replaced by the Answer (a drawing of its own, not
+            // an overlay on the student's: see TriangleSpec)
+            if (p.answerGraph) {
+              expect(p.answerGraph.kind).toBe("triangle");
+              if (p.answerGraph.kind !== "triangle") continue;
+              expect(p.answerGraph.corners.map(({ x, y }) => ({ x, y }))).toEqual(
+                p.graph.corners.map(({ x, y }) => ({ x, y })),
+              );
+            }
+            continue;
           }
           if (p.graph && p.answerGraph) {
             // the student's graph is blank, and the Answer is drawn on that very frame
