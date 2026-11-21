@@ -126,7 +126,8 @@ export function determinants(k: CramerConstruction): { D: Rat; Di: Rat[] } {
  * constants put in the wrong column, so D_y / D lands on x); D divided by
  * D_i instead (the fraction upside down); the determinants left undivided
  * (D_x, D_y); the sign of D dropped (every coordinate negated); in three
- * variables, the coordinates rotated; in two, D found as ad + bc.
+ * variables, the coordinates rotated; in two, D found as ad + bc; and the
+ * coordinates both swapped and negated.
  */
 export function distractors(k: CramerConstruction): string[] {
   const s = k.solution;
@@ -145,6 +146,9 @@ export function distractors(k: CramerConstruction): string[] {
     const wrongD = p * t + q * r;
     if (wrongD !== 0) candidates.push(tupleLatex(Di.map((d) => mul(d, rat(1, wrongD)))));
   }
+  // A zero coordinate (or D = ±1) collapses several of the above: the
+  // swapped coordinates with D's sign dropped keeps a third choice.
+  candidates.push(tupleLatex([mul(rat(-1), s[1]), mul(rat(-1), s[0]), ...s.slice(2)]));
   return distinctHints(answerLatex(k), candidates);
 }
 

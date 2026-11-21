@@ -931,3 +931,60 @@ export function halfAngleValue(fn: "sin" | "cos" | "tan", h: Angle): HalfValue {
   if (c.d !== 2) throw new Error("halfAngleValue: unexpected cosine");
   return { kind: "nested", v: { s: sign as 1 | -1, a: c.d, b: n, r: c.r, d: 2 } };
 }
+
+// ------------------------------------------------------------------ solution families
+// (added for the trig equation Topics: simple, factoring, multiple-angle)
+
+/** a·b, simplified and rationalized. */
+export const surdMul = (a: Surd, b: Surd): Surd => surd(a.n * b.n, a.r * b.r, a.d * b.d);
+
+/** One family of solutions x = start + period·k. */
+export interface SolutionFamily {
+  start: Angle;
+  period: Angle;
+}
+
+/** a reduced into [0, turn·π). */
+const modTurn = (a: Angle, turn: number): Angle => sub(a, rat(turn * Math.floor(a.n / (turn * a.d))));
+
+/**
+ * The general solution of an equation whose solutions in [0, turn·π) are
+ * `angles` (turn 2 for one full turn; 4 for an equation in x/2), as few
+ * families as the textbook writes them: each solution not yet covered starts
+ * the family with the shortest period (turn/m) that stays inside the set.
+ * {0, π/3, π, 5π/3} gives πk, π/3 + 2πk, 5π/3 + 2πk; {π/4, 3π/4, 5π/4, 7π/4}
+ * gives π/4 + πk/2. Families are listed by their start, ascending; the same
+ * set always gives the same families.
+ */
+export function solutionFamilies(angles: readonly Angle[], turn = 2): SolutionFamily[] {
+  const set: Angle[] = [];
+  for (const a of angles.map((x) => modTurn(x, turn))) if (!set.some((b) => ratEq(a, b))) set.push(a);
+  set.sort(byValue);
+  const has = (a: Angle) => set.some((b) => ratEq(a, b));
+  const covered: Angle[] = [];
+  const out: SolutionFamily[] = [];
+  for (const s of set) {
+    if (covered.some((c) => ratEq(c, s))) continue;
+    for (let m = set.length; m >= 1; m--) {
+      const period = rat(turn, m);
+      const members = Array.from({ length: m }, (_, j) => modTurn(add(s, mul(period, rat(j))), turn));
+      if (!members.every(has)) continue;
+      out.push({ start: [...members].sort(byValue)[0], period });
+      covered.push(...members);
+      break;
+    }
+  }
+  return out.sort((x, y) => byValue(x.start, y.start));
+}
+
+/**
+ * Families printed: "x = \pi k, \frac{\pi}{3} + 2\pi k", "x = \frac{\pi}{4} +
+ * \frac{\pi k}{2}", "\theta = 30^{\circ} + 360^{\circ} k"; NO_SOLUTION when
+ * empty. With one shared period it prints as generalSolutionLatex does.
+ */
+export function familiesLatex(families: readonly SolutionFamily[], v: string, unit: AngleUnit, k = "k"): string {
+  if (families.length === 0) return NO_SOLUTION;
+  const step = (p: Angle) => (unit === "degrees" ? `${degreeLatex(p)} ${k}` : piLatex(p.n, p.d, k));
+  const family = (f: SolutionFamily) => (f.start.n === 0 ? step(f.period) : `${angleLatex(f.start, unit)} + ${step(f.period)}`);
+  return `${v} = ${families.map(family).join(", ")}`;
+}

@@ -441,6 +441,13 @@ describe("multi-part Answers wrap between their parts", () => {
     expect(out).toBe("#box[@@M0@@]#[;] #box[@@M1@@]");
   });
 
+  it("wraps periodic angle solutions between complete families", () => {
+    const { math, placeholder } = collect();
+    const out = answerMath("x = \\pi k, \\frac{\\pi}{3} + 2\\pi k", placeholder);
+    expect(math).toEqual(["x = \\pi k", "\\frac{\\pi}{3} + 2\\pi k"]);
+    expect(out).toBe("#box[@@M0@@]#[,] #box[@@M1@@]");
+  });
+
   it("leaves a single-part Answer as one breakable equation", () => {
     const { math, placeholder } = collect();
     expect(answerMath("x = 3, 5", placeholder)).toBe("@@M0@@");

@@ -5,6 +5,9 @@ import { NO_SOLUTION, rat, ratEq, ratValue, sub } from "../shared/equationKit";
 import { close, evalLatex } from "../shared/latexEval.testkit";
 import {
   anglesWithValue,
+  familiesLatex,
+  solutionFamilies,
+  surdMul,
   coterminal,
   coterminalMistakes,
   decimalLatex,
@@ -522,5 +525,22 @@ describe("trigKit: right triangles", () => {
       }),
     );
     expect(() => rightTriangleCorners(0, 3)).toThrow();
+  });
+});
+
+describe("exact products and solution families", () => {
+  it("reduces and rationalizes surd products", () => {
+    expect(surdMul(surd(-2, 6, 3), surd(3, 2, 4))).toEqual(surd(-1, 3));
+    expect(surdMul(surd(0), surd(5, 3))).toEqual(surd(0));
+  });
+
+  it("normalizes duplicate and negative angles over a half-angle equation's full cycle", () => {
+    const families = solutionFamilies([rat(-1), rat(1), rat(3), rat(1)], 4);
+    expect(families).toEqual([{ start: rat(1), period: rat(2) }]);
+    for (const unit of ["degrees", "radians"] as const) {
+      const [, rhs] = familiesLatex(families, "x", unit, "n").split(" = ");
+      for (const n of [-2, 0, 3]) expect(evalLatex(rhs, { n })).toBeCloseTo(Math.PI * (1 + 2 * n));
+    }
+    expect(familiesLatex([], "x", "radians")).toBe(NO_SOLUTION);
   });
 });

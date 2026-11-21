@@ -82,7 +82,7 @@ describe("App", () => {
     const title = screen.getByRole("textbox", { name: "Worksheet title" });
     await userEvent.clear(title);
     await userEvent.type(title, "Unit 3 Test");
-    await addSection("solving factoring");
+    await addSection("solving quadratics factoring");
     await addSection("quadratic formula");
     await addSection("parabolas");
 
@@ -155,7 +155,7 @@ describe("App: throwaway Worksheets stay out of the Library", () => {
   it("a blank Worksheet with a Section added and then deleted is removed on leaving", async () => {
     renderApp();
     await userEvent.click(screen.getByRole("button", { name: /New Worksheet/ }));
-    await addSection("solving factoring");
+    await addSection("solving quadratics factoring");
     await waitFor(() => expect(library.size).toBe(1), { timeout: 3000 });
     await userEvent.click(screen.getByRole("button", { name: "Section A actions" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /Delete Section/ }));
@@ -167,7 +167,7 @@ describe("App: throwaway Worksheets stay out of the Library", () => {
   it("an empty Worksheet the teacher named is kept", async () => {
     renderApp();
     await userEvent.click(screen.getByRole("button", { name: /New Worksheet/ }));
-    await addSection("solving factoring");
+    await addSection("solving quadratics factoring");
     const title = screen.getByRole("textbox", { name: "Worksheet title" });
     await userEvent.clear(title);
     await userEvent.type(title, "Unit 4 Quiz");

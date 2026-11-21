@@ -301,6 +301,12 @@ export function evalLatex(latex: string, env: Env = {}): number {
   return new Parser(tokenize(latex), env).parseAll();
 }
 
+/** Tokenize once when sampling the same printed expression at many points. */
+export function prepareLatex(latex: string): (env: Env) => number {
+  const tokens = tokenize(latex);
+  return (env) => new Parser(tokens, env).parseAll();
+}
+
 /** Split "lhs = rhs" (exactly one "="). */
 export function splitEquation(latex: string): [string, string] {
   const parts = latex.split("=");

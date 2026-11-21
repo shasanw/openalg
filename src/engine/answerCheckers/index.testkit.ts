@@ -34,6 +34,10 @@ import { productToSum } from "../generators/trig/productToSum.answer.testkit";
 import { lawOfSines } from "../generators/trig/lawOfSines.answer.testkit";
 import { lawOfCosines } from "../generators/trig/lawOfCosines.answer.testkit";
 import { triangleArea } from "../generators/trig/triangleArea.answer.testkit";
+import { simpleTrigEquations } from "../generators/trig/simpleTrigEquations.answer.testkit";
+import { inverseTrig } from "../generators/trig/inverseTrig.answer.testkit";
+import { trigEquationsFactoring } from "../generators/trig/trigEquationsFactoring.answer.testkit";
+import { trigEquationsMultipleAngle } from "../generators/trig/trigEquationsMultipleAngle.answer.testkit";
 import type { Problem } from "../types";
 
 export const checkers: Record<string, (p: Problem) => void> = {
@@ -50,6 +54,10 @@ export const checkers: Record<string, (p: Problem) => void> = {
   "law-of-sines": lawOfSines,
   "law-of-cosines": lawOfCosines,
   "triangle-area": triangleArea,
+  "simple-trig-equations": simpleTrigEquations,
+  "inverse-trig": inverseTrig,
+  "trig-equations-factoring": trigEquationsFactoring,
+  "trig-equations-multiple-angle": trigEquationsMultipleAngle,
   "arithmetic-sequences": arithmeticSequences,
   "arithmetic-series": arithmeticSeries,
   "general-sequences": generalSequences,
