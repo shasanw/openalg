@@ -1,6 +1,6 @@
 # OpenAlg
 
-A worksheet and test generator for math teachers, focused on Algebra 2 and Precalculus, that runs in the browser. Pick a topic, set its options, and get printable problems with matching answer keys. Every answer is known by construction (problems are built backwards from their answers), so keys are never wrong.
+A worksheet and test generator for math teachers, focused on Algebra 2 and Precalculus, that runs in the browser. Pick a topic, set its options, and get printable problems with matching answer keys. Problems are built backwards from their answers. Independent property tests check what the Answer Key prints.
 
 No install, no account. Worksheets are saved automatically in your browser's Library, and you can download any worksheet as a portable `.oalg` file or back up the whole Library.
 
@@ -85,6 +85,10 @@ Vercel compresses on the fly and doesn't use the build's `.br` files, so the com
 ## Supported browsers
 
 Current Chrome, Edge, Safari and Firefox on laptops and Chromebooks, plus Safari on iPad. Phones are not supported.
+
+## Checking a new Topic
+
+Register an independent checker for its id in [the Answer checker map](src/engine/answerCheckers/index.testkit.ts). Read the printed prompt, Answer and any graph specs. Check the mathematical result, the requested form, and that each Distractor is wrong in value. Use test-only readers or evaluators for the reference calculation. Run `pnpm exec vitest run src/engine/answers.allGenerators.test.ts` to exercise every Topic over seeds, defaults and single-option variants. The existing Topic tests continue to cover option combinations and construction invariants.
 
 ## Contributing
 
