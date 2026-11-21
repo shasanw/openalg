@@ -31,6 +31,9 @@ import { fundamentalIdentities } from "../generators/trig/fundamentalIdentities.
 import { sumDifferenceIdentities } from "../generators/trig/sumDifferenceIdentities.answer.testkit";
 import { multipleAngleIdentities } from "../generators/trig/multipleAngleIdentities.answer.testkit";
 import { productToSum } from "../generators/trig/productToSum.answer.testkit";
+import { lawOfSines } from "../generators/trig/lawOfSines.answer.testkit";
+import { lawOfCosines } from "../generators/trig/lawOfCosines.answer.testkit";
+import { triangleArea } from "../generators/trig/triangleArea.answer.testkit";
 import type { Problem } from "../types";
 
 export const checkers: Record<string, (p: Problem) => void> = {
@@ -44,6 +47,9 @@ export const checkers: Record<string, (p: Problem) => void> = {
   "sum-difference-identities": sumDifferenceIdentities,
   "multiple-angle-identities": multipleAngleIdentities,
   "product-to-sum": productToSum,
+  "law-of-sines": lawOfSines,
+  "law-of-cosines": lawOfCosines,
+  "triangle-area": triangleArea,
   "arithmetic-sequences": arithmeticSequences,
   "arithmetic-series": arithmeticSeries,
   "general-sequences": generalSequences,

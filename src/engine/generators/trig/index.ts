@@ -12,6 +12,9 @@ import { generator as fundamentalIdentities } from "./fundamentalIdentities";
 import { generator as sumDifferenceIdentities } from "./sumDifferenceIdentities";
 import { generator as multipleAngleIdentities } from "./multipleAngleIdentities";
 import { generator as productToSum } from "./productToSum";
+import { generator as lawOfSines } from "./lawOfSines";
+import { generator as lawOfCosines } from "./lawOfCosines";
+import { generator as triangleArea } from "./triangleArea";
 
 export const generators: readonly Generator[] = [
   angleMeasure,
@@ -24,4 +27,7 @@ export const generators: readonly Generator[] = [
   sumDifferenceIdentities,
   multipleAngleIdentities,
   productToSum,
+  lawOfSines,
+  lawOfCosines,
+  triangleArea,
 ];
