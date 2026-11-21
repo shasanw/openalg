@@ -1,10 +1,10 @@
+import { determinants } from "./determinants.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator } from "./determinants";
 import { fromInts } from "./matrixKit";
-import { evalLatex } from "../shared/latexEval.testkit";
-import { expectKatex, expectTidy, leibnizDet, readMatrices } from "../shared/matrices.testkit";
+import { expectKatex, expectTidy } from "../shared/matrices.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyParams = fc.record({
@@ -18,9 +18,7 @@ describe("determinants: answers", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.prompt).toMatch(/^\\begin\{vmatrix\}.*\\end\{vmatrix\}$/);
-        const [m] = readMatrices(p.prompt);
-        expect(evalLatex(p.answer)).toBe(leibnizDet(m));
+        determinants(p);
       }),
     );
   });

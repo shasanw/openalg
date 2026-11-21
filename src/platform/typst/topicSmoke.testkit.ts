@@ -21,7 +21,7 @@ import { FONT_FILES, MITEX_PACKAGE_FILE } from "./assetFiles";
 import { buildTypstDocument } from "../../engine/typst";
 import { ANSWER_KEY_FORMATS, buildWorksheet, setResponseFormat } from "../../engine/worksheet";
 import { GENERATORS } from "../../engine/registry";
-import type { ParamValues } from "../../engine/types";
+import { topicVariants } from "../../engine/topicVariants.testkit";
 
 /** How many topicsN.smoke.test.ts files share the Topics. */
 export const TOPIC_SHARDS = 7;
@@ -56,12 +56,7 @@ export function everyTopicCompiles(shard: number): void {
 
   describe(`every Topic compiles (shard ${shard + 1} of ${TOPIC_SHARDS})`, () => {
     for (const g of topicsOfShard(shard)) {
-      const variants: ParamValues[] = [{}];
-      for (const f of g.schema) {
-        if (f.type === "enum") for (const o of f.options) variants.push({ [f.key]: o.value });
-        if (f.type === "boolean") variants.push({ [f.key]: !f.default });
-        if (f.type === "int") variants.push({ [f.key]: f.min }, { [f.key]: f.max });
-      }
+      const variants = topicVariants(g.schema);
       it(`${g.id}: ${variants.length} option variants, free response and multiple choice, every Answer Key format`, async () => {
         for (const [i, params] of variants.entries()) {
           const fr = buildWorksheet({ generatorId: g.id, params, baseSeed: 1000 + i, count: 20 });

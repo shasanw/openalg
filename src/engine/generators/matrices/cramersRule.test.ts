@@ -1,9 +1,9 @@
+import { cramersRule, readTuple } from "./cramersRule.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator } from "./cramersRule";
 import { rat } from "../shared/equationKit";
-import { evalLatex, splitEquation } from "../shared/latexEval.testkit";
 import { expectKatex, expectTidy } from "../shared/matrices.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
@@ -12,33 +12,12 @@ const anyParams = fc.record({
   fractions: fc.boolean(),
 });
 
-/** The equations of a printed system, as plain "lhs = rhs". */
-function equations(prompt: string): string[] {
-  const m = prompt.match(/^\\left\\\{ \\begin\{aligned\} (.*) \\end\{aligned\} \\right\.$/);
-  if (!m) throw new Error(`not a system: ${prompt}`);
-  return m[1].split(" \\\\ ").map((e) => e.replace(" &= ", " = "));
-}
-
-/** "(3, -2)", "\left(\frac{1}{2}, 4\right)" -> numbers */
-function readTuple(latex: string): number[] {
-  const m = latex.match(/^(?:\\left)?\((.*?)(?:\\right)?\)$/);
-  if (!m) throw new Error(`not a tuple: ${latex}`);
-  return m[1].split(", ").map((v) => evalLatex(v));
-}
-
 describe("cramers-rule: answers", () => {
   it("the Answer satisfies every printed equation", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        const values = readTuple(p.answer);
-        const eqs = equations(p.prompt);
-        expect(eqs).toHaveLength(values.length);
-        const env = Object.fromEntries(values.map((v, i) => [["x", "y", "z"][i], v]));
-        for (const eq of eqs) {
-          const [lhs, rhs] = splitEquation(eq);
-          expect(Math.abs(evalLatex(lhs, env) - evalLatex(rhs))).toBeLessThan(1e-9);
-        }
+        cramersRule(p);
       }),
     );
   });

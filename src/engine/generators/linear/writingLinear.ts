@@ -36,6 +36,7 @@ import {
   q,
   slope,
   slopeEquation,
+  slopeInterceptLatex,
   slopeQ,
   type EquationForm,
   type Line,
@@ -177,7 +178,10 @@ export function distractors(k: WritingConstruction): string[] {
   const d = new Distractors(answerLatex(k));
   const [x1, y1] = k.points[0];
   const s = k.slope;
-  const write = (l: Line, through: Point) => equationLatex(l, k.form, through);
+  // A different point on the same line gives another correct point-slope equation.
+  const correctLine = slopeInterceptLatex(lineOf(k));
+  const write = (l: Line, through: Point) =>
+    slopeInterceptLatex(l) === correctLine ? null : equationLatex(l, k.form, through);
   const horizontal = (c: number): Line => ({ vertical: false, m: q(0), b: q(c) });
   const vertical = (c: number): Line => ({ vertical: true, x: q(c) });
 

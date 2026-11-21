@@ -205,10 +205,14 @@ export function distractors(k: MultiplyConstruction): string[] {
   }
   const answer = answerTerms(k);
   c.push(answer.map((t, i) => (i === answer.length - 1 ? { ...t, coef: mono(-t.coef.n, t.coef.vars) } : t)));
-  return distinctValued(
-    valuedSum(answer),
-    c.filter((x) => x.length > 0).map(valuedSum),
-  ).slice(0, 6);
+  const correct = valuedSum(answer);
+  const candidates = c.filter((terms) => terms.length > 0).map(valuedSum);
+  const hints = distinctValued(correct, candidates);
+  // With equal small roots several mistakes coincide. Omitting one factor
+  // is another distinct mistake for these short lists.
+  if (hints.length < 3)
+    return distinctValued(correct, [...candidates, valuedSum(A), valuedSum(B)]).slice(0, 3);
+  return hints.slice(0, 6);
 }
 
 export const generator: Generator = {
