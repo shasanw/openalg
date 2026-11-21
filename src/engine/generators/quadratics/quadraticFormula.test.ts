@@ -1,3 +1,5 @@
+import { expectDistinctChoices, solutionValues } from "../shared/distractors.testkit";
+import { anyParams } from "../polynomials/polynomials.testkit";
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -130,17 +132,21 @@ describe("quadratic-formula: parameter constraints", () => {
 describe("quadratic-formula: distractors", () => {
   it("are distinct and never equal the correct answer, for every mode", () => {
     fc.assert(
-      fc.property(anySeed, fc.constantFrom(...ROOT_TYPES), (seed, rootType) => {
-        const p = generator.generate({ rootType }, seed);
-        expect(p.distractorHints.length).toBeGreaterThan(0);
-        expect(p.distractorHints).not.toContain(p.answer);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+      fc.property(anySeed, anyParams(generator.schema), (seed, opts) => {
+        const p = generator.generate(opts, seed);
+        expectDistinctChoices(p, solutionValues);
       }),
     );
   });
 });
 
 describe("quadratic-formula: generate()", () => {
+  it("models taking only the minus branch", () => {
+    const p = generator.generate({}, 42);
+    expect(p.prompt).toBe("3x^2 - x - 30 = 0");
+    expect(p.distractorHints).toContain("x = -3");
+  });
+
   it("is deterministic for the same (params, seed)", () => {
     fc.assert(
       fc.property(anySeed, fc.constantFrom(...ROOT_TYPES), (seed, rootType) => {

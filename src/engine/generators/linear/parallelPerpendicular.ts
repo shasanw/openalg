@@ -227,14 +227,20 @@ export function distractors(k: PPConstruction): string[] {
       d.add(String(A));
     }
   }
-  if (line.vertical) {
+  if (line.vertical && k.given.form !== "slope") {
     // x = c read as a slope of c
     d.add(qLatex(line.x), line.x.n !== 0 ? fractionToLatex(-line.x.d, line.x.n) : null);
-  } else if (k.given.form !== "slope") {
+  } else if (!line.vertical && k.given.form !== "slope") {
     // the intercept taken as the slope
     d.add(qLatex(line.b));
   }
   d.add("0", "\\text{undefined}", "1", "-1");
+  // Assumed a point or an intercept is also required to find the slope.
+  d.add("\\text{Cannot be determined}");
+  if (!line.vertical && k.given.form !== "slope" && line.b.n !== 0) {
+    // Took the negative reciprocal of the intercept instead of the slope.
+    d.add(fractionToLatex(-line.b.d, line.b.n));
+  }
   return d.list;
 }
 

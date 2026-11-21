@@ -254,14 +254,30 @@ export function distractors(k: AbsConstruction): string[] {
     out.push(set(pos, neg(pos)));
     if (b !== 1) out.push(set(rat(k.k - c), rat(-k.k - c))); // forgot to divide by b
     out.push(set(lo)); // only the negative case
+    out.push(set(x(k.k + c), x(-k.k + c))); // moved c across without changing its sign
+    if (c !== 0) out.push(set(x(k.k), x(-k.k))); // forgot to move c at all
+    out.push(set(pos, x(c - k.k))); // second case: negated only the bx term, -bx + c = k
+    if (!isolated) {
+      // forgot to divide by a while isolating: |bx + c| = e - d
+      out.push(set(x(e - d - c), x(-(e - d) - c)));
+      // added d instead of subtracting it: |bx + c| = (e + d) / a
+      const kk = rat(e + d, a);
+      out.push(set(rat(kk.n - c * kk.d, kk.d * b), rat(-kk.n - c * kk.d, kk.d * b)));
+    }
   } else if (k.outcome === "one") {
     const [x0] = k.solutions;
     out.push(NO_SOLUTION, set(x0, neg(x0)), set(neg(x0)));
     if (b !== 1) out.push(set(rat(-c))); // forgot to divide by b
     out.push(`${v} = 0`, ALL_REALS);
+    out.push(set(rat(c))); // read the constant c as the solution, without negating or dividing
+    if (b !== 1) out.push(set(rat(-c * b))); // multiplied by b instead of dividing
+    if (!isolated) out.push(set(x(e - a * c, a * b), x(-e - a * c, a * b))); // forgot to subtract d before dividing by a
   } else {
     const m = Math.abs(k.k);
     out.push(set(x(m - c), x(-m - c)), set(x(m - c)), set(x(-m - c)), ALL_REALS, `${v} = 0`);
+    out.push(set(x(-c))); // ignored the negative right side and set bx + c = 0
+    out.push(set(x(m + c), x(-m + c))); // solved as if positive, and moved c without changing its sign
+    out.push(set(x(m), x(-m))); // solved as if positive, and forgot to move c
   }
   return distinctHints(answer, out);
 }

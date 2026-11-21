@@ -262,6 +262,9 @@ export function promptLatex(k: OneStepConstruction): string {
   return k.swapSides ? `${right} = ${left}` : `${left} = ${right}`;
 }
 
+/** -r, or null when r is missing. */
+const negOrNull = (r: Rat | null): Rat | null => (r ? neg(r) : null);
+
 /**
  * Mistake-based Distractors, most common first:
  * - addition / subtraction: did the same operation instead of the inverse
@@ -280,16 +283,62 @@ export function distractors(k: OneStepConstruction): string[] {
   let values: (Rat | null)[];
   switch (k.op) {
     case "add":
-      values = [add(b, a), sub(a, b), neg(add(b, a)), b, neg(b)];
+      values = [
+        add(b, a),
+        sub(a, b),
+        neg(add(b, a)),
+        b,
+        neg(b),
+        a, // read the number added as the solution
+        neg(a), // read the number added as the solution, sign dropped
+        mul(a, b), // multiplied instead of subtracting
+        div(b, a), // divided instead of subtracting
+        div(a, b), // divided upside down
+      ];
       break;
     case "subtract":
-      values = [sub(b, a), sub(a, b), neg(add(b, a)), b, neg(b)];
+      values = [
+        sub(b, a),
+        sub(a, b),
+        neg(add(b, a)),
+        b,
+        neg(b),
+        a, // read the number subtracted as the solution
+        neg(a), // read the number subtracted as the solution, sign flipped
+        mul(a, b), // multiplied instead of adding
+        div(b, a), // divided instead of adding
+        div(a, b), // divided upside down
+      ];
       break;
     case "multiply":
-      values = [sub(b, a), mul(a, b), div(a, b), neg(k.x), b, add(b, a)];
+      values = [
+        sub(b, a),
+        mul(a, b),
+        div(a, b),
+        neg(k.x),
+        b,
+        add(b, a),
+        neg(mul(a, b)), // multiplied instead of dividing, with a sign slip
+        sub(a, b), // subtracted the wrong way round
+        negOrNull(div(a, b)), // divided upside down, with a sign slip
+        a, // read the coefficient as the solution
+        neg(a), // read the coefficient as the solution, sign flipped
+      ];
       break;
     case "divide":
-      values = [div(b, a), add(b, a), div(a, b), neg(k.x), b, sub(b, a)];
+      values = [
+        div(b, a),
+        add(b, a),
+        div(a, b),
+        neg(k.x),
+        b,
+        sub(b, a),
+        negOrNull(div(b, a)), // divided instead of multiplying, with a sign slip
+        sub(a, b), // subtracted the wrong way round
+        a, // read the divisor as the solution
+        neg(a), // read the divisor as the solution, sign flipped
+        neg(add(b, a)), // added instead of multiplying, with a sign slip
+      ];
       break;
   }
   const answer = solutionLatex(k.v, k.x, k.style);

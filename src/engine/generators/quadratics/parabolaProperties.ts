@@ -124,6 +124,10 @@ export interface Facts {
   axis: Rational;
   /** Rendered as "y = …" instead of "x = …": only used by a distractor. */
   axisAsY?: boolean;
+  /** With `axisAsY`: the value printed after "y = " (default: the vertex's y). */
+  axisAsYValue?: Rational;
+  /** Only the "+" x-intercept is listed (the dropped-the-± mistake): only used by a distractor. */
+  plusOnly?: boolean;
   xIntercepts: ExactRoots;
   /** The y-intercept point, as [x, y]; the answer always has x = 0. */
   yIntercept: [number, number];
@@ -301,8 +305,15 @@ function radicalTerm(qq: number, s: number): string {
 }
 
 /** The x-intercepts as points, "(x1, 0), (x2, 0)" or "(p ± q√s / r, 0)". */
-export function xInterceptsLatex(x: ExactRoots): string {
+export function xInterceptsLatex(x: ExactRoots, plusOnly = false): string {
   if (x.s < 0) return "\\text{none}";
+  if (plusOnly) {
+    if (x.q === 0 || x.s === 0) return point(fractionToLatex(x.p, x.r), "0");
+    if (x.s === 1) return point(fractionToLatex(x.p + x.q, x.r), "0");
+    const rad = radicalTerm(x.q, x.s);
+    const numer = x.p === 0 ? rad : `${x.p} + ${rad}`;
+    return point(x.r === 1 ? numer : `\\frac{${numer}}{${x.r}}`, "0");
+  }
   if (x.q === 0 || x.s === 0) return point(fractionToLatex(x.p, x.r), "0");
   if (x.s === 1) {
     const vals = [
@@ -327,13 +338,13 @@ export function answerToLatex(f: Facts, ask: Ask): string {
     parts.push(
       `\\text{Vertex: } ${point(ratLatex(f.vertex[0]), ratLatex(f.vertex[1]))}`,
       f.axisAsY
-        ? `\\text{Axis: } y = ${ratLatex(f.vertex[1])}`
+        ? `\\text{Axis: } y = ${ratLatex(f.axisAsYValue ?? f.vertex[1])}`
         : `\\text{Axis: } x = ${ratLatex(f.axis)}`,
     );
   }
   if (ask !== "vertexAxis") {
     parts.push(
-      `\\text{$x$-intercepts: } ${xInterceptsLatex(f.xIntercepts)}`,
+      `\\text{$x$-intercepts: } ${xInterceptsLatex(f.xIntercepts, f.plusOnly)}`,
       `\\text{$y$-intercept: } ${point(String(f.yIntercept[0]), String(f.yIntercept[1]))}`,
     );
   }
@@ -358,6 +369,11 @@ export function promptToLatex(k: ParabolaConstruction): string {
 
 // ---------------------------------------------------------------- distractors
 
+/** a x^2 + b x + c at the exact rational n/d (a wrong x-coordinate substituted back). */
+function valueAt(a: number, b: number, c: number, x: Rational): Rational {
+  return q(a * x.n * x.n + b * x.n * x.d + c * x.d * x.d, x.d * x.d);
+}
+
 /** Mistake-based distractors: each is the full answer with ONE classic error.
  * Errors in properties the Topic Options do not ask for render identically to
  * the answer and are dropped, so the set adapts to `ask`. */
@@ -365,6 +381,8 @@ export function distractors(k: ParabolaConstruction, ask: Ask): string[] {
   const { a, b, c, D, facts } = k;
   const [hv, kv] = facts.vertex;
   const negH = q(-hv.n, hv.d);
+  const hNoTwo = q(-b, a);
+  const hNoA = q(-b, 2);
   const variants: Facts[] = [
     // sign of h flipped: x = b/2a instead of -b/2a (standard form, then
     // substituted back), or (x - h) misread as h -> -h (vertex form)
@@ -388,6 +406,39 @@ export function distractors(k: ParabolaConstruction, ask: Ask): string[] {
       ...facts,
       yIntercept: k.form === "vertex" ? [0, k.k as number] : [c, 0],
     },
+    // forgot the 2 in 2a: x = -b/a, with the vertex's y from substituting it back
+    { ...facts, vertex: [hNoTwo, valueAt(a, b, c, hNoTwo)], axis: hNoTwo },
+    // forgot the a in 2a: x = -b/2, with the vertex's y from substituting it back
+    { ...facts, vertex: [hNoA, valueAt(a, b, c, hNoA)], axis: hNoA },
+    // read the y-intercept c as the vertex's y-coordinate
+    { ...facts, vertex: [hv, q(c)] },
+    // sign error on the vertex's y-coordinate
+    { ...facts, vertex: [hv, q(-kv.n, kv.d)] },
+    // right vertex, but the axis written as a horizontal line through the vertex's x
+    { ...facts, axisAsY: true, axisAsYValue: hv },
+    // dropped the ±: listed only the "+" x-intercept
+    { ...facts, plusOnly: true },
+    // left a out of 4ac in the discriminant
+    { ...facts, xIntercepts: makeRoots(-b, b * b - 4 * c, 2 * a) },
+    // forgot the 4 in 4ac
+    { ...facts, xIntercepts: makeRoots(-b, b * b - a * c, 2 * a) },
+    // Reported the axis of symmetry as the only x-intercept.
+    { ...facts, xIntercepts: makeRoots(-b, 0, 2 * a) },
+    // sign error on the y-intercept
+    { ...facts, yIntercept: [0, -c] },
+    // read the x-coefficient b as the y-intercept (standard form), or forgot k (vertex form)
+    {
+      ...facts,
+      yIntercept: k.form === "vertex" ? [0, c - (k.k as number)] : [0, b],
+    },
+    // vertex form: solved a(x - h)^2 + k = 0 with the wrong sign on h
+    ...(k.form === "vertex"
+      ? [
+          { ...facts, xIntercepts: makeRoots(-(k.h as number) * a, -(k.k as number) * a, a) },
+          // vertex form: moved k across with the wrong sign, (x - h)^2 = k / a
+          { ...facts, xIntercepts: makeRoots((k.h as number) * a, (k.k as number) * a, a) },
+        ]
+      : []),
   ];
   const correct = answerToLatex(facts, ask);
   const seen = new Set<string>([correct]);

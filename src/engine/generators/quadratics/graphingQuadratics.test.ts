@@ -1,7 +1,8 @@
+import { expectDistinctChoices, graphFactValues } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
-import { assemble, choiceKey } from "../../mc";
+import { assemble } from "../../mc";
 import { blankGraph, plot, type CoordinatePlaneSpec } from "../../plot";
 import { factsFrom, answerToLatex } from "./parabolaProperties";
 import {
@@ -144,17 +145,12 @@ describe("graphing-quadratics: graphs", () => {
 });
 
 describe("graphing-quadratics: multiple choice", () => {
-  // A vertex on the y-axis makes several mistakes harmless (h = -h, c = k), so
-  // three is the floor; the assembler tops a fifth choice up with fallbacks.
-  it("offers at least three text Distractors, distinct from the Answer and from each other", () => {
+  it("offers at least four text Distractors, distinct from the Answer and from each other", () => {
     fc.assert(
       fc.property(anySeed, anyOptions, (seed, opts) => {
         const p = generator.generate(opts, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        const keys = p.distractorHints.map(choiceKey);
-        expect(new Set(keys).size).toBe(keys.length);
-        expect(keys).not.toContain(choiceKey(p.answer));
-        const { choices, correctIndex } = assemble(p, { choices: 4, seed });
+        expectDistinctChoices(p, graphFactValues);
+        const { choices, correctIndex } = assemble(p, { choices: 5, seed });
         expect(choices[correctIndex]).toBe(p.answer);
         // every choice comes from the mistake-based hints, not the fallback
         for (const c of choices) expect([p.answer, ...p.distractorHints]).toContain(c);
@@ -164,6 +160,12 @@ describe("graphing-quadratics: multiple choice", () => {
 });
 
 describe("graphing-quadratics: registration", () => {
+  it("models dropping the negative square-root branch", () => {
+    const p = generator.generate({}, 42);
+    expect(p.prompt).toBe("y = (x + 2)^2 - 4");
+    expect(p.distractorHints).toContain(p.answer.replace("(-4, 0), (0, 0)", "(0, 0)"));
+  });
+
   it("is registered under its id and title", () => {
     expect(generator.id).toBe(GRAPHING_QUADRATICS_ID);
     expect(generator.title).toBe("Graphing quadratics");

@@ -1,3 +1,5 @@
+import { expectDistinctChoices, solutionValues } from "../shared/distractors.testkit";
+import { anyParams } from "../polynomials/polynomials.testkit";
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -55,11 +57,9 @@ describe("quadratic-factoring: construction", () => {
 describe("quadratic-factoring: distractors", () => {
   it("are distinct and never equal the correct answer", () => {
     fc.assert(
-      fc.property(anySeed, (seed) => {
-        const p = generator.generate({}, seed);
-        expect(p.distractorHints.length).toBeGreaterThan(0);
-        expect(p.distractorHints).not.toContain(p.answer);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+      fc.property(anySeed, anyParams(generator.schema), (seed, opts) => {
+        const p = generator.generate(opts, seed);
+        expectDistinctChoices(p, solutionValues);
       }),
     );
   });
@@ -118,6 +118,7 @@ describe("quadratic-factoring: mistake-based distractors", () => {
   });
 
   it("includes a dropped solution", () => {
+    expect(distractors(k)).toContain("x = -3, 3"); // applied ± to just one root
     expect(distractors(k)).toContain("x = 3");
   });
 
@@ -131,17 +132,6 @@ describe("quadratic-factoring: mistake-based distractors", () => {
         for (const d of generator.generate({}, seed).distractorHints) {
           expect(d).toMatch(/^x = -?\d+(, -?\d+)?$/);
         }
-      }),
-    );
-  });
-
-  it("always offers at least three mistake-based hints", () => {
-    fc.assert(
-      fc.property(anySeed, fc.boolean(), (seed, allowEqualRoots) => {
-        const p = generator.generate({ allowEqualRoots }, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(
-          allowEqualRoots ? 1 : 3,
-        );
       }),
     );
   });

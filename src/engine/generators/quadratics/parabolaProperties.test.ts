@@ -1,3 +1,4 @@
+import { expectDistinctChoices, graphFactValues } from "../shared/distractors.testkit";
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -217,11 +218,15 @@ describe("parabola-properties: distractors", () => {
     fc.assert(
       fc.property(anySeed, anyOptions, (seed, opts) => {
         const p = generator.generate(opts, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(p.distractorHints).not.toContain(p.answer);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctChoices(p, graphFactValues);
       }),
     );
+  });
+
+  it("models omitting the 2 in the axis formula", () => {
+    const p = generator.generate({ ask: "vertexAxis" }, 42);
+    expect(p.prompt).toBe("y = -2x^2 + 14x - 20");
+    expect(p.distractorHints).toContain("\\text{Vertex: } (7, -20);\\quad \\text{Axis: } x = 7");
   });
 
   it("include the flipped-h mistake when h is not zero", () => {

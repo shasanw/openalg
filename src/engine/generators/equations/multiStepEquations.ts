@@ -394,17 +394,19 @@ export function answerLatex(k: MultiStepConstruction): string {
 
 // ------------------------------------------------------------------ distractors
 
-type Mistake = "none" | "partial" | "negSign" | "absCombine";
+type Mistake = "none" | "partial" | "negSign" | "absCombine" | "absConstants";
 
 /** A side's x-coefficient and constant as a student making `mistake` would get them. */
 function mistakenParts(side: Piece[], mistake: Mistake): { xc: number; k: number } {
   let xc = 0;
   let k = 0;
   const hasNegativeX = side.some((p) => (p.kind === "term" ? p.x && p.coef < 0 : p.mult * p.p < 0));
+  const hasNegativeConstant = side.some((p) => p.kind === "term" && !p.x && p.coef < 0);
+  const constCount = side.filter((p) => p.kind === "term" && !p.x).length;
   const xCount = side.filter((p) => p.kind === "group" || p.x).length;
   for (const p of side) {
     if (p.kind === "term") {
-      if (!p.x) k += p.coef;
+      if (!p.x) k += mistake === "absConstants" && hasNegativeConstant && constCount >= 2 ? Math.abs(p.coef) : p.coef;
       else xc += mistake === "absCombine" && hasNegativeX && xCount >= 2 ? Math.abs(p.coef) : p.coef;
     } else {
       const px = p.mult * p.p;
@@ -443,11 +445,33 @@ export function distractors(k: MultiStepConstruction): string[] {
   const v = k.v;
   if (k.outcome === "none") {
     const d = r.k - l.k;
-    return distinctHints(answer, [ALL_REALS, `${v} = 0`, `${v} = ${d}`, `${v} = ${-d}`, `${v} = 1`]);
+    const m = l.xc; // both sides have the same x-coefficient
+    return distinctHints(answer, [
+      ALL_REALS,
+      `${v} = 0`,
+      `${v} = ${d}`,
+      `${v} = ${-d}`,
+      `${v} = 1`, // interpreted cancelling matching x terms as x = 1
+      solutionHint(v, div(rat(d), rat(m))), // left the x-term on one side and divided the leftover by it
+      solutionHint(v, div(rat(-d), rat(m))), // the same with a sign slip
+      solutionHint(v, div(rat(d), rat(2 * m))), // moved the x-term across without changing its sign
+      solutionHint(v, rat(m)), // read the x-coefficient as the solution
+    ]);
   }
   if (k.outcome === "all") {
     const c = r.k;
-    return distinctHints(answer, [NO_SOLUTION, `${v} = 0`, `${v} = ${c}`, `${v} = 1`, `${v} = -1`]);
+    const m = l.xc;
+    return distinctHints(answer, [
+      NO_SOLUTION,
+      `${v} = 0`,
+      `${v} = ${c}`,
+      `${v} = 1`, // cancelled equal sides as a ratio of one
+      `${v} = -1`, // sign error when cancelling opposite terms
+      `${v} = ${-c}`, // sign slip when reading c = c as a solution
+      solutionHint(v, div(rat(c), rat(m))), // divided the matching constants by the x-coefficient
+      solutionHint(v, div(rat(-c), rat(m))), // the same with a sign slip
+      solutionHint(v, rat(m)), // read the x-coefficient as the solution
+    ]);
   }
   const x = k.x!;
   const values: (Rat | null)[] = [];
@@ -460,11 +484,26 @@ export function distractors(k: MultiStepConstruction): string[] {
   if (l.k !== 0 && r.k !== 0) values.push(div(rat(r.k + l.k), rat(l.xc - r.xc))); // constant moved without sign change
   values.push(neg(x));
   values.push(div(rat(l.xc - r.xc), rat(r.k - l.k))); // divided the wrong way round
-  values.push(add(x, rat(1)), sub(x, rat(1)));
+  // combined constants ignoring a minus sign: 2 - 5 -> 7
+  values.push(solveParts(mistakenParts(left, "absConstants"), mistakenParts(right, "absConstants")));
+  values.push(rat(r.k - l.k)); // forgot to divide by the x-coefficient
+  values.push(neg(rat(r.k - l.k))); // forgot to divide, and moved the constants across with a sign slip
+  values.push(rat((r.k - l.k) * (l.xc - r.xc))); // multiplied by the x-coefficient instead of dividing
+  values.push(sub(rat(r.k - l.k), rat(l.xc - r.xc))); // subtracted the x-coefficient instead of dividing by it
+  values.push(div(rat(r.k - l.k), rat(l.xc))); // forgot to move the x-term from the right
+  values.push(div(rat(r.k - l.k), rat(-r.xc))); // forgot to move the x-term from the left
+  values.push(div(rat(r.k + l.k), rat(l.xc + r.xc))); // moved the x-term and the constant without changing signs
+  if (l.k !== 0) values.push(div(rat(r.k), rat(l.xc - r.xc))); // ignored the constant on the left
+  if (r.k !== 0) values.push(div(rat(-l.k), rat(l.xc - r.xc))); // ignored the constant on the right
+  // Dropped a term while collecting the terms on one side.
+  for (const [i, piece] of left.entries()) {
+    if (piece.kind !== "term" || left.length === 1) continue;
+    values.push(solveParts(sideParts(left.filter((_, j) => j !== i)), r));
+  }
   return distinctHints(
     answer,
     values.map((val) => solutionHint(v, val)),
-  ).slice(0, 6);
+  ).slice(0, 8);
 }
 
 export const generator: Generator = {

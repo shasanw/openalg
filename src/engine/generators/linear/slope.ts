@@ -24,14 +24,12 @@ import { fractionToLatex } from "../../format";
 import {
   Distractors,
   GRID_LIMIT,
-  isVertical,
   lineGraph,
   lineThrough,
   pickSlope,
   pointLatex,
   slope,
   slopeLatex,
-  slopeQ,
   type Slope,
 } from "../shared/lines";
 import type { CoordinatePlaneSpec } from "../../plot";
@@ -150,11 +148,17 @@ export function distractors(k: SlopeConstruction): string[] {
   // or as the one distance that changes
   if (dy === 0) d.add(String(y1), String(dx));
   if (dx === 0) d.add(String(x1), String(dy), String(-dy), "1");
-  // a slope one off
-  if (!isVertical(k.slope)) {
-    const m = slopeQ(k.slope);
-    d.add(fractionToLatex(m.n + m.d, m.d), fractionToLatex(m.n - m.d, m.d));
-  }
+  // Reported just the rise or run, or divided one point's y-coordinate by its x-coordinate.
+  d.add(String(dy), String(dx), frac(y1, x1), frac(y2, x2));
+  // Subtracted on one axis but added on the other.
+  d.add(frac(y1 + y2, dx), frac(dy, x1 + x2));
+  if (dy === 0) d.add("\\infty"); // inverted rise/run and interpreted division by zero as infinity
+  if (dy === 0) d.add(String(x1), String(x2), String(-dx)); // used a horizontal distance as the slope
+  if (dx === 0) d.add(String(y1), String(y2), "\\infty"); // treated division by zero as infinity
+  // Counted the starting grid point as a unit of run.
+  d.add(frac(dy, dx + Math.sign(dx)));
+  // Read the equation x = c or y = c as having an implicit coefficient of one.
+  if (dy === 0 || dx === 0) d.add("1");
   return d.list;
 }
 

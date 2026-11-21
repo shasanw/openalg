@@ -133,6 +133,14 @@ export function distractors(k: FactoringConstruction): string[] {
     ...(pair2 ? [pair2] : []), // another wrong factor pair
     [Math.min(r1, r2)], // kept only the other solution
     [k.b, k.c], // read the coefficients as the answer
+    [-r1], // kept one solution and also flipped its sign
+    [-r2], // kept the other solution and flipped its sign
+    [r1, -r1], // treated the roots as plus-or-minus one value (square-root habit)
+    [r2, -r2], // same, built from the other root
+    [-k.b, -k.c], // read the coefficients as the answer with both signs flipped
+    [k.c], // read the constant term as the solution
+    [k.b], // read the x-coefficient as the solution
+    [-k.b], // read the x-coefficient as the solution, sign flipped
   ];
   const seen = new Set<string>([correct]);
   const out: string[] = [];
