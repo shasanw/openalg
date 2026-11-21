@@ -9,6 +9,11 @@
 // \log_{b}, each applied to the single factor that follows (with its power),
 // so "2\log_{3} x^{2} + \ln y" reads as 2 log3(x^2) + ln(y). The constant e is
 // an ordinary letter: bind it in the env (e: Math.E).
+// Trig: \sin \cos \tan \sec \csc \cot, optionally powered (\sin^{2} x, and
+// \sin^{-1} as the inverse), \arcsin \arccos \arctan and \operatorname{arcsec}
+// (arccsc, arccot), each applied to the following factor and any letters
+// right after it ("\sin 2x" is sin(2x), "\sin x \cos x" a product). Degrees
+// (30^{\circ} or 30^\circ) read as radians; \theta, \alpha, \beta, \phi are letters.
 
 export type Env = Record<string, number>;
 
@@ -39,6 +44,14 @@ function tokenize(s: string): Tok[] {
       if (cmd === "pi") out.push({ t: "var", name: "pi" });
       else if (cmd === "frac" || cmd === "cdot") out.push({ t: "sym", v: cmd });
       else if (cmd === "ln" || cmd === "log" || cmd === "sqrt") out.push({ t: "sym", v: cmd });
+      else if (TRIG.has(cmd)) out.push({ t: "sym", v: cmd });
+      else if (cmd === "operatorname") {
+        const name = s.slice(i).match(/^\{([a-z]+)\}/);
+        if (!name || !TRIG.has(name[1])) throw new Error(`unsupported operatorname in ${s}`);
+        out.push({ t: "sym", v: name[1] });
+        i += name[0].length;
+      } else if (cmd === "circ") out.push({ t: "sym", v: "circ" });
+      else if (GREEK.has(cmd)) out.push({ t: "var", name: cmd });
       else if (cmd === "left" || cmd === "right") continue;
       else if (cmd === "lvert" || cmd === "rvert") out.push({ t: "sym", v: "|" });
       else throw new Error(`unsupported command \\${cmd} in ${s}`);
@@ -62,7 +75,56 @@ function tokenize(s: string): Tok[] {
     }
     throw new Error(`unexpected "${ch}" in ${s}`);
   }
+  return degrees(out);
+}
+
+const TRIG = new Set(["sin", "cos", "tan", "sec", "csc", "cot", "arcsin", "arccos", "arctan", "arcsec", "arccsc", "arccot"]);
+const GREEK = new Set(["theta", "alpha", "beta", "phi"]);
+const isSymTok = (t: Tok | undefined, v: string) => t?.t === "sym" && t.v === v;
+
+/** Collapse "^{\circ}" and "^\circ" into one "deg" token. */
+function degrees(toks: Tok[]): Tok[] {
+  const out: Tok[] = [];
+  for (let i = 0; i < toks.length; i++) {
+    if (isSymTok(toks[i], "^") && isSymTok(toks[i + 1], "circ")) {
+      out.push({ t: "sym", v: "deg" });
+      i += 1;
+    } else if (isSymTok(toks[i], "^") && isSymTok(toks[i + 1], "{") && isSymTok(toks[i + 2], "circ") && isSymTok(toks[i + 3], "}")) {
+      out.push({ t: "sym", v: "deg" });
+      i += 3;
+    } else out.push(toks[i]);
+  }
   return out;
+}
+
+function applyTrig(fn: string, x: number): number {
+  switch (fn) {
+    case "sin":
+      return Math.sin(x);
+    case "cos":
+      return Math.cos(x);
+    case "tan":
+      return Math.tan(x);
+    case "sec":
+      return 1 / Math.cos(x);
+    case "csc":
+      return 1 / Math.sin(x);
+    case "cot":
+      return Math.cos(x) / Math.sin(x);
+    case "arcsin":
+      return Math.asin(x);
+    case "arccos":
+      return Math.acos(x);
+    case "arctan":
+      return Math.atan(x);
+    case "arcsec":
+      return Math.acos(1 / x);
+    case "arccsc":
+      return Math.asin(1 / x);
+    case "arccot":
+      return x === 0 ? Math.PI / 2 : x > 0 ? Math.atan(1 / x) : Math.PI + Math.atan(1 / x);
+  }
+  throw new Error(`unknown trig function ${fn}`);
 }
 
 class Parser {
@@ -114,7 +176,7 @@ class Parser {
     if (!t) return false;
     if (t.t !== "sym") return true;
     if (t.v === "|") return this.absDepth === 0;
-    return ["(", "frac", "{", "ln", "log", "sqrt"].includes(t.v);
+    return ["(", "frac", "{", "ln", "log", "sqrt"].includes(t.v) || TRIG.has(t.v);
   }
 
   term(): number {
@@ -129,7 +191,11 @@ class Parser {
   }
 
   power(): number {
-    const base = this.atom();
+    let base = this.atom();
+    if (this.isSym("deg")) {
+      this.i++;
+      base *= Math.PI / 180;
+    }
     if (!this.isSym("^")) return base;
     this.i++;
     const t = this.peek();
@@ -192,6 +258,22 @@ class Parser {
       const arg = this.power();
       if (!(arg > 0)) throw new Error(`log of non-positive ${arg}`);
       return Math.log(arg) / Math.log(base);
+    }
+    if (TRIG.has(t.v)) {
+      this.i++;
+      let exp = 1;
+      if (this.isSym("^")) {
+        this.i++;
+        const e = this.peek();
+        if (e?.t === "num") {
+          this.i++;
+          exp = e.v;
+        } else exp = this.group();
+      }
+      let arg = this.power();
+      while (this.peek()?.t === "var") arg *= this.power();
+      if (exp === -1 && !t.v.startsWith("arc")) return applyTrig(`arc${t.v}`, arg);
+      return applyTrig(t.v, arg) ** exp;
     }
     if (t.v === "(") {
       this.i++;
