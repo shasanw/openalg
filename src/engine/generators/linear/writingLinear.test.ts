@@ -141,6 +141,13 @@ describe("writing linear equations: multiple choice", () => {
     );
   });
 
+  it("excludes equivalent point-slope equations through a different point", () => {
+    const p = generator.generate({ answerForm: "pointSlope" }, 4294967295);
+    expect(p.answer).toBe("y = -(x - 3)");
+    for (const hint of p.distractorHints)
+      expect([0, 1].every(x => satisfies(hint, x, 3 - x)), hint).toBe(false);
+  });
+
   it("models the classic mistakes", () => {
     // through (2, 1) with slope 3: y = 3x - 5
     const k: WritingConstruction = { given: "slopePoint", form: "slopeIntercept", slope: { rise: 3, run: 1 }, c: -5, points: [[2, 1]] };
