@@ -15,10 +15,10 @@ import {
   type Worksheet,
 } from "./worksheet";
 import { buildTypstDocument } from "./typst";
-import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
-import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
-import { GRAPHING_QUADRATICS_ID } from "./generators/graphingQuadratics";
-import { QUADRATIC_INEQUALITIES_ID } from "./generators/quadraticInequalities";
+import { QUADRATIC_FACTORING_ID } from "./generators/quadratics/quadraticFactoring";
+import { QUADRATIC_FORMULA_ID } from "./generators/quadratics/quadraticFormula";
+import { GRAPHING_QUADRATICS_ID } from "./generators/quadratics/graphingQuadratics";
+import { QUADRATIC_INEQUALITIES_ID } from "./generators/quadratics/quadraticInequalities";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 

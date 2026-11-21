@@ -11,8 +11,8 @@ import {
 } from "@/engine/worksheet";
 import type { Problem } from "@/engine/types";
 import { getGenerator } from "@/engine/registry";
-import { GRAPHING_QUADRATICS_ID } from "@/engine/generators/graphingQuadratics";
-import { QUADRATIC_INEQUALITIES_ID } from "@/engine/generators/quadraticInequalities";
+import { GRAPHING_QUADRATICS_ID } from "@/engine/generators/quadratics/graphingQuadratics";
+import { QUADRATIC_INEQUALITIES_ID } from "@/engine/generators/quadratics/quadraticInequalities";
 import { DraftPages, hasUndrawableContent, sheetInches } from "./DraftPages";
 
 function sheet(opts: Partial<Worksheet> = {}): Worksheet {

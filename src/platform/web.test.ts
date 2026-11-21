@@ -5,8 +5,8 @@ import { TypstClient, type WorkerPort } from "./typst/client";
 import type { FromWorker, ToWorker } from "./typst/protocol";
 import { serializeWorksheet } from "../engine/persist";
 import { buildSection, buildWorksheet, type Worksheet } from "../engine/worksheet";
-import { QUADRATIC_FACTORING_ID } from "../engine/generators/quadraticFactoring";
-import { QUADRATIC_FORMULA_ID } from "../engine/generators/quadraticFormula";
+import { QUADRATIC_FACTORING_ID } from "../engine/generators/quadratics/quadraticFactoring";
+import { QUADRATIC_FORMULA_ID } from "../engine/generators/quadratics/quadraticFormula";
 
 function sampleWorksheet(title = "My Sheet", count = 8, baseSeed = 42): Worksheet {
   return buildWorksheet({

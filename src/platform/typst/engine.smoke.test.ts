@@ -19,9 +19,9 @@ import {
   type ScrambleMode,
 } from "../../engine/worksheet";
 import { GENERATORS } from "../../engine/registry";
-import { QUADRATIC_FORMULA_ID } from "../../engine/generators/quadraticFormula";
-import { QUADRATIC_FACTORING_ID } from "../../engine/generators/quadraticFactoring";
-import { GRAPHING_QUADRATICS_ID } from "../../engine/generators/graphingQuadratics";
+import { QUADRATIC_FORMULA_ID } from "../../engine/generators/quadratics/quadraticFormula";
+import { QUADRATIC_FACTORING_ID } from "../../engine/generators/quadratics/quadraticFactoring";
+import { GRAPHING_QUADRATICS_ID } from "../../engine/generators/quadratics/graphingQuadratics";
 import { plot } from "../../engine/plot";
 import { TOPIC_SHARDS, topicsOfShard } from "./topicSmoke.testkit";
 

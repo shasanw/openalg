@@ -18,8 +18,8 @@ import {
   type Worksheet,
 } from "./worksheet";
 import { assemble, choiceSeed } from "./mc";
-import { QUADRATIC_FACTORING_ID } from "./generators/quadraticFactoring";
-import { QUADRATIC_FORMULA_ID } from "./generators/quadraticFormula";
+import { QUADRATIC_FACTORING_ID } from "./generators/quadratics/quadraticFactoring";
+import { QUADRATIC_FORMULA_ID } from "./generators/quadratics/quadraticFormula";
 
 function twoSections(baseSeed = 11): Worksheet {
   const first = buildWorksheet({
