@@ -63,6 +63,12 @@ describe("multiplying-radicals: distractors", () => {
     );
   });
 
+  it("still supplies three wrong values for the product of two square roots of two", () => {
+    const p = generator.generate({ form: "monomial", cubeRoots: false, variables: false }, 1960976362);
+    expect(p.answer).toBe("2");
+    expectValueDistractors(p.answer, p.distractorHints);
+  });
+
   it("include the binomial square missing its middle term", () => {
     for (let s = 0; s < 300; s++) {
       const k = construct({ form: "binomial" }, createRng(s));
