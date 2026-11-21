@@ -8,9 +8,11 @@
 // is (outside)^n times what stays inside. Nothing is ever factored to find
 // the Answer.
 
+import { numLatex, rat } from "../shared/equationKit";
 import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
 import {
+  appendDistinct,
   cubeRootsField,
   distinctValued,
   mono,
@@ -113,7 +115,10 @@ const valued = (t: RadTerm): Valued => ({ tex: termLatex(t), value: termValue(t)
  * - dropped what stays inside: 6, or x^{2} for \sqrt{x^{5}};
  * - divided a variable's exponent without keeping the remainder inside;
  * - swapped what comes out and what stays in: 2\sqrt{6};
- * - lost the sign of a negative cube root.
+ * - lost the sign of a negative cube root;
+ * - a perfect power only (\sqrt{25}): divided the radicand by the index
+ *   (\frac{25}{2}) or multiplied the root by the index (10).
+ * These two come last, after the ones above, so existing order is kept.
  */
 export function distractors(k: SimplifyConstruction): string[] {
   const answer = answerTerm(k);
@@ -148,10 +153,16 @@ export function distractors(k: SimplifyConstruction): string[] {
     make(k.k * k.out + (k.k * k.out > 0 ? 1 : -1), outVars(floor), k.inside, inVars),
     make(k.k * k.out - (k.k * k.out > 0 ? 1 : -1), outVars(floor), k.inside, inVars),
   ];
-  return distinctValued(
-    valued(answer),
-    candidates.map((t) => (t ? valued(t) : null)),
-  ).slice(0, 6);
+  const old = candidates.map((t) => (t ? valued(t) : null));
+  if (k.inside !== 1 || k.vars.length > 0) return distinctValued(valued(answer), old).slice(0, 6);
+  // A perfect power (\sqrt{25}): mistakes that remain once the radicand is gone.
+  const extra: (Valued | null)[] = [
+    // divided the radicand by the index instead of taking its root: \sqrt{25} = 25 / 2
+    { tex: numLatex(rat(k.k * sign * out ** n, n)), value: (k.k * sign * out ** n) / n },
+    // multiplied the root by the index: \sqrt{25} = 5 \cdot 2
+    { tex: String(k.k * k.out * n), value: k.k * k.out * n },
+  ];
+  return appendDistinct(valued(answer), old, extra);
 }
 
 export const generator: Generator = {

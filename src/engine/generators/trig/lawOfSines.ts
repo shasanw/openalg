@@ -17,6 +17,7 @@ import {
   ANGLE_NAMES,
   SIDE_NAMES,
   VERTICES,
+  acosD,
   asinD,
   cosD,
   degLabel,
@@ -358,6 +359,8 @@ export function distractors(k: LawOfSinesConstruction): string[] {
   const A = k.t.angles;
   const S = k.t.sides;
   const cands: (string | null)[] = [];
+  /** later mistakes, after the ones above so their order is kept */
+  const later: (string | null)[] = [];
   if (k.kind === "side") {
     const K = A[k.known];
     const len = S[k.known];
@@ -381,6 +384,16 @@ export function distractors(k: LawOfSinesConstruction): string[] {
     cands.push(withSides((v) => (len * r2(sinD(A[v]))) / r2(sinD(K))));
     // cosines in place of sines
     cands.push(withSides((v) => (len * cosD(A[v])) / cosD(K)));
+    later.push(
+      // the angles used as the ratio in place of their sines: x = len · B / A
+      withSides((v) => (len * A[v]) / K),
+      // forgot to divide by sin of the known angle: x = len · sin B
+      withSides((v) => len * sinD(A[v])),
+      // tangents in place of sines
+      withSides((v) => (len * Math.tan((A[v] * Math.PI) / 180)) / Math.tan((K * Math.PI) / 180)),
+      // divided by the angle itself, not its sine: x = len · sin B / A
+      withSides((v) => (len * sinD(A[v])) / K),
+    );
   } else {
     const { g, h } = k;
     const w = third(g, h);
@@ -414,8 +427,19 @@ export function distractors(k: LawOfSinesConstruction): string[] {
     } else {
       cands.push(path(asinD(r2((sh * sinD(Ag)) / sg))));
     }
+    const sinH = (sh * sinD(Ag)) / sg;
+    later.push(
+      // cos⁻¹ in place of sin⁻¹
+      Math.abs(sinH) <= 1 ? path(acosD(sinH)) : null,
+      // tan⁻¹ in place of sin⁻¹
+      path((Math.atan(sinH) * 180) / Math.PI),
+      // the angles used as the ratio in place of their sines: θ = A · h / g
+      path((Ag * sh) / sg),
+      // cos of the given angle in place of its sine
+      Math.abs((sh * cosD(Ag)) / sg) <= 1 ? path(asinD((sh * cosD(Ag)) / sg)) : null,
+    );
   }
-  return distinctHints(answer, cands).slice(0, 6);
+  return distinctHints(answer, [...distinctHints(answer, cands).slice(0, 6), ...later]);
 }
 
 function ambiguousDistractors(k: LawOfSinesConstruction & AmbiguousConstruction): string[] {
@@ -462,8 +486,18 @@ function ambiguousDistractors(k: LawOfSinesConstruction & AmbiguousConstruction)
     // Bisecting the remaining angle assumes that the two unknown angles are equal.
     cands.push(show([(180 - Ag) / 2]));
   }
-  const hints = distinctHints(answer, cands);
-  return hints.slice(0, 6);
+  // Later mistakes, after the ones above so their order is kept.
+  const later: (string | null)[] = [
+    // cos⁻¹ in place of sin⁻¹
+    Math.abs(sinH) <= 1 ? show([acosD(sinH)]) : null,
+    // tan⁻¹ in place of sin⁻¹
+    show([(Math.atan(sinH) * 180) / Math.PI]),
+    // the angles used as the ratio in place of their sines: θ = A · h / g
+    show([(Ag * sh) / sg]),
+    // cos of the given angle in place of its sine
+    Math.abs((sh * cosD(Ag)) / sg) <= 1 ? show([asinD((sh * cosD(Ag)) / sg)]) : null,
+  ];
+  return distinctHints(answer, [...distinctHints(answer, cands).slice(0, 6), ...later]);
 }
 
 export const generator: Generator = {

@@ -122,24 +122,42 @@ export function distractors(k: MidpointConstruction): string[] {
   const [x2, y2] = k.b;
   const answer = answerLatex(k);
   const P = (x: Rat, y: Rat) => pointLatex(x, y);
+  const [mx, my] = midpointOf(k.a, k.b);
   if (k.task === "midpoint") {
-    return distinctHints(answer, [
+    const old = [
       P(rat(x2 - x1, 2), rat(y2 - y1, 2)),
       P(rat(x1 + x2), rat(y1 + y2)),
       P(rat(y1 + y2, 2), rat(x1 + x2, 2)),
       P(rat(x1 + y1, 2), rat(x2 + y2, 2)),
       P(rat(x1 - x2, 2), rat(y1 - y2, 2)),
       P(rat(x1 + x2 + 2, 2), rat(y1 + y2, 2)),
-    ]).slice(0, 6);
+    ];
+    return distinctHints(answer, [
+      ...old,
+      // averaged only the x's and copied the first y (or the reverse)
+      P(mx, rat(y1)),
+      P(rat(x1), my),
+      P(mx, rat(y2)),
+      P(rat(x2), my),
+    ]);
   }
-  return distinctHints(answer, [
+  const old = [
     P(rat(3 * x1 + x2, 4), rat(3 * y1 + y2, 4)),
     P(rat(3 * x1 + x2, 2), rat(3 * y1 + y2, 2)),
     P(rat(x2 - x1, 2), rat(y2 - y1, 2)),
     P(rat(3 * x1 - x2, 2), rat(3 * y1 - y2, 2)),
     P(rat(y2), rat(x2)),
     P(rat(-x2), rat(-y2)),
-  ]).slice(0, 6);
+  ];
+  return distinctHints(answer, [
+    ...old,
+    // doubled the midpoint but forgot to subtract the endpoint
+    P(rat(x1 + x2), rat(y1 + y2)),
+    // added the endpoint instead of subtracting it: 2M + A
+    P(rat(2 * x1 + x2), rat(2 * y1 + y2)),
+    // gave the midpoint itself as the other endpoint
+    P(mx, my),
+  ]);
 }
 
 export const generator: Generator = {

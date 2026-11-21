@@ -110,17 +110,18 @@ describe("right-triangle-solving: Distractors", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        const ans = values(p.answer);
+        const stated = new Set([JSON.stringify(values(p.answer))]);
         const shape = (s: string) => s.replace(/\d+(\.\d+)?/g, "#").replace(/\\approx|=/g, "~");
         const keys = new Set([choiceKey(p.answer)]);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
         for (const d of p.distractorHints) {
           expect(keys.has(choiceKey(d)), d).toBe(false);
           keys.add(choiceKey(d));
           expect(shape(d)).toBe(shape(p.answer));
           const v = values(d);
           expect(v.every((x) => x > 0)).toBe(true);
-          expect(v.some((x, i) => x !== ans[i]), d).toBe(true);
+          expect(stated.has(JSON.stringify(v)), d).toBe(false);
+          stated.add(JSON.stringify(v));
         }
       }),
       { numRuns: 400 },
@@ -141,4 +142,9 @@ describe("right-triangle-solving: generator", () => {
       { numRuns: 100 },
     );
   });
+});
+
+it("offers the mistake of using cosine for both legs of the 24-degree triangle", () => {
+  const p = generator.generate({ problems: "solve" }, 3);
+  expect(p.distractorHints).toContain("A = 66^{\\circ};\\quad a \\approx 14.6;\\quad b \\approx 14.6");
 });
