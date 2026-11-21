@@ -141,6 +141,8 @@ export function distractors(k: SpecialCaseConstruction): string[] {
     c.push(factoredOf(k, a, 2 * b, null));
     c.push(PRIME);
   }
+  // Take the square roots of the two terms and report only one factor.
+  c.push({ g: mono(g), factors: [linear(a, k.square ? b : -b, k.two)] });
   return factoredHints(answerLatex(k), expandedOf(k), c, k.vars);
 }
 

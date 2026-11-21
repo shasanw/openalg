@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { matrixInverses } from "./matrixInverses.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -65,13 +66,14 @@ describe("matrix-inverses: Topic Options", () => {
 });
 
 describe("matrix-inverses: distractors", () => {
-  it("are distinct matrices, never the Answer, and at least two", () => {
+  it("are distinct matrices, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        expect(p.distractorHints).not.toContain(p.answer);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        expect(new Set(choices.map((s) => s.startsWith("\\text") ? s : JSON.stringify(readMatrix(s)))).size).toBe(choices.length);
         for (const d of p.distractorHints) readMatrix(d);
       }),
     );
@@ -83,6 +85,7 @@ describe("matrix-inverses: distractors", () => {
       [4, 7],
       [2, 6],
     ]);
+    expect(distractors({ m, inv: null })).toContain("\\begin{bmatrix} -4 & -7 \\\\ -2 & -6 \\end{bmatrix}"); // additive inverse
     const [undivided, wrongSwap] = distractors({ m, inv: null });
     expect(undivided).toBe("\\begin{bmatrix} 6 & -7 \\\\ -2 & 4 \\end{bmatrix}");
     expect(wrongSwap).toBe("\\begin{bmatrix} \\dfrac{2}{5} & -\\dfrac{7}{10} \\\\ -\\dfrac{1}{5} & \\dfrac{3}{5} \\end{bmatrix}");

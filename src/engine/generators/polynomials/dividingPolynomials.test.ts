@@ -82,7 +82,7 @@ describe("dividing-polynomials: distractors", () => {
     fc.assert(
       fc.property(anySeed, params, (seed, ps) => {
         const p = generator.generate(ps, seed);
-        expectGoodHints(p, 3);
+        expectGoodHints(p, 4);
         expectHintsWrongInValue(p);
       }),
     );
@@ -94,6 +94,7 @@ describe("dividing-polynomials: distractors", () => {
     const k = { vars: ["x", "y"] as [string, string], divisor, quotient, dividend: mul(quotient, divisor), remainder: 0 };
     expect(answerLatex(k)).toBe("x + 2");
     // x^2 - x - 6 = (x + 3)(x - 4) + 6
+    expect(distractors(k)).toContain("x"); // stop after the first division
     expect(distractors(k)[0]).toBe("x - 4 + \\frac{6}{x - 3}");
     expect(distractors(k)).toContain("x^{2} + 2x");
     expect(distractors(k)).toContain("x - 2");

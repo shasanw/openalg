@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -77,13 +78,14 @@ describe("counting-principle: Topic Options", () => {
 });
 
 describe("counting-principle: distractors", () => {
-  it("are distinct whole numbers, never the Answer, and at least two", () => {
+  it("are distinct whole numbers, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        expect(p.distractorHints).not.toContain(p.answer);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        expect(new Set(choices.map(readCount)).size).toBe(choices.length);
         for (const d of p.distractorHints) expect(readCount(d)).toBeGreaterThan(0);
       }),
     );
@@ -99,6 +101,7 @@ describe("counting-principle: distractors", () => {
         { ways: 5, times: 1 },
       ],
     };
+    expect(distractors(outfit)).toContain("35"); // (4 + 3) × 5
     expect(countOf(outfit)).toBe(60);
     expect(distractors(outfit)[0]).toBe("12");
     const coin: CountingConstruction = { context: "experiments", text: "", stages: [{ ways: 2, times: 5 }] };

@@ -90,7 +90,7 @@ describe("factoring-quadratics: distractors", () => {
     fc.assert(
       fc.property(anySeed, params, (seed, ps) => {
         const p = generator.generate(ps, seed);
-        expectGoodHints(p, 3);
+        expectGoodHints(p, 4);
         expectHintsWrongInValue(p);
         if (!ps.prime) expect(p.distractorHints).not.toContain(PRIME);
       }),
@@ -104,13 +104,16 @@ describe("factoring-quadratics: distractors", () => {
 
   it("x^2 - x - 12 = (x + 3)(x - 4): leads with both signs wrong, then a wrong factor pair", () => {
     const out = distractors(k([1, 3, 1, -4]), false);
+    expect(out).toContain("x + 3"); // omit the second factor
     expect(out[0]).toBe("(x + 4)(x - 3)");
     expect(out[1]).toBe("(x + 2)(x - 6)");
     expect(out).toContain("(x + 4)(x + 3)");
   });
 
   it("6x^2 + x - 2 = (2x - 1)(3x + 2): offers the constants in the wrong factors", () => {
-    expect(distractors(k([2, -1, 3, 2]), false)).toContain("(2x + 2)(3x - 1)");
+    const choices = distractors(k([2, -1, 3, 2]), false);
+    // The higher-ranked wrong pair already expands to (2x + 2)(3x - 1).
+    expect(choices.filter((tex) => sameValue(tex, "(2x + 2)(3x - 1)"))).toHaveLength(1);
   });
 
   it("with a common factor, offers forgetting it", () => {

@@ -233,6 +233,10 @@ export function scenarioSlips(s: Scenario): number[] {
       comb(n, r),
       perm(a.n, a.r) * perm(b.n, b.r),
       comb(a.n, a.r) * comb(b.n, b.r - 1),
+      // ordering one group's choice (nPr for it, nCr for the other)
+      perm(a.n, a.r) * comb(b.n, b.r),
+      comb(a.n, a.r) * perm(b.n, b.r),
+      comb(a.n, a.r - 1) * comb(b.n, b.r),
     ];
   }
   const other = s.kind === "permutation" ? comb(n, r) : perm(n, r);

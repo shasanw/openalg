@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { determinants } from "./determinants.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -55,19 +56,22 @@ describe("determinants: Topic Options", () => {
 });
 
 describe("determinants: distractors", () => {
-  it("are distinct whole numbers, never the Answer, and at least one", () => {
+  it("are distinct whole numbers, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(1);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        expect(p.distractorHints).not.toContain(p.answer);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        expect(new Set(choices.map(Number)).size).toBe(choices.length);
         for (const d of p.distractorHints) expect(d).toMatch(/^-?\d+$/);
       }),
     );
   });
 
   it("model adding the diagonals and dropping the cofactor signs", () => {
+    expect(distractors({ m: fromInts([[3, 2], [1, 4]]) })).toContain("12"); // main diagonal alone
+    expect(distractors({ m: fromInts([[3, 2], [1, 4]]) })).toContain("-2"); // only the subtracted diagonal, minus sign kept
     // |3 2; 1 4| = 10; 3*4 + 2*1 = 14; 2*1 - 3*4 = -10
     expect(distractors({ m: fromInts([[3, 2], [1, 4]]) }).slice(0, 2)).toEqual(["14", "-10"]);
     // |1 2 3; 0 1 4; 5 6 0| = 1; without the alternating sign: 1(-24) + 2(-20) + 3(-5) = -79

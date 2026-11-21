@@ -11,6 +11,7 @@ import { resolveParams, type Generator, type ParamSchema, type ParamValues, type
 import { prose } from "../../format";
 import { distinctHints } from "../shared/equationKit";
 import {
+  comb,
   countLatex,
   factorial,
   perm,
@@ -139,7 +140,8 @@ export const answerLatex = (k: PermutationsConstruction): string => countLatex(c
 /**
  * Mistake-based Distractors, most common first. For nPr: the combination
  * nCr (dividing by r! too), n^r (repetition allowed), n! / r!, one factor
- * too few or too many, and n!. For word problems, the slips every counting
+ * too few or too many, and n!, plus multiplying n by r, dividing by r instead of r!
+ * and starting the product one factor low. For word problems, the slips every counting
  * scenario shares (see scenarioSlips). For repeated symbols: n! (repeats
  * ignored), dividing by only the most repeated symbol's count factorial,
  * dividing by the counts themselves rather than their factorials, the
@@ -151,9 +153,15 @@ export function distractors(k: PermutationsConstruction): string[] {
   if (k.form === "notation") {
     const { n, r } = k;
     values = [perm(n, r) / factorial(r), n ** r, factorial(n) / factorial(r), perm(n, r - 1), perm(n, r + 1), factorial(n)];
+    // multiplied n by r, divided by r instead of r!, started the product one factor low (n - 1)
+    values.push(n * r, factorial(n) / r, perm(n - 1, r));
   } else if (k.form === "words") {
     values = scenarioSlips(k.scenario);
-    if (k.scenario.r === k.scenario.n) values.unshift(factorial(k.scenario.n - 1), k.scenario.n ** 2);
+    if (k.scenario.r === k.scenario.n) {
+      values.unshift(factorial(k.scenario.n - 1), k.scenario.n ** 2);
+      // repetition allowed (n^n), and stopping the product after two positions
+      values.push(k.scenario.n ** k.scenario.n, perm(k.scenario.n, 2));
+    }
   } else {
     const n = k.symbols.length;
     const c = repeats(k.symbols);
@@ -164,6 +172,11 @@ export function distractors(k: PermutationsConstruction): string[] {
       factorial(c.length),
       factorial(n) / factorial(c.filter((x) => x > 1).reduce((t, x) => t + x, 0)),
       factorial(n) * c.reduce((p, x) => p * factorial(x), 1),
+      // only choosing the places of the most repeated symbol (nCr), counting those places in order
+      // (nPr), and dividing by the repeated symbol's factorial once for each copy of it
+      comb(n, c[0]),
+      perm(n, c[0]),
+      factorial(n) / factorial(c[0]) ** c[0],
     ];
   }
   return distinctHints(
