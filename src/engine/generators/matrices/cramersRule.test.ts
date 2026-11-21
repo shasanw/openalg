@@ -69,7 +69,8 @@ describe("cramers-rule: distractors", () => {
   it("keep three when the Answer has a zero coordinate and D = ±1", () => {
     // x - y = -5, -7x + 6y = 30: (0, 5); D = -1, D_x = 0
     const k = { a: [[1, -1], [-7, 6]], b: [-5, 30], solution: [rat(0), rat(5)] };
-    expect(distractors(k)).toEqual(["(5, 0)", "(0, -5)", "(-5, 0)"]);
+    // D found as ad + bc = 6 + 7 = 13, then the swapped, negated point
+    expect(distractors(k)).toEqual(["(5, 0)", "(0, -5)", "\\left(0, -\\frac{5}{13}\\right)", "(-5, 0)"]);
   });
 
   it("model swapped coordinates, an upside-down quotient and undivided determinants", () => {
