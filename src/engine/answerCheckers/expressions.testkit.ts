@@ -66,8 +66,10 @@ export function expression(p: Problem) {
   if (p.answer === "\\text{prime}") {
     check(p.generatorId === "factoring-quadratics", "unexpected prime");
     primitiveFactor(p.prompt);
-    const v = p.prompt.match(/[a-z]/)![0];
-    const { a, b, c } = coefficients((x) => evalLatex(p.prompt, { [v]: x }));
+    // For a homogeneous binary quadratic, setting the second variable to
+    // one gives the same discriminant as the univariate polynomial.
+    const [v, second] = new Set(p.prompt.match(/[a-z]/g));
+    const { a, b, c } = coefficients((x) => evalLatex(p.prompt, { [v]: x, ...(second ? { [second]: 1 } : {}) }));
     check(!Number.isInteger(Math.sqrt(b * b - 4 * a * c)), "reducible quadratic");
     return;
   }
