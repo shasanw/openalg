@@ -148,6 +148,16 @@ describe("writing linear equations: multiple choice", () => {
       expect([0, 1].every(x => satisfies(hint, x, 3 - x)), hint).toBe(false);
   });
 
+  it("still offers three Distractors when a slope of -1 passes through a point on y = -x", () => {
+    // Through (3, -3) with m = -1: the unflipped point (-3, 3) and the swapped
+    // point both lie on the Answer's own line, so they are dropped.
+    const p = generator.generate({ answerForm: "pointSlope" }, 1);
+    expect(p.answer).toBe("y + 3 = -(x - 3)");
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
+    for (const hint of p.distractorHints)
+      expect([0, 1].every((x) => satisfies(hint, x, -x)), hint).toBe(false);
+  });
+
   it("models the classic mistakes", () => {
     // through (2, 1) with slope 3: y = 3x - 5
     const k: WritingConstruction = { given: "slopePoint", form: "slopeIntercept", slope: { rise: 3, run: 1 }, c: -5, points: [[2, 1]] };

@@ -220,6 +220,11 @@ export function distractors(k: WritingConstruction): string[] {
   if (k.points.length === 2) d.add(at(s, [k.points[1][0], y1]));
   // the rise miscounted by one
   d.add(at(slope(s.rise + (s.rise > 0 ? 1 : -1), s.run), [x1, y1]));
+  // When several of those land on the Answer's own line (a slope of -1
+  // through a point on y = -x, say), the run miscounted by one, then the
+  // rise miscounted the other way.
+  if (d.list.length < 3) d.add(at(slope(s.rise, s.run + 1), [x1, y1]));
+  if (d.list.length < 3 && Math.abs(s.rise) > 1) d.add(at(slope(s.rise - (s.rise > 0 ? 1 : -1), s.run), [x1, y1]));
   return d.list;
 }
 
