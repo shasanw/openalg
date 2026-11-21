@@ -323,6 +323,22 @@ export function distractors(k: DistributiveConstruction): string[] {
   candidates.push(withGroupMistake(k, (g) => expand(g).slice(-1)));
   // Read juxtaposition as addition: 2(9x + 6) becomes 2 + 9x + 6.
   candidates.push(withGroupMistake(k, (g) => [g.mult, ...g.inner]));
+  // With two groups, the slip happens in only one of them (the other is expanded correctly).
+  if (k.extra && isGroup(k.extra.part)) {
+    const second = k.extra.part;
+    const mixed = (wrong: (g: Group) => Term[]): Term[][] => {
+      const main = [wrong(k.group), expand(k.group)];
+      const other = [expand(second), wrong(second)];
+      const ordered = (m: Term[], o: Term[]) => (k.extra!.before ? [...o, ...m] : [...m, ...o]);
+      return [ordered(main[0], other[0]), ordered(main[1], other[1])];
+    };
+    for (const w of [firstOnly, lastOnly, addedToConstant]) candidates.push(...mixed(w));
+  }
+  // Combined unlike terms: 4t + 8 as 12t.
+  if (k.combined && new Set(k.answer.map((t) => t.deg)).size > 1) {
+    const sum = k.answer.reduce((s, t) => add(s, t.coef), rat(0));
+    if (sum.n !== 0) candidates.push([{ coef: sum, deg: Math.max(...k.answer.map((t) => t.deg)) }]);
+  }
   const seen = new Set([termsLatex(combine(k.answer), k.v)]);
   return distinctHints(
     answerLatex(k),

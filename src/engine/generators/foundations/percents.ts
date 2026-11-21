@@ -166,6 +166,8 @@ export function distractors(k: PercentConstruction, decimals = true): string[] {
   }
   // Added the percent (or the part) onto the whole instead of finding a part of it.
   if (k.find === "part") values.push(add(whole, part), add(whole, percent), sub(whole, percent));
+  // Over 100%: counted only the part above the whole (175% of 100 as 75, forgetting the 100%).
+  if (k.find === "part" && percent.n > 100 * percent.d) values.push(mul(whole, sub(f, rat(1))));
   if (k.find === "whole") values.push(add(part, percent), add(whole, part), sub(whole, part), div(part, percent));
   // Used the whole as a percentage, used the remaining part as the base,
   // or reported the percent after an increase instead of the part's percent.

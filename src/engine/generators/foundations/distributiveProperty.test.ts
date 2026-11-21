@@ -150,3 +150,18 @@ describe("distributive-property: generate()", () => {
     expect(prompts.size).toBeGreaterThan(150);
   });
 });
+
+describe("distributive-property: soak regressions", () => {
+  it("keeps four Distractors for 2(t + 2) + 2(2 + t) (seed 989682511)", () => {
+    const params = { multiplier: "integer", terms: 2, combineLikeTerms: true, allowNegatives: false, maxCoefficient: 2, varyVariable: true };
+    const p = generator.generate(params, 989682511);
+    expect(p.prompt).toBe("2(t + 2) + 2(2 + t)");
+    expect(p.answer).toBe("4t + 8");
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+    // the slip in only one group: 2(t + 2) as 2t + 2, the other group worked correctly
+    expect(p.distractorHints).toContain("4t + 6");
+    // combined the unlike terms 4t + 8 as 12t
+    expect(p.distractorHints).toContain("12t");
+  });
+});
