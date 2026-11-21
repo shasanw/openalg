@@ -1,7 +1,8 @@
+import { expectDistinctChoices, graphFactValues } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
-import { assemble, choiceKey } from "../../mc";
+import { assemble } from "../../mc";
 import { blankGraph, plot, type CoordinatePlaneSpec } from "../../plot";
 import { buildSection } from "../../worksheet";
 import {
@@ -127,14 +128,11 @@ describe("graphing linear equations: graphs", () => {
 });
 
 describe("graphing linear equations: multiple choice", () => {
-  it("offers at least three Distractors, distinct and never the Answer", () => {
+  it("offers at least four Distractors, distinct and never the Answer", () => {
     fc.assert(
       fc.property(anySeed, anyOptions, (seed, opts) => {
         const p = generator.generate(opts, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        const keys = p.distractorHints.map(choiceKey);
-        expect(new Set(keys).size).toBe(keys.length);
-        expect(keys).not.toContain(choiceKey(p.answer));
+        expectDistinctChoices(p, graphFactValues);
         const { choices, correctIndex } = assemble(p, { choices: 5, seed });
         expect(choices[correctIndex]).toBe(p.answer);
       }),
@@ -155,6 +153,7 @@ describe("graphing linear equations: multiple choice", () => {
     const hints = distractors(k);
     // read as through (-3, -1): -1 = 2(-3) + b gives b = 5, the same as the intercept sign slip
     expect(hints).toContain("m = 2;\\quad \\text{$y$-intercept: } (0, 5)");
+    expect(hints).toContain("m = 2;\\quad \\text{$y$-intercept: } (-5, 0)"); // swapped coordinates
     // the point's y taken as the intercept
     expect(hints).toContain("m = 2;\\quad \\text{$y$-intercept: } (0, 1)");
   });

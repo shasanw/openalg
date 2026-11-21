@@ -8,7 +8,7 @@
 
 import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
-import { add, distinctHints, div, mul, neg, rat, type Rat } from "../shared/equationKit";
+import { abs, add, distinctHints, div, mul, neg, rat, type Rat } from "../shared/equationKit";
 import {
   answerFormField,
   drawRational,
@@ -21,7 +21,7 @@ import {
   type FractionForm,
   type RationalStyle,
 } from "./rationalKit";
-import { answerLatex, mixedParts, plausible } from "./multiplyingRationals";
+import { answerLatex, lcm, mixedParts, plausible } from "./multiplyingRationals";
 
 export const DIVIDING_RATIONALS_ID = "dividing-rationals";
 
@@ -125,6 +125,7 @@ export function distractors(k: QuotientConstruction, negativesOnSheet = true): s
     if (wholes && parts) values.unshift(add(wholes, parts));
   }
   values.push(div(rat(1), mul(dividend, divisor)), neg(mul(dividend, divisor)));
+  values.push(...moreMistakes(k));
   return distinctHints(
     answerLatex(k, answer),
     // a negative choice on a sheet with no negative numbers gives itself away
@@ -132,6 +133,38 @@ export function distractors(k: QuotientConstruction, negativesOnSheet = true): s
       .filter((r): r is Rat => plausible(k.style, r, 3) && (negativesOnSheet || r.n > 0))
       .map((r) => answerLatex(k, r)),
   );
+}
+
+function moreMistakes(k: QuotientConstruction): Rat[] {
+  const { dividend, divisor, answer } = k;
+  const out: (Rat | null)[] = [];
+  if (k.style === "fraction" || k.style === "mixed") {
+    // a/b \div c/d worked as (a/b) \div c, with only the numerator of the divisor used
+    out.push(div(dividend, rat(divisor.n)));
+    // ... or multiplied by d only
+    out.push(mul(dividend, rat(divisor.d)));
+    // ... or divided by d only, or multiplied by c only (the wrong half of the divisor)
+    out.push(div(dividend, rat(divisor.d)), mul(dividend, rat(divisor.n)));
+    // numerators added and denominators added, as if the sign were a plus: (a + c)/(b + d)
+    out.push(rat(dividend.n + divisor.n, dividend.d + divisor.d));
+    // common denominator found, the numerators divided and the denominator kept: (a' \div c')/L
+    const L = lcm(dividend.d, divisor.d);
+    out.push(div(answer, rat(L)));
+  }
+  // Shifted the decimal in only one operand by two places.
+  if (k.style === "decimal") out.push(mul(answer, rat(100)), mul(answer, rat(1, 100)));
+  // Recalled the wrong neighbouring fact from the times table: 12 \div 4 as 4 or 2 (instead of 3) for the quotient.
+  if (k.style === "integer") {
+    const step = answer.n < 0 ? -1 : 1;
+    out.push(add(answer, rat(step)), add(answer, rat(-step)));
+  }
+  // Divided the divisor by the dividend (the quotient upside down).
+  out.push(div(divisor, dividend));
+  // subtracted, or added, instead of dividing
+  out.push(add(dividend, neg(divisor)), add(dividend, divisor));
+  // ... or took the smaller from the larger, so the difference comes out positive
+  out.push(abs(add(dividend, neg(divisor))));
+  return out.filter((r): r is Rat => r !== null);
 }
 
 export const generator: Generator = {

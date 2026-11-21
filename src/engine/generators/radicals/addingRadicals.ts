@@ -155,7 +155,11 @@ export const answerLatex = (k: AddConstruction) => sumLatex(answerTerms(k));
  * - simplified each term but forgot to multiply by what came out: k\sqrt{s^2 b} as k\sqrt{b};
  * - brought out s^2 instead of s;
  * - lost a subtraction sign on the last term;
- * - combined radicals that are not alike (with two groups).
+ * - combined radicals that are not alike (with two groups);
+ * - a minus sign carried on to every later term (a - b + c read as a - b - c);
+ * - the first term left out;
+ * - a term with no written coefficient counted as 0 instead of 1;
+ * - the radicands subtracted as well as the coefficients (\sqrt{28} - \sqrt{7} = \sqrt{21}).
  */
 export function distractors(k: AddConstruction): string[] {
   const G = k.groups.length;
@@ -188,6 +192,23 @@ export function distractors(k: AddConstruction): string[] {
   candidates.push(perGroup((a) => Math.abs(a.k) * a.s));
   candidates.push(perGroup((a) => (a === last ? 0 : a.k * a.s)));
   candidates.push(perGroup((a) => a.k * a.s + (a === last ? -1 : 0)));
+  // a minus sign carried on: after the first subtracted term, every later term is subtracted too
+  const index = (a: AddTerm) => k.terms.indexOf(a);
+  candidates.push(
+    perGroup((a) =>
+      (k.terms.slice(0, index(a) + 1).some((b) => b.k < 0) ? -1 : 1) * Math.abs(a.k) * a.s,
+    ),
+  );
+  // the first term left out
+  candidates.push(perGroup((a) => (a === k.terms[0] ? 0 : a.k * a.s)));
+  // a term printed without a coefficient (\sqrt{6x}) counted as 0, not 1
+  candidates.push(perGroup((a) => (Math.abs(a.k) === 1 ? 0 : a.k * a.s)));
+  // the radicands combined with the signs of their terms: \sqrt{28} - \sqrt{7} = \sqrt{21}
+  if (G === 1 && sameVars) {
+    const coef = k.terms.reduce((s, a) => s + a.k, 0);
+    const inside = printed.reduce((s, t, i) => s + (k.terms[i].k < 0 ? -1 : 1) * t.rad.n, 0);
+    if (inside > 0) candidates.push(combine([term(mono(coef === 0 ? 1 : coef, printed[0].coef.vars), n, mono(inside, printed[0].rad.vars))]));
+  }
   return distinctValued(
     valuedSum(answerTerms(k)),
     candidates.filter((c) => c.length > 0).map(valuedSum),

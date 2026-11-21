@@ -347,6 +347,22 @@ export function distinctValued(answer: Valued, candidates: readonly (Valued | nu
   return out;
 }
 
+/**
+ * `distinctValued(answer, old)` capped at `cap`, followed by the distinct
+ * values of `extra` that it does not already hold. New mistakes are appended
+ * this way so a Topic's earlier Distractors keep their order and rank.
+ */
+export function appendDistinct(
+  answer: Valued,
+  old: readonly (Valued | null | undefined)[],
+  extra: readonly (Valued | null | undefined)[],
+  cap = 6,
+): string[] {
+  const base = distinctValued(answer, old);
+  const all = distinctValued(answer, [...old, ...extra]);
+  return [...base.slice(0, cap), ...all.slice(base.length)];
+}
+
 export const valuedSum = (terms: readonly RadTerm[]): Valued => ({ tex: sumLatex(terms), value: sumValue(terms) });
 export const valuedFraction = (f: RadFraction): Valued => ({ tex: fractionLatex(f), value: fractionValue(f) });
 

@@ -132,7 +132,9 @@ export function construct(params: ParamValues, rng: Rng): QuadraticFactoringCons
       // No common factor: 2x^2 + 4x + 6 factors as 2(x^2 + 2x + 3), so it is not prime.
       const k = { vars, two, g: 1, factors: null, a, b, c };
       // enough near-miss factor pairs to offer as Distractors
-      if (distractors(k, true).length < 4) continue;
+      // Preserve the original seed-selection rule, which counted printed factor pairs.
+      const spellings = wrongPairs(a, b, c).slice(0, 6).map((f) => factoredLatex(factoredOf(k, f), vars));
+      if (new Set(spellings).size < 4) continue;
       return k;
     }
   }
@@ -203,6 +205,9 @@ export function distractors(k: QuadraticFactoringConstruction, primeInPlay: bool
   const c: (Factored | string)[] = [];
   if (!k.factors) {
     for (const f of pairs.slice(0, 6)) c.push(factoredOf(k, f));
+    // Use the coefficients themselves as the constants, or repeat a factor as a square.
+    c.push(factoredOf(k, [1, base.b, base.a, base.c]));
+    for (const [p, q] of pairs.slice(0, 6)) c.push(factoredOf(k, [p, q, p, q]));
     return factoredHints(answer, null, c, k.vars);
   }
   const [pp, q, rr, s] = k.factors;
@@ -217,6 +222,8 @@ export function distractors(k: QuadraticFactoringConstruction, primeInPlay: bool
   // wrote the coefficients themselves into the factors: (x + b)(x + c)
   c.push(factoredOf(k, [1, base.b, base.a, base.c]));
   for (const f of pairs.slice(2, 5)) c.push(factoredOf(k, f));
+  // Lose one factor when reporting the factorization.
+  for (const factor of factoredOf(k).factors) c.push({ g: mono(k.g), factors: [factor] });
   return factoredHints(answer, expandFactored(factoredOf(k)), c, k.vars);
 }
 

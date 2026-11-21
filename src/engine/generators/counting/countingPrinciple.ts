@@ -260,6 +260,29 @@ export function distractors(k: CountingConstruction): string[] {
   for (let i = k.stages.length - 1; i >= 0 && k.stages.length > 1; i--) {
     values.push(countOf({ ...k, stages: k.stages.filter((_, j) => j !== i) }));
   }
+  const factor = (s: Stage) => s.ways ** s.times;
+  const others = (skip: number[]) => k.stages.reduce((p, s, j) => (skip.includes(j) ? p : p * factor(s)), 1);
+  k.stages.forEach((s, i) => {
+    if (s.times > 1) {
+      // exponent slips in one stage: ways + times (adding base and exponent), times^ways (base and exponent swapped)
+      values.push(others([i]) * (s.ways + s.times), others([i]) * s.times ** s.ways);
+    }
+  });
+  // two stages that each go once: ways^other (an exponent instead of a product)
+  if (k.stages.length === 2 && k.stages.every((s) => s.times === 1)) {
+    const [a, b] = k.stages;
+    values.push(a.ways ** b.ways, b.ways ** a.ways);
+    // Treat the outcomes as unordered pairs or as draws without replacement.
+    if ((a.ways * b.ways) % 2 === 0) values.push((a.ways * b.ways) / 2);
+    values.push(a.ways * (b.ways - 1));
+  }
+  // added two stages and multiplied the rest (a + b) * c, for each adjacent pair
+  if (k.stages.length >= 3) {
+    for (let i = 0; i + 1 < k.stages.length; i++) {
+      const pair = k.stages[i].ways * k.stages[i].times + k.stages[i + 1].ways * k.stages[i + 1].times;
+      values.push(pair * others([i, i + 1]));
+    }
+  }
   return distinctHints(
     answerLatex(k),
     values.filter((v) => v > 0 && Number.isSafeInteger(v)).map(countLatex),

@@ -1,3 +1,4 @@
+import { expectDistinctChoices, solutionValues } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -125,13 +126,11 @@ describe("multi-step-equations: Topic Options", () => {
 });
 
 describe("multi-step-equations: distractors", () => {
-  it("are distinct, never the Answer, and at least three", () => {
+  it("are distinct, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(p.distractorHints).not.toContain(p.answer);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctChoices(p, solutionValues);
         if (p.answer.startsWith("\\text")) return;
         const answer = answerValues(p.answer).values[0];
         for (const d of p.distractorHints) {
@@ -139,6 +138,15 @@ describe("multi-step-equations: distractors", () => {
         }
       }),
     );
+  });
+
+  it("models dropping a term when the constants cancel", () => {
+    const p = generator.generate({
+      distribute: false, combineLikeTerms: true, bothSides: false, specialCases: false,
+      solutions: "integer", allowNegatives: true, maxSolution: 14, maxCoefficient: 2, varyVariable: true,
+    }, 0xfffffffe);
+    expect(p.prompt).toBe("-n + 1 + 2n - 1 = 1");
+    expect(p.distractorHints).toContain("n = 2"); // omitted +1 on the left
   });
 
   it("model distribution and sign mistakes", () => {
@@ -156,6 +164,7 @@ describe("multi-step-equations: distractors", () => {
         right: [{ kind: "term", coef: 17, x: false }],
       },
     };
+    expect(distractors(k)).toContain("x = 9"); // stopped at 3x = 9
     const d = distractors(k);
     expect(d[0]).toBe("x = \\frac{25}{3}"); // 5x - 2x - 8 = 17
     expect(d[1]).toBe("x = 7"); // 5x - 2x - 4 = 17: distributed to the first term only

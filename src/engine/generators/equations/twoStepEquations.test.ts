@@ -1,3 +1,4 @@
+import { expectDistinctChoices, solutionValues } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -111,12 +112,11 @@ describe("two-step-equations: Topic Options", () => {
 });
 
 describe("two-step-equations: distractors", () => {
-  it("are distinct, never the Answer, never a different value written the same, and at least three", () => {
+  it("are distinct, never the Answer, never a different value written the same, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctChoices(p, solutionValues);
         const answer = answerValues(p.answer).values[0];
         for (const d of p.distractorHints) expect(close(answerValues(d).values[0], answer)).toBe(false);
         if (params.numbers === "decimals") for (const d of p.distractorHints) expect(d).not.toContain("\\frac");
@@ -136,6 +136,7 @@ describe("two-step-equations: distractors", () => {
       swapSides: false,
       style: "fraction" as const,
     };
+    expect(distractors(k)).toContain("x = 18"); // added the 3 to 15 instead of dividing
     expect(distractors(k).slice(0, 3)).toEqual([
       "x = \\frac{23}{3}", // (19 + 4)/3: moved the 4 with the wrong sign
       "x = \\frac{7}{3}", // 19/3 - 4: divided before subtracting

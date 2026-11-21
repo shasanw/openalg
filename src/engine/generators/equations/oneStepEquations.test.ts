@@ -1,3 +1,4 @@
+import { expectDistinctChoices, solutionValues } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -119,13 +120,11 @@ describe("one-step-equations: Topic Options", () => {
 });
 
 describe("one-step-equations: distractors", () => {
-  it("are distinct, never the Answer, and at least three", () => {
+  it("are distinct, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(p.distractorHints).not.toContain(p.answer);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctChoices(p, solutionValues);
         for (const d of p.distractorHints) {
           const { values } = answerValues(d);
           expect(close(values[0], answerValues(p.answer).values[0])).toBe(false);
@@ -137,6 +136,7 @@ describe("one-step-equations: distractors", () => {
   it("model the inverse-operation mistakes", () => {
     const base = { v: "x", constantFirst: false, swapSides: false, style: "fraction" as const };
     // x + 5 = 12: added instead of subtracting
+    expect(distractors({ ...base, op: "add", x: rat(7), a: rat(5), b: rat(12) })).toContain("x = 60"); // multiplied 12 by 5
     expect(distractors({ ...base, op: "add", x: rat(7), a: rat(5), b: rat(12) })[0]).toBe("x = 17");
     // 3x = 12: subtracted the coefficient, multiplied, divided upside down
     expect(distractors({ ...base, op: "multiply", x: rat(4), a: rat(3), b: rat(12) }).slice(0, 4)).toEqual([

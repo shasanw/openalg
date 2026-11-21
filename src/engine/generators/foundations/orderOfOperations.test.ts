@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -129,8 +130,10 @@ describe("order-of-operations: Distractors", () => {
       fc.property(anySeed, anyParams, (seed, params) => {
         const k = construct(params, createRng(seed));
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(1);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        // an expression made only of 2s, like (2^2)^2 or 2 - 2 \\div 2, is the natural limit: the slips coincide
+        const allTwos = /^[^0-9]*2([^0-9]+2)*[^0-9]*$/.test(p.prompt);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(allTwos ? 3 : 4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
         for (const d of p.distractorHints) {
           expect(d).toMatch(/^-?\d+$/);
           expect(d).not.toBe(p.answer);
@@ -147,6 +150,7 @@ describe("order-of-operations: Distractors", () => {
   it("model the real mistakes", () => {
     // 2 + 3 \times 4 = 14: left to right gives 20
     const k: OrderConstruction = { tree: bin("+", num(2), bin("*", num(3), num(4), 12), 14), answer: 14 };
+    expect(distractors(k)).toContain("9"); // added 3 and 4, then added 2
     expect(distractors(k)[0]).toBe("20");
     // 12 - 2 + 3 = 13: "addition before subtraction" gives 7
     const pemdas: OrderConstruction = { tree: bin("+", bin("-", num(12), num(2), 10), num(3), 13), answer: 13 };
@@ -183,5 +187,29 @@ describe("order-of-operations: generate()", () => {
   it("has enough variety for a 20-Problem Section without repeats", () => {
     const prompts = new Set(Array.from({ length: 200 }, (_, s) => generator.generate({}, s).prompt));
     expect(prompts.size).toBeGreaterThan(180);
+  });
+});
+
+describe("order-of-operations: soak regressions", () => {
+  it.each([
+    [{ operations: 5, exponents: false, parentheses: false, allowNegatives: false, maxNumber: 3 }, 2503905099],
+    [{ operations: 6, exponents: false, parentheses: true, allowNegatives: false, maxNumber: 3 }, 3321403652],
+  ])("keeps four distinct Distractors for a sheet of 2s with a stray 3 or 4 (seed %#)", (params, seed) => {
+    const p = generator.generate(params, seed);
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+    expect(p.distractorHints).not.toContain(p.answer);
+  });
+
+  it("small-number sheets keep four Distractors unless every number is a 2, across option combinations", () => {
+    const small = fc.record({ operations: fc.integer({ min: 2, max: 6 }), exponents: fc.boolean(), parentheses: fc.boolean(), allowNegatives: fc.boolean(), maxNumber: fc.integer({ min: 3, max: 4 }) });
+    fc.assert(
+      fc.property(anySeed, small, (seed, params) => {
+        const p = generator.generate(params, seed);
+        const allTwos = !/[013-9]/.test(p.prompt);
+        expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(allTwos ? 3 : 4);
+      }),
+      { numRuns: 400 },
+    );
   });
 });

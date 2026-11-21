@@ -17,6 +17,7 @@ import {
   ANGLE_NAMES,
   SIDE_NAMES,
   VERTICES,
+  acosD,
   asinD,
   cosD,
   degLabel,
@@ -358,6 +359,8 @@ export function distractors(k: LawOfSinesConstruction): string[] {
   const A = k.t.angles;
   const S = k.t.sides;
   const cands: (string | null)[] = [];
+  /** later mistakes, after the ones above so their order is kept */
+  const later: (string | null)[] = [];
   if (k.kind === "side") {
     const K = A[k.known];
     const len = S[k.known];
@@ -381,6 +384,16 @@ export function distractors(k: LawOfSinesConstruction): string[] {
     cands.push(withSides((v) => (len * r2(sinD(A[v]))) / r2(sinD(K))));
     // cosines in place of sines
     cands.push(withSides((v) => (len * cosD(A[v])) / cosD(K)));
+    later.push(
+      // the angles used as the ratio in place of their sines: x = len · B / A
+      withSides((v) => (len * A[v]) / K),
+      // forgot to divide by sin of the known angle: x = len · sin B
+      withSides((v) => len * sinD(A[v])),
+      // tangents in place of sines
+      withSides((v) => (len * Math.tan((A[v] * Math.PI) / 180)) / Math.tan((K * Math.PI) / 180)),
+      // divided by the angle itself, not its sine: x = len · sin B / A
+      withSides((v) => (len * sinD(A[v])) / K),
+    );
   } else {
     const { g, h } = k;
     const w = third(g, h);
@@ -414,20 +427,32 @@ export function distractors(k: LawOfSinesConstruction): string[] {
     } else {
       cands.push(path(asinD(r2((sh * sinD(Ag)) / sg))));
     }
+    const sinH = (sh * sinD(Ag)) / sg;
+    later.push(
+      // cos⁻¹ in place of sin⁻¹
+      Math.abs(sinH) <= 1 ? path(acosD(sinH)) : null,
+      // tan⁻¹ in place of sin⁻¹
+      path((Math.atan(sinH) * 180) / Math.PI),
+      // the angles used as the ratio in place of their sines: θ = A · h / g
+      path((Ag * sh) / sg),
+      // cos of the given angle in place of its sine
+      Math.abs((sh * cosD(Ag)) / sg) <= 1 ? path(asinD((sh * cosD(Ag)) / sg)) : null,
+    );
   }
-  return distinctHints(answer, cands).slice(0, 6);
+  return distinctHints(answer, [...distinctHints(answer, cands).slice(0, 6), ...later]);
 }
 
 function ambiguousDistractors(k: LawOfSinesConstruction & AmbiguousConstruction): string[] {
   const { Ag, sg, sh, places: p, whole } = k;
   const answer = answerLatex(k);
-  const sol = (H: number): SsaSolution => {
-    const W = 180 - Ag - H;
-    return { H, W, sw: (sg * sinD(W)) / sinD(Ag) };
-  };
+  const sol = (H: number, third = 180 - Ag - H, sideOf = (W: number) => (sg * sinD(W)) / sinD(Ag)): SsaSolution => ({
+    H,
+    W: third,
+    sw: sideOf(third),
+  });
   const ok = (s: SsaSolution) => !whole || s.W > 0;
-  const show = (Hs: number[]) => {
-    const sols = Hs.map(sol);
+  const show = (Hs: number[], third?: (H: number) => number, sideOf?: (W: number) => number) => {
+    const sols = Hs.map((H) => sol(H, third?.(H), sideOf));
     return sols.every(ok) ? ambiguousLatex(k, sols, p, whole) : null;
   };
   const sinH = (sh * sinD(Ag)) / sg;
@@ -462,8 +487,28 @@ function ambiguousDistractors(k: LawOfSinesConstruction & AmbiguousConstruction)
     // Bisecting the remaining angle assumes that the two unknown angles are equal.
     cands.push(show([(180 - Ag) / 2]));
   }
-  const hints = distinctHints(answer, cands);
-  return hints.slice(0, 6);
+  // Later mistakes, after the ones above so their order is kept.
+  const later: (string | null)[] = [
+    // cos⁻¹ in place of sin⁻¹
+    Math.abs(sinH) <= 1 ? show([acosD(sinH)]) : null,
+    // tan⁻¹ in place of sin⁻¹
+    show([(Math.atan(sinH) * 180) / Math.PI]),
+    // the angles used as the ratio in place of their sines: θ = A · h / g
+    show([(Ag * sh) / sg]),
+    // cos of the given angle in place of its sine
+    Math.abs((sh * cosD(Ag)) / sg) <= 1 ? show([asinD((sh * cosD(Ag)) / sg)]) : null,
+  ];
+  // Still later: sin of the given angle left out (sin H = side h / side g), and, once H is found,
+  // the third angle taken as 180 degrees minus H (the given angle forgotten), or the third side
+  // found from the inverted ratio.
+  if (sh / sg <= 1) later.push(show([asinD(sh / sg)]));
+  if (whole && !Number.isNaN(H1)) {
+    later.push(
+      show([H1], (H) => 180 - H),
+      show([H1], undefined, (W) => (sg * sinD(Ag)) / sinD(W)),
+    );
+  }
+  return distinctHints(answer, [...distinctHints(answer, cands).slice(0, 6), ...later]);
 }
 
 export const generator: Generator = {

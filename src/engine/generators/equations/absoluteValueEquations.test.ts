@@ -1,9 +1,9 @@
+import { expectDistinctChoices, solutionValues } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator, type AbsConstruction } from "./absoluteValueEquations";
 import { NO_SOLUTION, ratValue } from "../shared/equationKit";
-import { choiceKey } from "../../mc";
 import { answerValues, close, evalLatex, splitEquation } from "../shared/latexEval.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
@@ -128,14 +128,11 @@ describe("absolute-value-equations: Topic Options", () => {
 });
 
 describe("absolute-value-equations: distractors", () => {
-  it("are distinct, never the Answer (in any order), and at least three", () => {
+  it("are distinct, never the Answer (in any order), and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        const keys = p.distractorHints.map(choiceKey);
-        expect(new Set(keys).size).toBe(keys.length);
-        expect(keys).not.toContain(choiceKey(p.answer));
+        expectDistinctChoices(p, solutionValues);
       }),
     );
   });
@@ -156,6 +153,7 @@ describe("absolute-value-equations: distractors", () => {
         { n: 2, d: 1 },
       ],
     };
+    expect(distractors(k)).toContain("x = -5, 5"); // dropped the inner constant
     const d = distractors(k);
     expect(d[0]).toBe("x = 2, 8"); // x + 3 = 5 or x - 3 = 5
     expect(d).toContain("x = 2"); // only the positive case

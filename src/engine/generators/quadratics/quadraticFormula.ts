@@ -109,6 +109,19 @@ export function distractors(k: FormulaConstruction): string[] {
   ];
   const texts = candidates.map(answerToLatex);
   texts.splice(1, 0, singleRootToLatex(k.root)); // dropped the ±
+  const minusOnly = { ...k.root, q: -k.root.q };
+  const more: string[] = [
+    singleRootToLatex(minusOnly), // dropped the ± and kept the minus root
+    answerToLatex(makeRoot(-b, -b * b - 4 * a * c, 2 * a)), // squared -b as -b^2
+    answerToLatex(makeRoot(-b, b * b - 4 * c, 2 * a)), // left a out of 4ac
+    answerToLatex(makeRoot(-b, b * b - a * c, 2 * a)), // forgot the 4 in 4ac
+    answerToLatex(makeRoot(-b, b * b - 2 * a * c, 2 * a)), // used 2ac for 4ac
+    answerToLatex(makeRoot(b, D, 2)), // forgot to negate b and divided by 2
+    ...(D > 0
+      ? [answerToLatex(makeRoot(-b, D * D, 2 * a))] // forgot the square root of D
+      : []),
+  ];
+  texts.push(...more);
   const seen = new Set<string>([correct]);
   const out: string[] = [];
   for (const tex of texts) {

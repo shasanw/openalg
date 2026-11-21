@@ -77,9 +77,27 @@ export function distractors(k: DeterminantConstruction): string[] {
   if (v.length === 2) {
     const [[a, b], [c, d]] = v;
     values.push(a * d + b * c, b * c - a * d, a * b - c * d, a * c - b * d);
+    // adding the diagonal entries instead of multiplying (a + d) - (b + c), only the main diagonal
+    // product, only the other diagonal's product, and all the negative signs dropped
+    values.push(a + d - (b + c), a * d, b * c, Math.abs(a * d) - Math.abs(b * c));
+    // only the subtracted diagonal, with its minus sign kept (-bc)
+    values.push(-(b * c));
+    // all four entries added, as if the bars meant a sum
+    values.push(a + b + c + d);
+    // row sums or column sums multiplied, (a + b)(c + d) and (a + c)(b + d)
+    values.push((a + b) * (c + d), (a + c) * (b + d));
+    // the bars read as absolute value bars: the entries' magnitudes added
+    values.push(Math.abs(a) + Math.abs(b) + Math.abs(c) + Math.abs(d));
+    // adding on one diagonal only (ad - (b + c), (a + d) - bc)
+    values.push(a * d - (b + c), a + d - b * c);
+    // both signs wrong, -(ad + bc), and across rows or columns then added (ab + cd, ac + bd)
+    values.push(-(a * d + b * c), a * b + c * d, a * c + b * d);
+    // a negative sign mishandled on one diagonal (ad - |bc|, |ad| - bc)
+    values.push(a * d - Math.abs(b * c), Math.abs(a * d) - b * c);
   } else {
     const [[a, b, c], [d, e, f], [g, h, i]] = v;
-    const mins = minors(k.m)[0].map((x) => x.n);
+    const minorValues = minors(k.m).map((row) => row.map((x) => x.n));
+    const mins = minorValues[0];
     const forward = a * e * i + b * f * g + c * d * h;
     const backward = c * e * g + a * f * h + b * d * i;
     values.push(
@@ -89,6 +107,21 @@ export function distractors(k: DeterminantConstruction): string[] {
       -(forward - backward),
       a * (e * i + f * h) - b * (d * i + f * g) + c * (d * h + e * g),
     );
+    // only the first term of the expansion, the middle term forgotten, and each entry paired
+    // with the neighbouring entry's minor
+    values.push(a * mins[0], a * mins[0] + c * mins[2], a * mins[1] - b * mins[2] + c * mins[0]);
+    // the alternating signs stopping after the middle term (a m0 - b m1 - c m2), and only the
+    // three backward diagonals of the rule of Sarrus
+    values.push(a * mins[0] - b * mins[1] - c * mins[2], backward);
+    // only the main diagonal's product, each minor taken as only its first product (the subtraction
+    // forgotten)
+    values.push(a * e * i, a * (e * i) - b * (d * i) + c * (d * h));
+    // expanding down the first column with no alternating signs
+    values.push(a * minorValues[0][0] + d * minorValues[1][0] + g * minorValues[2][0]);
+    // Report a single 2-by-2 minor instead of expanding along the row.
+    values.push(...minorValues.flat());
+    // Take just one Sarrus diagonal's product (the others forgotten).
+    values.push(b * f * g, c * d * h, a * f * h, b * d * i, c * e * g);
   }
   return distinctHints(
     answerLatex(k),

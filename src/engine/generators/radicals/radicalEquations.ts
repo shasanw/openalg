@@ -19,6 +19,7 @@ import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
 import {
   distinctHints,
+  add,
   div,
   linearLatex,
   NO_SOLUTION,
@@ -77,6 +78,8 @@ export interface RadicalEquationConstruction {
   hints: (string | null)[];
   /** used only when fewer than three distinct hints remain */
   spare?: (string | null)[];
+  /** later mistakes, appended after everything above so its order is kept */
+  extra?: (string | null)[];
 }
 
 // ------------------------------------------------------------------ printing
@@ -134,6 +137,24 @@ function numberForm(rng: Rng, index: RootIndex, o: Opts): RadicalEquationConstru
   }
   if (!bad) list.push(index === 2 ? NO_SOLUTION : null, hint(rat(-x)));
   list.push(hint(rat(x + 1)));
+  // slips after squaring, on the radical's value squared (cubed): ax + b = r^n
+  const rn = rat(value ** index);
+  const extra: (string | null)[] = [
+    // moved the constant with the wrong sign: ax = r^n + b
+    hint(div(add(rn, rat(b)), rat(a))),
+    // dropped the constant: ax = r^n
+    hint(div(rn, rat(a))),
+    // "squared" by doubling: ax + b = 2r
+    index === 2 ? hint(xOf(rat(2 * value))) : null,
+    // "squared" by halving (or thirding for a cube root): ax + b = r / n
+    hint(xOf(rat(value, index))),
+    // forgot to divide by the coefficient of x: x = r^n - b
+    Math.abs(a) === 1 ? null : hint(sub(rn, rat(b))),
+    // kept the sign of the radical through the square: (-3)^2 = -9
+    bad ? hint(xOf(rat(-(value * value)))) : null,
+    // ignored the minus sign on the right side and forgot to square
+    bad ? hint(xOf(rat(c))) : null,
+  ];
   return {
     form: "number",
     index,
@@ -145,6 +166,7 @@ function numberForm(rng: Rng, index: RootIndex, o: Opts): RadicalEquationConstru
     // With the radical equal to -1, forgetting to square can land on x + 1,
     // so the opposite sign, then x - 1, fill the third place.
     spare: bad ? [hint(rat(-x)), hint(rat(x - 1))] : [],
+    extra,
   };
 }
 
@@ -172,6 +194,16 @@ function bothSidesForm(rng: Rng, index: RootIndex, o: Opts): RadicalEquationCons
   // x terms added rather than subtracted
   list.push(hint(div(rat(b2 - k * b1), rat(k * a1 + a2))));
   list.push(hint(rat(x + 1)));
+  const extra: (string | null)[] = [
+    // the x terms moved but the other side's x dropped: k a1 x = b2 - k b1
+    hint(div(rat(b2 - k * b1), rat(k * a1))),
+    // everything added: k a1 x + a2 x = b2 + k b1
+    hint(div(rat(b2 + k * b1), rat(k * a1 + a2))),
+    // equated the radicands without multiplying by d^n
+    d === 1 ? null : hint(div(rat(b2 - b1), rat(a1 - a2))),
+    // solved the right side's radicand for x only
+    hint(div(rat(-b2), rat(a2))),
+  ];
   return {
     form: "bothSides",
     index,
@@ -183,7 +215,18 @@ function bothSidesForm(rng: Rng, index: RootIndex, o: Opts): RadicalEquationCons
     // when the sign slips coincide (and cube roots offer no "no solution"),
     // x off by one the other way, then the radicands equated without d^n
     spare: [hint(rat(x - 1)), a1 === a2 ? null : hint(div(rat(b2 - b1), rat(a1 - a2)))],
+    extra,
   };
+}
+
+/** All integer roots of Ax^2 + Bx + C = 0 as a solution list, or null when there are none to offer. */
+function quadHints(A: number, B: number, C: number): string | null {
+  const disc = B * B - 4 * A * C;
+  if (disc < 0) return null;
+  const root = Math.round(Math.sqrt(disc));
+  if (root * root !== disc) return null;
+  const xs = [...new Set([(-B - root) / (2 * A), (-B + root) / (2 * A)])].filter((r) => Number.isInteger(r)).sort((p, q) => p - q);
+  return xs.length === 0 || xs.some((r) => Math.abs(r) > 150) ? null : hints(xs);
 }
 
 /** root(ax + b) = x + c, from the roots r1 < r2 of (x + c)^2 = ax + b. */
@@ -216,7 +259,17 @@ function linearForm(rng: Rng, o: Opts): RadicalEquationConstruction | null {
   list.push(hint(div(rat(c - b), rat(a - 1))));
   list.push(hints([-r1, -r2].filter((r) => r + c >= 0)));
   list.push(hints([-r1, -r2]));
-  return { form: "linear", index: 2, left, right, solutions: valid, extraneous, hints: list };
+  const extra: (string | null)[] = [
+    // squared the right side as x^2 + c^2 (no middle term): x^2 - a x + c^2 - b = 0
+    quadHints(1, -a, c * c - b),
+    // wrong sign on c when squaring: (x - c)^2 = ax + b
+    quadHints(1, -(a + 2 * c), c * c - b),
+    // moved the constant with the wrong sign: x^2 + (2c - a) x + c^2 + b = 0
+    quadHints(1, 2 * c - a, c * c + b),
+    // answered with the value of the right side, x + c, instead of x
+    c === 0 ? null : hints((valid.length > 0 ? valid : [r1, r2]).map((r) => r + c)),
+  ];
+  return { form: "linear", index: 2, left, right, solutions: valid, extraneous, hints: list, extra };
 }
 
 export function construct(params: ParamValues, rng: Rng): RadicalEquationConstruction {
@@ -254,8 +307,11 @@ export function answerLatex(k: RadicalEquationConstruction): string {
  * - the opposite sign.
  */
 export function distractors(k: RadicalEquationConstruction): string[] {
-  const out = distinctHints(answerLatex(k), k.hints).slice(0, 6);
-  return out.length >= 3 ? out : distinctHints(answerLatex(k), [...k.hints, ...(k.spare ?? [])]).slice(0, 6);
+  const answer = answerLatex(k);
+  const out = distinctHints(answer, k.hints).slice(0, 6);
+  const base = out.length >= 3 ? out : distinctHints(answer, [...k.hints, ...(k.spare ?? [])]).slice(0, 6);
+  // new mistakes go after the old ones
+  return distinctHints(answer, [...base, ...(k.extra ?? [])]);
 }
 
 export const generator: Generator = {

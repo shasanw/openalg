@@ -93,17 +93,18 @@ function expectGraphs(p: Problem, opts: ParamValues): void {
   }
 }
 
-/** A Distractor changes exactly one part, and that part is really wrong. */
+/** A Distractor changes one or two parts, and every part it changes is really wrong. */
 function expectWrongDistractor(p: Problem, hint: string): void {
   const printed = readPrompt(p.prompt);
   const right = readParts(p.answer);
   const wrong = readParts(hint);
   expect([...wrong.keys()]).toEqual([...right.keys()]);
   const changed = [...right.keys()].filter((k) => right.get(k) !== wrong.get(k));
-  expect(changed, hint).toHaveLength(1);
+  expect(changed.length, hint).toBeGreaterThanOrEqual(1);
+  expect(changed.length, hint).toBeLessThanOrEqual(2);
   const r = readAnswer(p.answer);
   const w = readAnswer(hint);
-  switch (changed[0]) {
+  for (const part of changed) switch (part) {
     case "Amplitude":
       expect(near(w.amplitude!, r.amplitude!)).toBe(false);
       break;
@@ -236,11 +237,11 @@ describe("graphing-trig: the student's grid gives nothing away", () => {
 });
 
 describe("graphing-trig: multiple choice", () => {
-  it("offers at least three mistake-based Distractors, distinct, each really wrong", { timeout: 60_000 }, () => {
+  it("offers at least four mistake-based Distractors, distinct, each really wrong", { timeout: 60_000 }, () => {
     fc.assert(
       fc.property(anySeed, anyOptions, (seed, opts) => {
         const p = generator.generate(opts, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
         const keys = p.distractorHints.map(choiceKey);
         expect(new Set(keys).size).toBe(keys.length);
         expect(keys).not.toContain(choiceKey(p.answer));
@@ -252,8 +253,41 @@ describe("graphing-trig: multiple choice", () => {
         expect(choices[correctIndex]).toBe(p.answer);
         for (const c of choices) expect([p.answer, ...p.distractorHints]).toContain(c);
       }),
-      { numRuns: 300 },
+      { numRuns: 1500 },
     );
+  });
+
+  it("offers four Distractors for a plain graph, the combination that once offered three (seed 0)", () => {
+    const p = generator.generate(
+      { functions: "all", phaseShift: false, verticalShift: false, reflections: false, form: "expanded", periods: "two", workSpace: "grid" },
+      0,
+    );
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    for (const h of p.distractorHints) expectWrongDistractor(p, h);
+  });
+
+  it("offers asymptotes a whole period apart for secant and cosecant, and the shift applied the wrong way", () => {
+    let spacedByPeriod = 0;
+    let wrongWay = 0;
+    for (let s = 0; s < 300; s++) {
+      const p = generator.generate({ functions: "secCsc", phaseShift: true, form: "expanded" }, s);
+      const r = readAnswer(p.answer);
+      const ws = p.distractorHints.map(readAnswer);
+      if (ws.some((w) => near(w.asymptotes!.spacing, r.period) && near(w.asymptotes!.start, r.asymptotes!.start))) spacedByPeriod++;
+      const { start, spacing } = r.asymptotes!;
+      const flipped = (((start - 2 * r.shift) % spacing) + spacing) % spacing; // the shift applied the other way
+      if (ws.some((w) => near(w.asymptotes!.spacing, r.asymptotes!.spacing) && near(w.asymptotes!.start, flipped))) wrongWay++;
+    }
+    // (omitted only where the window cannot tell the two families apart: b = 1/2, where a period is two spacings)
+    expect(spacedByPeriod).toBeGreaterThan(150);
+    expect(wrongWay).toBeGreaterThan(0);
+  });
+
+  it("offers a Distractor with two parts wrong at once", () => {
+    const p = generator.generate({ functions: "sinCos" }, 1);
+    const r = readAnswer(p.answer);
+    const twoWrong = p.distractorHints.map(readAnswer).filter((w) => !near(w.period, r.period) && !near(w.amplitude!, r.amplitude!));
+    expect(twoWrong.length).toBeGreaterThan(0);
   });
 
   it("includes the named mistakes when they apply", () => {

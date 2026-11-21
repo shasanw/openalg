@@ -11,7 +11,7 @@
 import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
 import { pointLatex } from "../shared/lines";
-import { distinctValued, simplifyTerm, term, termLatex, type Valued } from "./radicalKit";
+import { appendDistinct, mono, reduceFraction, valuedFraction, simplifyTerm, term, termLatex, type Valued } from "./radicalKit";
 
 export const DISTANCE_FORMULA_ID = "distance-formula";
 
@@ -145,7 +145,7 @@ export function distractors(k: DistanceConstruction): string[] {
   };
   const plain = (v: number): Valued | null => (v > 0 ? { tex: String(v), value: v } : null);
   const answer: Valued = { tex: answerLatex(k), value: k.rounded ? Number(answerLatex(k)) : Math.sqrt(k.squared) };
-  return distinctValued(answer, [
+  const old = [
     plain(k.squared),
     plain(Math.abs(dx) + Math.abs(dy)),
     show(Math.abs(dx * dx - dy * dy)),
@@ -154,7 +154,37 @@ export function distractors(k: DistanceConstruction): string[] {
     show(Math.abs(dx) + Math.abs(dy)),
     plain(Math.abs(dx + dy)),
     show(k.squared + 1),
-  ]).slice(0, 6);
+  ];
+  const extra = [
+    // divided by 2 as in the midpoint formula
+    halved(k.squared, k.rounded),
+    // squared only one of the differences
+    show(dx * dx + Math.abs(dy)),
+    show(Math.abs(dx) + dy * dy),
+    // averaged the two differences, as if finding a midpoint
+    halfOf(Math.abs(dx) + Math.abs(dy), k.rounded),
+    // multiplied the two differences
+    plain(Math.abs(dx * dy)),
+  ];
+  return appendDistinct(answer, old, extra);
+}
+
+/** v / 2 for a whole number v: a whole number, \frac{v}{2}, or a decimal when rounded. */
+function halfOf(v: number, rounded: boolean): Valued | null {
+  if (!(v > 0)) return null;
+  if (rounded) return { tex: String(v / 2), value: v / 2 };
+  return { tex: v % 2 === 0 ? String(v / 2) : `\\frac{${v}}{2}`, value: v / 2 };
+}
+
+/** The distance \sqrt{s} divided by 2, printed like the Answer. */
+function halved(s: number, rounded: boolean): Valued | null {
+  const value = Math.sqrt(s) / 2;
+  if (rounded) {
+    const tex = (Math.round(value * 10) / 10).toFixed(1).replace(/\.0$/, "");
+    return { tex, value: Number(tex) };
+  }
+  const t = simplifyTerm(term(1, 2, s));
+  return valuedFraction(reduceFraction({ num: [t], den: mono(2) }));
 }
 
 export const generator: Generator = {

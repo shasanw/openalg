@@ -183,12 +183,17 @@ export function factoredHints(
   candidates: (Factored | string | null | undefined)[],
   vars: readonly string[],
 ): string[] {
+  // Two factorizations that multiply out to the same polynomial are one choice, so one is kept.
+  const offered: Poly[] = [];
   return distinctHints(
     answer,
     candidates.map((c) => {
       if (c == null || typeof c === "string") return c;
       if (c.factors.some((p) => norm(p).length === 0)) return null;
-      if (answerPoly && polyEq(expandFactored(c), answerPoly)) return null;
+      const expanded = expandFactored(c);
+      if (answerPoly && polyEq(expanded, answerPoly)) return null;
+      if (offered.some((o) => polyEq(o, expanded))) return null;
+      offered.push(expanded);
       return factoredLatex(c, vars);
     }),
   );

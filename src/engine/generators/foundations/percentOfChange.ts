@@ -143,8 +143,9 @@ const flip = (d: Direction): Direction => (d === "increase" ? "decrease" : "incr
  *   taken as the percent, the new amount as a percent of the original
  *   (130% for a 30% increase), and forgetting to multiply by 100;
  * - new amount: just the change (not added on), the wrong direction, the
- *   percent added on as a number (40 + 30), and the decimal point one place
- *   off in the percent.
+ *   percent added on as a number (40 + 30), the decimal point one place
+ *   off in the percent, the original divided by the percent, the decimal moved
+ *   one place too few, and 100 changed by the percent.
  */
 export function distractors(k: ChangeConstruction, decimals = true): string[] {
   const { original, updated, percent, direction } = k;
@@ -157,6 +158,15 @@ export function distractors(k: ChangeConstruction, decimals = true): string[] {
       [size, direction],
       [mul(div(updated, original)!, rat(100)), direction],
       [div(percent, rat(100)), direction],
+      // Converted the ratio to percent by moving the decimal only one place.
+      [div(percent, rat(10)), direction],
+      // Moved it three places instead of two.
+      [mul(percent, rat(10)), direction],
+      // Gave what is left of the original (100% minus the change), in either direction.
+      [sub(rat(100), percent), direction],
+      [sub(rat(100), percent), flip(direction)],
+      // Calculated the reverse change, using the new amount as the starting amount.
+      [mul(div(size, updated)!, rat(100)), flip(direction)],
     ];
     return distinctHints(
       answerLatex(k),
@@ -171,6 +181,20 @@ export function distractors(k: ChangeConstruction, decimals = true): string[] {
     mul(original, factor(flip(direction), percent)),
     (direction === "increase" ? add : sub)(original, percent),
     mul(original, factor(direction, div(percent, rat(10))!)),
+    // Applied the change a second time to the new amount.
+    (direction === "increase" ? add : sub)(updated, size),
+    // Treated a percent as a whole-number multiplier.
+    mul(original, percent),
+    // Divided by the growth factor instead of multiplying by it.
+    div(original, factor(direction, percent)),
+    // Added the percent as a number whichever way the change went: 16 decreased by 50% as 16 + 50.
+    add(original, percent),
+    // Divided by the percent as a decimal instead of multiplying by it: 80 decreased by 25% as 80 \div 0.25.
+    div(original, div(percent, rat(100))!),
+    // Moved the decimal point only one place (30% as 3.0 instead of 0.3), for the change.
+    mul(original, factor(direction, mul(percent, rat(10)))),
+    // Took the percent of 100 (the base of every percent) instead of of the original: 100 \pm p.
+    (direction === "increase" ? add : sub)(rat(100), percent),
   ];
   return distinctHints(
     answerLatex(k),

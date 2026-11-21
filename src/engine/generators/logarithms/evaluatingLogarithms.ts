@@ -11,7 +11,7 @@ import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
 import { gcd } from "../../format";
 import { distinctHints, div, isInt, neg, numLatex, rat, sub, add, type Rat } from "../shared/equationKit";
-import { COMMON, intPow, logOf, NATURAL, numberBase, type LogBase } from "./logKit";
+import { baseLatex, COMMON, intPow, logOf, NATURAL, numberBase, type LogBase } from "./logKit";
 
 export const EVALUATING_LOGARITHMS_ID = "evaluating-logarithms";
 
@@ -173,10 +173,8 @@ export function distractors(k: EvaluateConstruction): string[] {
     add(q, rat(1)),
     sub(q, rat(1)),
   ];
-  return distinctHints(
-    numLatex(q),
-    values.map((v) => (v ? numLatex(v) : null)),
-  );
+  // Identify the base instead of the exponent being asked for.
+  return distinctHints(numLatex(q), [...values.map((v) => v && numLatex(v)), baseLatex(k.base)]);
 }
 
 export const generator: Generator = {

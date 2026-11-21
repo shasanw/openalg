@@ -1,3 +1,4 @@
+import { expectDistinctDistractors } from "../sequences/distinctDistractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import katex from "katex";
@@ -121,12 +122,11 @@ describe("log-properties: Topic Options", () => {
 });
 
 describe("log-properties: distractors", () => {
-  it("are distinct, never equivalent to the Answer, and at least three", () => {
+  it("are distinct, never equivalent to the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctDistractors(p, equivalent);
         for (const d of p.distractorHints) expect(equivalent(d, p.answer), d).toBe(false);
       }),
     );
@@ -140,6 +140,7 @@ describe("log-properties: distractors", () => {
       { v: "y", e: rat(-1) },
     ];
     const expand = { expand: true, base, factors, k: 0, order: [0, 1] };
+    expect(distractors(expand)).toContain("2\\log_{3} x"); // denominator omitted
     expect(distractors(expand).slice(0, 2)).toEqual(["2\\log_{3} x + \\log_{3} y", "\\log_{3} x - \\log_{3} y"]);
     const condense = { ...expand, expand: false };
     expect(distractors(condense)[0]).toBe("\\frac{\\log_{3} x^{2}}{\\log_{3} y}");

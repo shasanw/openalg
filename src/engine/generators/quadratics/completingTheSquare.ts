@@ -135,6 +135,16 @@ export function distractors(k: SquareConstruction): string[] {
     mistakeToLatex(makeRoot(-b, b * b - 4 * c, 2)),
     // added b/2a instead of its square: (x + b/2a)^2 = -c/a + b/2a
     mistakeToLatex(makeRoot(-b, 2 * a * b - 4 * a * c, 2 * a)),
+    // dropped the ± and kept the minus root
+    singleRootToLatex({ ...k.root, q: -k.root.q }),
+    // added (b/a)^2 instead of (b/2a)^2: used b, not half of b, in the square
+    mistakeToLatex(makeRoot(-b, b * b - a * c, a)),
+    // squared b and then halved it, instead of halving and then squaring
+    mistakeToLatex(makeRoot(-b, 2 * (b * b - 2 * a * c), 2 * a)),
+    // moved the constant across with the wrong sign: (x + b/2a)^2 = c/a + (b/2a)^2
+    mistakeToLatex(makeRoot(-b, b * b + 4 * a * c, 2 * a)),
+    // forgot to take the square root of the right side
+    ...(D > 0 ? [mistakeToLatex(makeRoot(-2 * a * b, D * D, 4 * a * a))] : []),
   ];
   const seen = new Set<string>([correct]);
   const out: string[] = [];

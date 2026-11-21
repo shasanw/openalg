@@ -1,7 +1,12 @@
+// Test-only: the every-Topic printed Answer check, sharded across
+// answersN.allGenerators.test.ts so the Topics run on several workers at once
+// (one file held them all and set the wall time of the whole suite).
+//
 // Check only the baked Problem. A distractor that answers the same question
 // correctly would give a multiple-choice Problem two correct choices.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import type { Generator } from "./types";
 import { arithmetic, expression, equivalentExpression } from "./answerCheckers/expressions.testkit";
 import { evalArithmetic } from "./generators/foundations/arithmeticEval.testkit";
 import { close } from "./generators/shared/latexEval.testkit";
@@ -10,8 +15,16 @@ import { GENERATORS } from "./registry";
 import { anyParams } from "./generators/polynomials/polynomials.testkit";
 import { topicVariants } from "./topicVariants.testkit";
 
-describe("printed Answer Key across every Topic", () => {
-  for (const g of GENERATORS) {
+/** How many answersN.allGenerators.test.ts files share the Topics. */
+export const ANSWER_SHARDS = 4;
+
+/** Shard `shard` (0-based) of ANSWER_SHARDS: every ANSWER_SHARDS-th Topic. */
+export const answerTopicsOfShard = (shard: number): Generator[] =>
+  GENERATORS.filter((_, i) => i % ANSWER_SHARDS === shard);
+
+export function everyTopicAnswerIsRight(shard: number): void {
+describe(`printed Answer Key across every Topic (shard ${shard + 1} of ${ANSWER_SHARDS})`, () => {
+  for (const g of answerTopicsOfShard(shard)) {
     it(
       g.id,
       () => {
@@ -53,3 +66,4 @@ describe("printed Answer Key across every Topic", () => {
     );
   }
 });
+}

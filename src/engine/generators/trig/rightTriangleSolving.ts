@@ -512,6 +512,13 @@ export function sideMistakes(p: SideProblem): number[] {
     ...[s, c, t].flatMap((r) => [g * r, g / r]),
     truncateTo(x, 1),
     Math.round(x),
+    // the wrong special triangle: a 45° angle read as 30-60-90 (legs g, g√3; hypotenuse 2g),
+    // a 30° or 60° angle as 45-45-90 (hypotenuse g√2)
+    ...(theta === 45 ? [g * Math.sqrt(3), g / Math.sqrt(3), 2 * g, g / 2] : theta === 30 || theta === 60 ? [g * Math.SQRT2, g / Math.SQRT2] : []),
+    // the trig value rounded to two places before multiplying or dividing
+    ...[s, c, t].flatMap((r) => [g * (Math.round(r * 100) / 100), g / (Math.round(r * 100) / 100)]),
+    // solved for the third side instead of the one asked for
+    sideFrom(theta, given, g, ROLES.find((r) => r !== given && r !== unknown)!),
   ];
 }
 
@@ -525,12 +532,25 @@ export function angleMistakes(p: AngleProblem): number[] {
   const theta = angleFrom(p.sides);
   const [a, b] = Object.values(p.sides) as number[];
   const r = Math.min(a, b) / Math.max(a, b);
+  // the ratio the student writes (by roles) and the inverse function that undoes it
+  const { opp, adj, hyp } = p.sides;
+  const [ratio, inverse] =
+    opp !== undefined && hyp !== undefined
+      ? ([opp / hyp, Math.asin] as const)
+      : adj !== undefined && hyp !== undefined
+        ? ([adj / hyp, Math.acos] as const)
+        : ([opp! / adj!, Math.atan] as const);
   return [
     90 - theta,
     ...[Math.asin(r), Math.acos(r), Math.atan(r), Math.atan(1 / r)].map((v) => v / RAD),
     angleFrom(p.sides, true),
     truncateTo(theta, 1),
     Math.round(theta),
+    // forgot the inverse: the ratio itself (or its reciprocal) given as the angle
+    ratio,
+    1 / ratio,
+    // the ratio rounded to two places before taking the inverse
+    inverse(Math.round(ratio * 100) / 100) / RAD,
   ];
 }
 
@@ -538,6 +558,8 @@ export function angleMistakes(p: AngleProblem): number[] {
 function solveMistakes(k: Extract<SolvingConstruction, { form: "solve" }>): string[] {
   const s = solve(k.given);
   const out: Solution[] = [];
+  /** later mistakes, after the ones above so their order is kept */
+  const later: Solution[] = [];
   const truncated: Solution = {
     theta: truncateTo(s.theta, 1),
     other: truncateTo(s.other, 1),
@@ -551,6 +573,11 @@ function solveMistakes(k: Extract<SolvingConstruction, { form: "solve" }>): stri
     out.push({ ...s, other: 180 - theta });
     out.push({ ...s, sides: sides((r) => (g * g) / s.sides[r]) });
     out.push({ ...s, sides: sides((r) => sideFrom(theta, given, g, r, true)) });
+    // one side wrong in the ways a single side goes wrong, the rest right
+    for (const r of ROLES) {
+      if (r === given) continue;
+      for (const v of sideMistakes({ form: "side", theta, given, g, unknown: r }).filter((x) => roundTo(x, 1) > 0 && x < 1e4)) later.push({ ...s, sides: { ...s.sides, [r]: v } });
+    }
   } else {
     const sides = k.given.sides;
     out.push({ ...s, theta: s.other, other: s.theta });
@@ -561,14 +588,16 @@ function solveMistakes(k: Extract<SolvingConstruction, { form: "solve" }>): stri
     out.push({ ...s, other: 180 - s.theta });
     const rad = angleFrom(sides, true);
     out.push({ ...s, theta: rad, other: 90 - rad });
+    // the angle wrong in the ways an angle goes wrong, the other angle taken from it
+    for (const v of angleMistakes({ form: "angle", sides }).filter((x) => roundTo(x, 1) > 0 && x < 180)) later.push({ ...s, theta: v, other: 90 - v });
   }
-  out.push(truncated);
+  out.push(truncated, ...later);
   return out.filter((m) => [m.theta, m.other, ...Object.values(m.sides)].every((v) => v > 0 && Number.isFinite(v))).map((m) => solveLatex(k, m));
 }
 
 /** Mistake-based Distractors: the slips above, printed like the Answer, distinct and never the Answer. */
 export function distractors(k: SolvingConstruction): string[] {
-  if (k.form === "solve") return distinctHints(answerLatex(k), solveMistakes(k));
+  if (k.form === "solve") return distinctHints(answerLatex(k), solveMistakes(k)).slice(0, 8);
   const values = k.form === "side" ? sideMistakes(k) : angleMistakes(k);
   return distinctHints(
     answerLatex(k),

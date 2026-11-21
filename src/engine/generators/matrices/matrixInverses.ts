@@ -22,6 +22,7 @@ import {
   minors,
   mmul,
   mscale,
+  cofactors,
   transpose,
   det,
   type Matrix,
@@ -218,11 +219,22 @@ export function distractors(k: InverseConstruction): string[] {
       ]),
     );
     if (D === 0) out.push(transpose(m));
+    // the matrix itself, only dividing by D (no swap or sign change), multiplying by D instead of
+    // dividing, dividing by ad + bc (a sign slip in the determinant)
+    out.push(m, over([[a, b], [c, d]]));
+    if (D !== 0) out.push(mscale(rat(D), fromInts([[d, -b], [-c, a]])));
+    if (a * d + b * c !== 0)
+      out.push(mscale(rat(1, a * d + b * c), fromInts([[d, -b], [-c, a]])));
   } else {
     const D = det(m);
     if (k.inv) out.push(transpose(k.inv), mscale(rat(D.d, D.n), transpose(minors(m))), mscale(rat(-1), k.inv));
     else out.push(transpose(minors(m)), transpose(m));
+    // the matrix itself, the matrix of minors not transposed, the cofactor matrix not transposed
+    // and left undivided
+    out.push(m, D.n === 0 ? minors(m) : mscale(rat(D.d, D.n), minors(m)), cofactors(m));
   }
+  // For either size: the additive inverse -A, and the reciprocal of each entry (zeros left as they are)
+  out.push(mscale(rat(-1), m), m.map((r) => r.map((x) => (x.n === 0 ? x : rat(x.d, x.n)))));
   return distinctHints(answerLatex(k), out.map((x) => matrixLatex(x)));
 }
 

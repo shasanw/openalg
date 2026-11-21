@@ -1,7 +1,8 @@
+import { expectDistinctChoices, slopeValue } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
-import { assemble, choiceKey } from "../../mc";
+import { assemble } from "../../mc";
 import { buildSection } from "../../worksheet";
 import {
   construct,
@@ -113,14 +114,11 @@ describe("parallel and perpendicular slopes: built answer-first", () => {
 });
 
 describe("parallel and perpendicular slopes: multiple choice", () => {
-  it("offers at least three Distractors, distinct and never the Answer", () => {
+  it("offers at least four Distractors, distinct and never the Answer", () => {
     fc.assert(
       fc.property(anySeed, anyOptions, (seed, opts) => {
         const p = generator.generate(opts, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        const keys = p.distractorHints.map(choiceKey);
-        expect(new Set(keys).size).toBe(keys.length);
-        expect(keys).not.toContain(choiceKey(p.answer));
+        expectDistinctChoices(p, slopeValue);
         const { choices, correctIndex } = assemble(p, { choices: 5, seed });
         expect(choices[correctIndex]).toBe(p.answer);
       }),
@@ -134,6 +132,7 @@ describe("parallel and perpendicular slopes: multiple choice", () => {
       given: { line: { vertical: false, m: q(2, 3), b: q(1) }, form: "slopeIntercept" },
       answer: slope(-3, 2),
     };
+    expect(distractors(k)).toContain("\\text{Cannot be determined}"); // assumed a point was required
     expect(distractors(k).slice(0, 4)).toEqual(["\\frac{2}{3}", "\\frac{3}{2}", "-\\frac{2}{3}", "1"]);
   });
 });

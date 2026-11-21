@@ -1,3 +1,5 @@
+import { values } from "../polynomials/polynomials.testkit";
+import { choiceKey } from "../../mc";
 import { binomialTheorem, readMonomial } from "./binomialTheorem.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -54,13 +56,14 @@ describe("binomial-theorem: Topic Options", () => {
 });
 
 describe("binomial-theorem: distractors", () => {
-  it("are distinct, never the Answer, in the Answer's shape, and at least two", () => {
+  it("are distinct, never the Answer, in the Answer's shape, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        expect(p.distractorHints).not.toContain(p.answer);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        expect(new Set(choices.map((s) => JSON.stringify(values(s.split("\\mathord{,}").join(""))))).size).toBe(choices.length);
         const k = construct(params, createRng(seed));
         for (const d of p.distractorHints) {
           if (k.task === "coefficient") readCount(d.replace(/^-/, ""));
@@ -72,6 +75,7 @@ describe("binomial-theorem: distractors", () => {
 
   it("model the freshman's dream, a missing binomial coefficient and the term one place off", () => {
     const base = { a: 2, b: -3, n: 5, twoVariables: true, k: 3 };
+    expect(distractors({ ...base, task: "coefficient" })).toContain("-540"); // 5C4 × 2² × (-3)³
     const expand = distractors({ ...base, task: "expand" });
     expect(expand[0]).toBe("32x^{5} - 243y^{5}");
     expect(expand[1]).toBe("32x^{5} - 48x^{4}y + 72x^{3}y^{2} - 108x^{2}y^{3} + 162xy^{4} - 243y^{5}");

@@ -98,7 +98,7 @@ describe("law-of-sines", () => {
       fc.property(anyParams, anySeed, (params, seed) => {
         const p = generator.generate(params, seed);
         expectGoodDistractors(p, choiceKey);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(params.problems === "ambiguous" ? 1 : 2);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
         for (const d of p.distractorHints) for (const part of d.split(ANSWER_PART_SEPARATOR)) expectRenders(part);
       }),
       { numRuns: 600 },
@@ -133,5 +133,52 @@ describe("law-of-sines", () => {
     };
     expect(kinds("mixed")).toEqual(["angle", "side"]);
     expect(kinds("all")).toEqual(["ambiguous", "angle", "side"]);
+  });
+});
+
+it("offers the mistake of using inverse cosine to recover the angle opposite side 16", () => {
+  const p = generator.generate({}, 6);
+  expect(p.distractorHints).toContain("50.2^{\\circ}");
+});
+
+it("keeps four Distractors for the ambiguous case when solving the whole triangle", () => {
+  for (const rounding of ["tenth", "hundredth"] as const) {
+    for (let seed = 0; seed < 300; seed++) {
+      const p = generator.generate({ problems: "ambiguous", solveTriangle: true, rounding }, seed);
+      expect(p.distractorHints.length, `${rounding} seed ${seed}`).toBeGreaterThanOrEqual(4);
+    }
+  }
+});
+
+describe("law-of-sines: soak regressions", () => {
+  const whole = { problems: "ambiguous", solveTriangle: true, rounding: "tenth" } as const;
+
+  for (const seed of [1244141722, 939979862]) {
+    it(`keeps four Distractors for an obtuse given angle, solved whole (seed ${seed})`, () => {
+      const p = generator.generate(whole, seed);
+      expect(p.answer).toContain("1 triangle");
+      expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+      expectGoodDistractors(p, choiceKey);
+    });
+  }
+
+  it("models sin left out, the third angle as 180 minus the found one, and the inverted ratio", () => {
+    // B = 118, b = 17, c = 9: sin C = 9 sin 118 / 17, so C = 27.9; the mistaken C = asin(9 / 17) = 32
+    const p = generator.generate(whole, 1244141722);
+    expect(p.distractorHints).toContain("\\text{1 triangle};\\quad C = 32^{\\circ};\\quad A = 30^{\\circ};\\quad a = 9.6");
+    // A = 180 - C = 152.1 (118 forgotten), side a from that angle
+    expect(p.distractorHints).toContain("\\text{1 triangle};\\quad C = 27.9^{\\circ};\\quad A = 152.1^{\\circ};\\quad a = 9");
+    // a = b sin A / sin B inverted: 26.8
+    expect(p.distractorHints).toContain("\\text{1 triangle};\\quad C = 27.9^{\\circ};\\quad A = 34.1^{\\circ};\\quad a = 26.8");
+  });
+
+  it("offers four Distractors across the ambiguous case's options", () => {
+    fc.assert(
+      fc.property(anySeed, fc.boolean(), fc.constantFrom("tenth", "hundredth"), (seed, solveTriangle, rounding) => {
+        const p = generator.generate({ problems: "ambiguous", solveTriangle, rounding }, seed);
+        expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(4);
+      }),
+      { numRuns: 300 },
+    );
   });
 });

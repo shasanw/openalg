@@ -68,7 +68,7 @@ describe("factoring-by-grouping: distractors", () => {
     fc.assert(
       fc.property(anySeed, params, (seed, ps) => {
         const p = generator.generate(ps, seed);
-        expectGoodHints(p, 3);
+        expectGoodHints(p, 4);
         expectHintsWrongInValue(p);
       }),
     );
@@ -79,6 +79,7 @@ describe("factoring-by-grouping: distractors", () => {
     expect(generator.generate({ form: "cubic" }, 0).prompt).toMatch(/x\^\{3\}/);
     expect(answerLatex(k)).toBe("(2x^{2} - 5)(x + 3)");
     const out = distractors(k);
+    expect(out).toContain("x + 3"); // shared binomial alone
     expect(out[0]).toBe("(2x^{2} + 5)(x + 3)");
     expect(out).toContain("(2x^{2} - 5)(x - 3)");
     expect(out).toContain("(x^{2} + 3)(2x - 5)");

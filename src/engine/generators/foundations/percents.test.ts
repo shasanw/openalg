@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { percentOfChange } from "./percentOfChange.answer.testkit";
 import { percents, num, printed } from "./percents.answer.testkit";
 import { describe, expect, it } from "vitest";
@@ -68,8 +69,8 @@ describe("percents: Distractors", () => {
     fc.assert(
       fc.property(anySeed, percentParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(1);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
         for (const d of p.distractorHints) {
           expect(close(num(d), num(p.answer))).toBe(false);
           expect(num(d)).toBeGreaterThan(0);
@@ -84,6 +85,7 @@ describe("percents: Distractors", () => {
     // 12 is what percent of 48: upside down gives 400%, forgetting \times 100 gives 0.25%
     expect(distractors({ ...base, find: "percent" }).slice(0, 2)).toEqual(["400\\%", "0.25\\%"]);
     // 25% of 48: divided by the percent instead (192)
+    expect(distractors({ ...base, find: "part" })).toContain("60"); // reported the increased whole
     expect(distractors({ ...base, find: "part" })[0]).toBe("192");
     // 12 is 25% of what: multiplied instead (3)
     expect(distractors({ ...base, find: "whole" })[0]).toBe("3");
@@ -98,6 +100,31 @@ const changeParams = fc.record({
   percents: fc.constantFrom("whole", "any"),
   decimals: fc.boolean(),
   maxAmount: fc.integer({ min: 20, max: 1000 }),
+});
+
+describe("percents: soak regressions", () => {
+  it.each([
+    [1612015036, 192],
+    [3241041729, 220],
+  ])("keeps four Distractors for 175% of 100 (seed %i)", (seed, maxWhole) => {
+    const p = generator.generate({ find: "part", percents: "any", decimals: false, maxWhole }, seed);
+    expect(p.prompt).toMatch(/175\\% \\text\{ of \} 100/);
+    expect(p.answer).toBe("175");
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+    // counted only the part above 100%: 175% of 100 as 75
+    expect(p.distractorHints).toContain("75");
+  });
+
+  it("keeps four Distractors for every percent of a whole, over seeds and options", () => {
+    fc.assert(
+      fc.property(anySeed, fc.constantFrom("whole", "any"), fc.boolean(), fc.integer({ min: 20, max: 1000 }), (seed, percents, decimals, maxWhole) => {
+        const p = generator.generate({ find: "part", percents, decimals, maxWhole }, seed);
+        expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(4);
+      }),
+      { numRuns: 400 },
+    );
+  });
 });
 
 describe("percent-of-change: answers", () => {
@@ -131,12 +158,14 @@ describe("percent-of-change: Topic Options", () => {
 });
 
 describe("percent-of-change: Distractors", () => {
-  it("are distinct, never the Answer, and at least one", () => {
+  it("are distinct, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, changeParams, (seed, params) => {
         const p = Change.generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(1);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        // 100 decreased by a large percent, on a whole-number sheet, has only three real slips
+        const hundredDown = /^100 \\text\{ decreased by \}/.test(p.prompt) && params.decimals === false;
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(hundredDown ? 3 : 4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
         expect(p.distractorHints).not.toContain(p.answer);
       }),
     );
@@ -146,14 +175,55 @@ describe("percent-of-change: Distractors", () => {
     // 40 to 52: 30% increase. Divided by the new amount (23.07...% does not terminate, so skipped),
     // the wrong direction, the change as the percent (12%), 130%, and 0.3%
     const k: Change.ChangeConstruction = { find: "percent", direction: "increase", percent: rat(30), original: rat(40), updated: rat(52) };
-    expect(Change.distractors(k)).toEqual([
+    expect(Change.distractors(k).slice(0, 5)).toEqual([
       "30\\% \\text{ decrease}",
       "12\\% \\text{ increase}",
       "130\\% \\text{ increase}",
       "0.3\\% \\text{ increase}",
+      "3\\% \\text{ increase}",
     ]);
     // 40 increased by 30%: just the change (12), the wrong direction (28), 30 added on (70)
     expect(Change.distractors({ ...k, find: "amount" }).slice(0, 3)).toEqual(["12", "28", "70"]);
+  });
+});
+
+describe("percent-of-change: soak regressions", () => {
+  const exactCase = (find: "amount", direction: "increase" | "decrease", percent: number, original: number, updated: number): Change.ChangeConstruction => ({
+    find,
+    direction,
+    percent: rat(percent),
+    original: rat(original),
+    updated: rat(updated),
+  });
+
+  it("keeps four Distractors for 50 increased by 50% (seed 2141231556)", () => {
+    const p = Change.generator.generate({ find: "amount", direction: "both", percents: "whole", decimals: false, maxAmount: 497 }, 2141231556);
+    expect(p.prompt).toBe("50 \\text{ increased by } 50\\%");
+    expect(p.answer).toBe("75");
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+  });
+
+  it("models the decimal moved one place too few, dividing by the decimal, and 100 changed by the percent", () => {
+    // 80 decreased by 25% = 60: 80 / 0.25 = 320, and 100 - 25 = 75
+    const down = Change.distractors(exactCase("amount", "decrease", 25, 80, 60));
+    expect(down).toContain("320");
+    expect(down).toContain("75");
+    // 50 increased by 50% = 75: 50 (1 + 5) = 300, and 100 + 50 = 150
+    const up = Change.distractors(exactCase("amount", "increase", 50, 50, 75));
+    expect(up).toContain("300");
+    expect(up).toContain("150");
+  });
+
+  it("only the exact 100-decreased-by family stays short of four, across option combinations", () => {
+    fc.assert(
+      fc.property(anySeed, changeParams, (seed, params) => {
+        const p = Change.generator.generate(params, seed);
+        const hundredDown = /^100 \\text\{ decreased by \}/.test(p.prompt);
+        expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(hundredDown ? 3 : 4);
+      }),
+      { numRuns: 400 },
+    );
   });
 });
 

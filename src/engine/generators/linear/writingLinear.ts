@@ -179,9 +179,13 @@ export function distractors(k: WritingConstruction): string[] {
   const [x1, y1] = k.points[0];
   const s = k.slope;
   // A different point on the same line gives another correct point-slope equation.
-  const correctLine = slopeInterceptLatex(lineOf(k));
-  const write = (l: Line, through: Point) =>
-    slopeInterceptLatex(l) === correctLine ? null : equationLatex(l, k.form, through);
+  const offered = new Set([slopeInterceptLatex(lineOf(k))]);
+  const write = (line: Line, through: Point) => {
+    const key = slopeInterceptLatex(line);
+    if (offered.has(key)) return null;
+    offered.add(key);
+    return equationLatex(line, k.form, through);
+  };
   const horizontal = (c: number): Line => ({ vertical: false, m: q(0), b: q(c) });
   const vertical = (c: number): Line => ({ vertical: true, x: q(c) });
 
@@ -197,6 +201,14 @@ export function distractors(k: WritingConstruction): string[] {
     }
     d.add(write(same(0), [x1, y1]));
     d.add(write(same(-c), [x1, y1]));
+    // the special slope (undefined or zero) misread as an ordinary slope of 1 or -1
+    d.add(write(lineThrough(slope(1, 1), x1, y1), [x1, y1]));
+    d.add(write(lineThrough(slope(-1, 1), x1, y1), [x1, y1]));
+    // the line's own constant read as its slope
+    if (c !== 0) {
+      d.add(write(lineThrough(slope(c, 1), x1, y1), [x1, y1]));
+      d.add(write(lineThrough(slope(-c, 1), x1, y1), [x1, y1]));
+    }
     return d.list;
   }
   const at = (t: Slope, p: Point) => write(lineThrough(t, p[0], p[1]), p);
@@ -225,6 +237,19 @@ export function distractors(k: WritingConstruction): string[] {
   // rise miscounted the other way.
   if (d.list.length < 3) d.add(at(slope(s.rise, s.run + 1), [x1, y1]));
   if (d.list.length < 3 && Math.abs(s.rise) > 1) d.add(at(slope(s.rise - (s.rise > 0 ? 1 : -1), s.run), [x1, y1]));
+  // Omitted the intercept and drew the line through the origin.
+  d.add(at(s, [0, 0]));
+  // Keep the slope but change the sign of just one point coordinate.
+  d.add(at(s, [-x1, y1]), at(s, [x1, -y1]));
+  // Treat the numerator as the whole slope or add the rise and run instead of dividing.
+  d.add(at(slope(s.rise, 1), [x1, y1]), at(slope(s.rise + s.run, 1), [x1, y1]));
+  if (k.points.length === 2) {
+    const [x2, y2] = k.points[1];
+    // added the coordinates instead of subtracting them to find the slope
+    if (x1 + x2 !== 0) d.add(write(lineThrough(slope(y1 + y2, x1 + x2), x1, y1), [x1, y1]));
+    // slope sign slip, written through the second point instead of the first
+    d.add(write(lineThrough(slope(-s.rise, s.run), x2, y2), [x2, y2]));
+  }
   return d.list;
 }
 

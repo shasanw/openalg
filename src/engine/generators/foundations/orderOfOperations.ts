@@ -247,7 +247,10 @@ export function construct(params: ParamValues, rng: Rng): OrderConstruction {
     // orders must give different whole numbers (a fraction would tell the
     // student something went wrong), and an asked-for feature should usually
     // show up
-    if (distractors(k).length < (attempt < 200 ? 2 : 1) && attempt < 500) continue;
+    if (coreDistractors(k).length < (attempt < 200 ? 2 : 1) && attempt < 500) continue;
+    // fewer than four distinct mistake-based Distractors (expressions of 2s
+    // with a stray 3 or 4): draw another one while there is time
+    if (distractors(k).length < 4 && attempt < 100) continue;
     if (lim.parentheses && !hasGroup(tree) && rng.bool(0.7) && attempt < 400) continue;
     if (lim.exponents && !hasPow(tree) && rng.bool(0.8) && attempt < 400) continue;
     return k;
@@ -464,7 +467,7 @@ export function correctValue(k: OrderConstruction): Rat | null {
  * level (12 - 2 + 3 as 7), and the opposite of the Answer (a sign slip),
  * keeping only whole numbers.
  */
-export function distractors(k: OrderConstruction): string[] {
+function coreDistractors(k: OrderConstruction): string[] {
   const mistakes: Mistake[] = [
     "leftToRight",
     "ignoredParentheses",
@@ -484,6 +487,51 @@ export function distractors(k: OrderConstruction): string[] {
     String(k.answer),
     values.map((v) => (v === null || (v < 0 && !hasNegative(k)) ? null : String(v))),
   );
+}
+
+/** Carry one local arithmetic slip through the remaining, correctly worked steps. */
+function stepMistakes(node: Node): number[] {
+  if (node.kind === "num") return [];
+  if (node.kind === "pow") {
+    const b = node.base.value;
+    // Dropped the exponent, or added it to the base instead of raising to it.
+    return [b, b + node.exp, ...stepMistakes(node.base).map((v) => v ** node.exp)];
+  }
+  const a = node.left.value;
+  const b = node.right.value;
+  // Stopped after one operand, or used the inverse operation at this step.
+  const values = [a, b];
+  const work = (x: number, y: number) => {
+    switch (node.op) {
+      case "+": return x + y;
+      case "-": return x - y;
+      case "*": return x * y;
+      case "/": return x / y;
+    }
+  };
+  switch (node.op) {
+    case "+":
+    case "-":
+      values.push(node.op === "+" ? a - b : a + b, b - a, a * b);
+      break;
+    case "*":
+      // Added the factors, or divided them instead.
+      values.push(a + b, a / b);
+      break;
+    case "/":
+      // Multiplied, reversed the quotient, or stopped after one subtraction.
+      values.push(a * b, b / a, a - b, a + b);
+      break;
+  }
+  return [...values, ...stepMistakes(node.left).map((v) => work(v, b)),
+    ...stepMistakes(node.right).map((v) => work(a, v))];
+}
+
+export function distractors(k: OrderConstruction): string[] {
+  const core = coreDistractors(k);
+  const signs = hasNegative(k);
+  const extra = stepMistakes(k.tree).filter((v) => Number.isSafeInteger(v) && (v >= 0 || signs));
+  return distinctHints(String(k.answer), [...core, ...extra.map(String)]);
 }
 
 /** Does anything negative appear in the working (so a negative choice is plausible)? */

@@ -81,7 +81,7 @@ describe("radical-equations: Topic Options", () => {
 });
 
 describe("radical-equations: distractors", () => {
-  it("still offer three when the radical equals -1 or the cube-root slips coincide", () => {
+  it("still offer four when the radical equals -1 or the cube-root slips coincide", () => {
     // sqrt(-2x + 5) = -1: forgetting to square gives x = 3, which is also x + 1;
     // and two cube-root equations whose sign slips land on the same value.
     for (const [params, seed] of [
@@ -90,24 +90,20 @@ describe("radical-equations: distractors", () => {
       [{ cubeRoots: true }, 18339],
     ] as const) {
       const p = generator.generate(params, seed);
-      expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(3);
+      expect(p.distractorHints.length, p.prompt).toBeGreaterThanOrEqual(4);
       expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
       expect(p.distractorHints).not.toContain(p.answer);
     }
   });
 
-  it("are distinct, never the Answer, and at least three", () => {
+  it("are distinct, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
         expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        const answer = values(p.answer);
-        for (const d of p.distractorHints) {
-          const v = values(d);
-          const same = v.length === answer.length && v.every((x, i) => close(x, answer[i]));
-          expect(same, d).toBe(false);
-        }
+        const sets = [p.answer, ...p.distractorHints].map(s => values(s).sort((a, b) => a - b));
+        expect(new Set(sets.map(xs => JSON.stringify(xs))).size).toBe(sets.length);
       }),
     );
   });
@@ -127,4 +123,9 @@ describe("radical-equations: generate()", () => {
   it("is deterministic, renders, and has variety", () => {
     commonChecks(generator, anyParams, [{}, { form: "number" }, { form: "bothSides" }, { form: "linear" }], 100);
   });
+});
+
+it("offers the mistake of adding 25 after squaring both sides of \u221a(3x + 25) = \u22121", () => {
+  const p = generator.generate({}, 12);
+  expect(p.distractorHints).toContain("x = \\frac{26}{3}");
 });

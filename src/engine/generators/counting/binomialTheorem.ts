@@ -171,6 +171,16 @@ export function distractors(k: BinomialConstruction): string[] {
     if (k.task === "term") values.push(at(k.k - 1, termCoefficient(a, b, n, k.k - 1)));
     // the coefficient of the other variable's power: C(n, k) with a and b's powers mixed up
     if (k.task === "coefficient") values.push(at(k.k, termCoefficient(a, b, n, n - k.k)));
+    // the binomial coefficient taken from the next or previous place, C(n, k + 1) or C(n, k - 1)
+    values.push(at(k.k, comb(n, k.k + 1) * a ** (n - k.k) * b ** k.k), at(k.k, comb(n, k.k - 1) * a ** (n - k.k) * b ** k.k));
+    // one factor's power left out entirely (a^(n-k) or b^k not written in)
+    values.push(at(k.k, comb(n, k.k) * b ** k.k), at(k.k, comb(n, k.k) * a ** (n - k.k)));
+    // exponents multiplied in instead of raised to (a(n - k) and bk for a^(n-k) and b^k)
+    values.push(at(k.k, comb(n, k.k) * a * (n - k.k) * b * k.k));
+    // the whole neighbouring coefficient (the next or previous place's term)
+    if (k.task === "coefficient") {
+      values.push(at(k.k, termCoefficient(a, b, n, k.k + 1)), at(k.k, termCoefficient(a, b, n, k.k - 1)));
+    }
   }
   return distinctHints(answerLatex(k), values);
 }

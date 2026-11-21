@@ -1,3 +1,4 @@
+import { expectDistinctChoices } from "../shared/distractors.testkit";
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import katex from "katex";
@@ -335,29 +336,29 @@ describe("quadratic-inequalities: distractors", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThan(0);
-        expect(p.distractorHints).not.toContain(p.answer);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctChoices(p, tex => parseAnswer(tex, params.notation).map(piece => [
+          piece.lo && exactValue(piece.lo), piece.hi && exactValue(piece.hi), piece.loClosed, piece.hiClosed,
+        ]));
         for (const d of p.distractorHints) expect(() => parseAnswer(d, params.notation)).not.toThrow();
       }),
     );
   });
 
-  it("two-critical-point problems offer at least three distractors", () => {
+  it("two-critical-point problems offer at least four distractors", () => {
     fc.assert(
       fc.property(anySeed, fc.constantFrom(...POINT_TYPES), fc.constantFrom(...NOTATIONS), (seed, criticalPoints, notation) => {
-        expect(generator.generate({ criticalPoints, notation }, seed).distractorHints.length).toBeGreaterThanOrEqual(3);
+        expect(generator.generate({ criticalPoints, notation }, seed).distractorHints.length).toBeGreaterThanOrEqual(4);
       }),
     );
   });
 
-  it("special-case problems offer at least two distractors", () => {
+  it("special-case problems offer at least four distractors", () => {
     fc.assert(
       fc.property(anySeed, fc.constantFrom(...NOTATIONS), (seed, notation) => {
         const k = construct({ allowSpecialCases: true }, createRng(seed));
         if (k.zeros.kind === "two") return;
         const p = generator.generate({ allowSpecialCases: true, notation }, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
       }),
     );
   });
@@ -373,6 +374,7 @@ describe("quadratic-inequalities: distractors", () => {
       if (p.prompt !== "x^2 - x - 6 \\le 0") continue;
       expect(p.answer).toBe("[-2, 3]");
       expect(p.distractorHints).toContain("(-\\infty, -2] \\cup [3, \\infty)"); // flipped
+      expect(p.distractorHints).toContain("[-2, \\infty)"); // kept only x ≥ -2
       expect(p.distractorHints).toContain("(-2, 3)"); // inclusion
       expect(p.distractorHints).toContain("[-3, 2]"); // sign error on the zeros
       return;

@@ -194,3 +194,42 @@ describe("choiceLetter", () => {
     expect([0, 1, 2, 3, 4].map(choiceLetter)).toEqual(["A", "B", "C", "D", "E"]);
   });
 });
+
+describe("Custom Problem fallback choices", () => {
+  function wrong(answer: string, hints: string[] = []) {
+    const set = assemble({ answer, distractorHints: hints }, { choices: 5, seed: 7 });
+    return set.choices.filter((_, i) => i !== set.correctIndex);
+  }
+
+  it("prefers the sign, reciprocal, double and half of a fraction", () => {
+    expect(wrong("x = \\frac{2}{3}").sort()).toEqual([
+      "x = -\\frac{2}{3}", "x = \\frac{3}{2}", "x = \\frac{4}{3}", "x = \\frac{1}{3}",
+    ].sort());
+  });
+
+  it("respects values already represented by an unreduced fraction or decimal", () => {
+    const choices = wrong("0.5", ["-\\frac{2}{4}", "1.0"]);
+    expect(choices).toContain("\\frac{1}{4}");
+    expect(choices).not.toContain("-\\frac{1}{2}");
+    expect(choices).not.toContain("1");
+  });
+
+  it("handles zero numerators, unit fractions equal to one, and leading coefficients", () => {
+    expect(wrong("\\frac{0}{3}").every(s => !s.includes("{0}"))).toBe(true);
+    expect(wrong("\\frac{2}{2}")).not.toContain("1");
+    expect(wrong("y = -3x + 1")).toContain("y = 3x + 1");
+    expect(wrong("0^{2}")).not.toContain("0^{3}");
+  });
+
+  it("nudges numbers inside a multi-part Answer without breaking its LaTeX or printing an unreduced fraction", () => {
+    const answer = "\\text{Vertex: } \\left(\\frac{9}{2}, \\frac{1}{4}\\right);\\quad \\text{Axis: } x = \\frac{9}{2}";
+    const choices = wrong(answer);
+    expect(choices).toHaveLength(4);
+    for (const c of choices) {
+      expect(c).not.toBe(answer);
+      expect(c).toContain("\\left(");
+      expect(c).toContain("\\right)");
+      expect(c).not.toMatch(/\\frac\{(10|12|8|6)\}\{(2|4)\}/);
+    }
+  });
+});

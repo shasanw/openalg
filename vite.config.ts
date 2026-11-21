@@ -5,6 +5,9 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 import { typstAssetBytes, typstServiceWorker } from "./vite/typstAssets";
 
+// Agent worktrees hold whole copies of the repo (with their own React).
+const EXCLUDE = ["**/node_modules/**", "**/dist/**", ".claude/**"];
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss(), typstServiceWorker()],
@@ -40,12 +43,43 @@ export default defineConfig(async () => ({
 
   test: {
     globals: true,
-    environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
     // Property tests take 1 to 3 s alone, and the Typst smoke shards run
     // beside them: the default 5 s timed them out under load.
     testTimeout: 20_000,
-    // Agent worktrees hold whole copies of the repo (with their own React).
-    exclude: ["**/node_modules/**", "**/dist/**", ".claude/**"],
+    // Three projects, so each test file pays only for what it uses:
+    // - engine: pure generators and layout, in plain Node (no fake browser);
+    // - dom: components, the app and browser platform code, in jsdom;
+    // - typst: every Topic compiled by the real compiler (slow; `pnpm test:typst`).
+    // `pnpm test` runs engine and dom; `pnpm test:all` runs all three.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "engine",
+          environment: "node",
+          include: ["src/engine/**/*.test.ts"],
+          exclude: EXCLUDE,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "dom",
+          environment: "jsdom",
+          setupFiles: ["./src/test/setup.ts"],
+          include: ["src/**/*.test.{ts,tsx}"],
+          exclude: [...EXCLUDE, "src/engine/**", "src/platform/typst/*.smoke.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "typst",
+          environment: "node",
+          include: ["src/platform/typst/*.smoke.test.ts"],
+          exclude: EXCLUDE,
+        },
+      },
+    ],
   },
 }));

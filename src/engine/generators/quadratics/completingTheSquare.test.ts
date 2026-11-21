@@ -1,3 +1,4 @@
+import { expectDistinctChoices, solutionValues } from "../shared/distractors.testkit";
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -155,9 +156,7 @@ describe("completing-the-square: distractors", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(p.distractorHints).not.toContain(p.answer);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
+        expectDistinctChoices(p, solutionValues);
       }),
     );
   });
@@ -177,6 +176,11 @@ describe("completing-the-square: distractors", () => {
       "x = -1, 7", // sign error in the square
       "x = 1", // dropped the ±
       "x = -3 \\pm \\sqrt{10}", // added 3 instead of 9
+      "x = -7", // only the minus root
+      "x = -6 \\pm \\sqrt{43}", // used 6 instead of half of 6
+      "x = -8, 2", // squared before halving
+      "x = -3 \\pm \\sqrt{2}", // moved 7 with the wrong sign
+      "x = -19, 13", // used 16 instead of its square root
     ]);
   });
 

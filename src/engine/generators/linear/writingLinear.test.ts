@@ -1,7 +1,9 @@
+import { coefficients } from "../systems/systems.testUtil";
+import { expectDistinctChoices } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
-import { assemble, choiceKey } from "../../mc";
+import { assemble } from "../../mc";
 import { plot, type CoordinatePlaneSpec } from "../../plot";
 import { buildSection, questionKey } from "../../worksheet";
 import {
@@ -14,6 +16,11 @@ import {
 } from "./writingLinear";
 import { isVertical, lineGrid } from "../shared/lines";
 import { satisfies } from "../shared/lines.testUtil";
+
+function lineValue(tex: string) {
+  const [a, b, c] = coefficients(tex);
+  return b === 0 ? ["x", c / a] : ["y", (-a / b).toFixed(9), (c / b).toFixed(9)];
+}
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyOptions = fc.record({
@@ -127,14 +134,11 @@ describe("writing linear equations: from a graph", () => {
 });
 
 describe("writing linear equations: multiple choice", () => {
-  it("offers at least three Distractors, distinct and never the Answer", () => {
+  it("offers at least four Distractors, distinct and never the Answer", () => {
     fc.assert(
       fc.property(anySeed, anyOptions, (seed, opts) => {
         const p = generator.generate(opts, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        const keys = p.distractorHints.map(choiceKey);
-        expect(new Set(keys).size).toBe(keys.length);
-        expect(keys).not.toContain(choiceKey(p.answer));
+        expectDistinctChoices(p, lineValue);
         const { choices, correctIndex } = assemble(p, { choices: 5, seed });
         expect(choices[correctIndex]).toBe(p.answer);
       }),
@@ -169,6 +173,8 @@ describe("writing linear equations: multiple choice", () => {
       "y = 3x - 1", // the point's coordinates swapped: through (1, 2)
       "y = -\\frac{1}{3}x + \\frac{5}{3}", // the negative reciprocal
       "y = 4x - 7", // the rise miscounted by one
+      "y = 3x", // omitted the intercept
+      "y = 3x - 7", // changed the sign of the point’s y-coordinate
     ]);
     expect(distractors({ ...k, form: "pointSlope" }).slice(0, 3)).toEqual([
       "y - 1 = -3(x - 2)",

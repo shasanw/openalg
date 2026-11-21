@@ -22,7 +22,12 @@ it("solves the printed triangle independently for every area option combination"
             const kind = checkArea(p, rounding === "tenth" ? 1 : 2);
             if (given !== "mixed") expect(kind).toBe(given);
             expectGoodDistractors(p, choiceKey);
-            expect(p.distractorHints.length).toBeGreaterThan(0);
+            expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
           }), { numRuns: 24 });
         }
 }, 60_000);
+
+it("offers the mistake of dropping the semiperimeter factor in Heron's formula", () => {
+  const p = generator.generate({}, 22);
+  expect(p.distractorHints).toContain("12.1");
+});

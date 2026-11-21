@@ -246,6 +246,9 @@ export function promptLatex(k: TwoStepConstruction): string {
   return k.swapSides ? `${right} = ${left}` : `${left} = ${right}`;
 }
 
+/** -r, or null when r is missing. */
+const negOrNull = (r: Rat | null): Rat | null => (r ? neg(r) : null);
+
 /**
  * Mistake-based Distractors, most common first. For ax + b = c (and b + ax = c):
  * - moved b with the wrong sign: (c + b)/a;
@@ -274,13 +277,35 @@ export function distractors(k: TwoStepConstruction): string[] {
       values = isInt(a)
         ? [div(add(c, b), a), sub(div(c, a)!, b), neg(x), rest, sub(rest, a), multiplied]
         : [multiplied, div(add(c, b), a), sub(div(c, a)!, b), neg(x), rest, sub(rest, a)];
+      values.push(
+        add(rest, a), // added the coefficient instead of dividing by it
+        div(c, a), // forgot to undo the constant, only divided
+        div(sub(b, c), a), // subtracted the wrong way round, then divided
+        sub(c, div(b, a)!), // divided only the constant by the coefficient
+        add(div(c, a)!, b), // divided c first, then added b with the wrong sign
+        negOrNull(div(add(c, b), a)), // moved b with the wrong sign and lost the sign
+        mul(add(c, b), a), // moved b with the wrong sign, then multiplied by the coefficient
+      );
       break;
     }
     case "divided":
       values = [mul(a, add(c, b)), div(sub(c, b), a), sub(mul(a, c), b), neg(x), sub(c, b)];
+      values.push(
+        mul(a, c), // forgot the constant, only multiplied
+        div(add(c, b), a), // moved b with the wrong sign and divided instead of multiplying
+        add(mul(a, c), b), // multiplied c by a but moved b with the wrong sign
+        add(sub(c, b), a), // added the divisor instead of multiplying by it
+        sub(sub(c, b), a), // subtracted the divisor instead of multiplying by it
+      );
       break;
     case "groupedOver":
       values = [add(mul(a, c), b), mul(a, sub(c, b)), sub(c, b), sub(div(c, a)!, b), neg(x)];
+      values.push(
+        mul(a, c), // multiplied by a but forgot to subtract b
+        div(sub(c, b), a), // undid b first, then divided instead of multiplying by a
+        add(c, b), // forgot the a step and moved b with the wrong sign
+        div(c, a), // divided instead of multiplying, and forgot b
+      );
       break;
   }
   return distinctHints(

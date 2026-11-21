@@ -13,7 +13,7 @@ import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
 import { distinctHints, linearLatex, rat, type Rat } from "../shared/equationKit";
 import { gcd } from "../../format";
-import { COMMON, intPow, logOf, NATURAL, numberBase, type LogBase } from "./logKit";
+import { baseValue, COMMON, intPow, logOf, NATURAL, numberBase, type LogBase } from "./logKit";
 
 export const LOG_PROPERTIES_ID = "log-properties";
 
@@ -206,6 +206,23 @@ const negE = (e: Rat) => rat(-e.n, e.d);
 /** a root's exponent flipped: \sqrt{x} read as x^{2} */
 const flipRoot = (e: Rat) => (e.d === 1 ? e : rat(Math.sign(e.n) * e.d, Math.abs(e.n)));
 
+/** A Distractor and its value at the sample point, to tell equivalent forms apart. */
+interface Candidate {
+  tex: string;
+  /** the expression's value at SAMPLE; NaN when it has none (the log of a negative) */
+  value: number;
+}
+
+/** Values the variables take when two forms are compared numerically. */
+const SAMPLE: Record<string, number> = { x: 1.7, y: 2.3, z: 3.1, w: 4.3 };
+
+/** log in the Problem's base of a positive number. */
+const logIn = (base: LogBase, v: number) => (v > 0 ? Math.log(v) / Math.log(baseValue(base)) : NaN);
+
+/** The value of a sum of coefficient times log of a variable, plus a constant. */
+const sumValue = (base: LogBase, fs: Factor[], constant: number) =>
+  fs.reduce((s, f) => s + (f.e.n / f.e.d) * logIn(base, SAMPLE[f.v]), constant);
+
 /**
  * Mistake-based Distractors, most common first.
  * Expanding:
@@ -217,7 +234,7 @@ const flipRoot = (e: Rat) => (e.d === 1 ? e : rat(Math.sign(e.n) * e.d, Math.abs
  * - a root's index as the coefficient: \sqrt{x} as 2\log x;
  * - the number not evaluated: \log_{2} (8x) as 8 + \log_{2} x;
  * - the product rule read as a product: \log (100x) as 2\log x;
- * - an exponent added rather than multiplied: \log x^{2} as 2 + \log x.
+ * - an exponent added rather than multiplied: \log x^{2} as 2 + \log x;
  * Condensing:
  * - a quotient of logarithms: \frac{\log x^{2}}{\log y};
  * - every factor in the numerator;
@@ -228,63 +245,119 @@ const flipRoot = (e: Rat) => (e.d === 1 ? e : rat(Math.sign(e.n) * e.d, Math.abs
  * - the number term as a power: 2 + \log x as \log x^{2};
  * - the product and quotient rules read as sums: \log (x^{2} + y - z);
  * - coefficients kept as multipliers: 2\log x + 3\log y as \log (2x \cdot 3y).
+ * Either way, last come a lost factor and a factor moved across the fraction bar.
+ * Candidates that equal the Answer or an earlier Distractor in value (checked
+ * at sample values) are dropped, so no two choices are equivalent forms.
  */
 export function distractors(k: PropertiesConstruction): string[] {
   const { base, factors: fs, k: n } = k;
-  const out: (string | null)[] = [];
+  const out: Candidate[] = [];
+  const add = (tex: string, value: number) => out.push({ tex, value });
   const hasRoot = fs.some((f) => f.e.d > 1);
+  const answerValue = sumValue(base, fs, n);
   if (k.expand) {
     const order = canonicalOrder(k);
-    const ex = (f: Factor[], kk = n, numberTex?: string) => expandedLatex(base, f, kk, order, numberTex);
-    out.push(ex(mapE(fs, absE), Math.abs(n)));
-    out.push(ex(mapE(fs, unit)));
+    /** an expansion; `numberTex` (the number evaluated wrongly) stands in for the constant */
+    const ex = (f: Factor[], kk = n, numberTex?: string, constantValue = kk) =>
+      add(
+        expandedLatex(base, f, kk, order, numberTex),
+        sumValue(base, f, constantValue),
+      );
+    ex(mapE(fs, absE), Math.abs(n));
+    ex(mapE(fs, unit));
     const firstBottom = fs.findIndex((f) => f.e.n < 0);
     if (firstBottom >= 0 && firstBottom < fs.length - 1)
-      out.push(ex(fs.map((f, i) => (i > firstBottom ? { v: f.v, e: absE(f.e) } : f))));
-    out.push(ex(mapE(fs, negE), -n));
-    if (hasRoot) out.push(ex(mapE(fs, flipRoot)));
-    if (n !== 0) out.push(ex(fs, Math.sign(n), numberFactor(base, Math.abs(n))));
+      ex(fs.map((f, i) => (i > firstBottom ? { v: f.v, e: absE(f.e) } : f)));
+    ex(mapE(fs, negE), -n);
+    if (hasRoot) ex(mapE(fs, flipRoot));
+    if (n !== 0)
+      ex(fs, Math.sign(n), numberFactor(base, Math.abs(n)), Math.sign(n) * baseValue(base) ** Math.abs(n));
     // \log (100x) as 2\log x: the product rule read as a product
-    if (n !== 0) out.push(ex(fs.map((f, i) => (i === 0 ? { v: f.v, e: rat(f.e.n * n, f.e.d) } : f)), 0));
+    if (n !== 0) ex(fs.map((f, i) => (i === 0 ? { v: f.v, e: rat(f.e.n * n, f.e.d) } : f)), 0);
     if (!hasRoot) {
       // \log x^{2} as 2 + \log x: the exponent added rather than multiplied
       const c = fs.reduce((s, f) => s + (Math.abs(f.e.n) > 1 ? f.e.n : 0), n);
-      out.push(expandedLatex(base, mapE(fs, unit), c, [-1, ...fs.map((_, i) => i)]));
+      add(expandedLatex(base, mapE(fs, unit), c, [-1, ...fs.map((_, i) => i)]), sumValue(base, mapE(fs, unit), c));
     }
   } else {
-    const co = (f: Factor[], kk = n, numberTex?: string) => condensedLatex(base, f, kk, numberTex);
+    const co = (f: Factor[], kk = n, numberTex?: string, constantValue = kk) =>
+      add(
+        condensedLatex(base, f, kk, numberTex),
+        sumValue(base, f, constantValue),
+      );
     const top = fs.filter((f) => f.e.n > 0);
     const bottom = fs.filter((f) => f.e.n < 0);
     if (bottom.length > 0 && n >= 0) {
       const numTex = logOf(base, condensedArg(base, top, n));
       const denTex = logOf(base, condensedArg(base, mapE(bottom, negE), 0));
-      out.push(`\\frac{${numTex}}{${denTex}}`);
+      add(`\\frac{${numTex}}{${denTex}}`, sumValue(base, top, n) / sumValue(base, mapE(bottom, absE), 0));
     }
-    out.push(co(mapE(fs, absE), Math.abs(n)));
-    out.push(co(mapE(fs, unit)));
-    out.push(co(mapE(fs, negE), -n));
-    if (hasRoot) out.push(co(mapE(fs, flipRoot)));
-    if (Math.abs(n) > 1) out.push(co(fs, n, String(Math.abs(n))));
+    co(mapE(fs, absE), Math.abs(n));
+    co(mapE(fs, unit));
+    co(mapE(fs, negE), -n);
+    if (hasRoot) co(mapE(fs, flipRoot));
+    // 3 + \log_{2} x as \log_{2} (3x): the number taken as a factor, not a power of the base
+    if (Math.abs(n) > 1) co(fs, n, String(Math.abs(n)), logIn(base, Math.abs(n)) * Math.sign(n));
     // 2 + \log x as \log x^{2}: the number taken as a power
-    if (n !== 0) out.push(co(fs.map((f, i) => (i === 0 ? { v: f.v, e: rat(f.e.n * n, f.e.d) } : f)), 0));
+    if (n !== 0) co(fs.map((f, i) => (i === 0 ? { v: f.v, e: rat(f.e.n * n, f.e.d) } : f)), 0);
     {
       // \log x + \log y as \log (x + y): the product rule read as a sum
-      const parts = (n !== 0 ? [{ tex: numberFactor(base, Math.abs(n)), sign: Math.sign(n) }] : []).concat(
-        fs.map((f) => ({ tex: factorLatex(f.v, absE(f.e)), sign: Math.sign(f.e.n) })),
+      const parts = (
+        n !== 0
+          ? [{ tex: numberFactor(base, Math.abs(n)), sign: Math.sign(n), num: baseValue(base) ** Math.abs(n) }]
+          : []
+      ).concat(
+        fs.map((f) => ({
+          tex: factorLatex(f.v, absE(f.e)),
+          sign: Math.sign(f.e.n),
+          num: SAMPLE[f.v] ** (Math.abs(f.e.n) / f.e.d),
+        })),
       );
       parts.sort((a, b) => b.sign - a.sign);
       const sum = parts.map((q, i) => (i === 0 ? "" : q.sign > 0 ? " + " : " - ") + q.tex).join("");
-      out.push(logOf(base, `(${sum})`));
+      add(logOf(base, `(${sum})`), logIn(base, parts.reduce((s, q) => s + q.sign * q.num, 0)));
     }
     if (!hasRoot && n === 0) {
       // 2\log x + 3\log y as \log (2x \cdot 3y): coefficients kept as multipliers
       const side = (g: Factor[]) =>
         g.map((f) => (Math.abs(f.e.n) > 1 ? `${Math.abs(f.e.n)}${f.v}` : f.v)).join(" \\cdot ");
       const t = side(top);
-      out.push(logOf(base, bottom.length > 0 ? `\\frac{${t}}{${side(bottom)}}` : top.length > 1 ? `(${t})` : t));
+      add(
+        logOf(base, bottom.length > 0 ? `\\frac{${t}}{${side(bottom)}}` : top.length > 1 ? `(${t})` : t),
+        fs.reduce((s, f) => s + Math.sign(f.e.n) * logIn(base, Math.abs(f.e.n) * SAMPLE[f.v]), 0),
+      );
     }
   }
-  return distinctHints(answerLatex(k), out);
+  // Lose a factor, or move it across the fraction bar (change just its sign).
+  for (const i of canonicalOrder(k)) {
+    for (const omit of [true, false]) {
+      const constant = i === -1 ? (omit ? 0 : -n) : n;
+      const factors = fs.flatMap((factor, j) =>
+        j !== i ? [factor] : omit ? [] : [{ ...factor, e: negE(factor.e) }],
+      );
+      const changed = { ...k, k: constant, factors };
+      add(answerLatex(changed), sumValue(base, factors, constant));
+    }
+  }
+  return distinctHints(
+    answerLatex(k),
+    dedupeByValue(out, answerValue).map((c) => c.tex),
+  );
+}
+
+/** Drop candidates whose value matches the Answer's or an earlier candidate's. */
+function dedupeByValue(candidates: Candidate[], answerValue: number): Candidate[] {
+  const seen = [answerValue];
+  const same = (a: number, b: number) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+  const kept: Candidate[] = [];
+  for (const c of candidates) {
+    if (Number.isFinite(c.value)) {
+      if (seen.some((v) => same(v, c.value))) continue;
+      seen.push(c.value);
+    }
+    kept.push(c);
+  }
+  return kept;
 }
 
 export const generator: Generator = {

@@ -273,6 +273,10 @@ export function promptNumbers(prompt: string): { lengths: number[]; angles: numb
 
 /** Distractors distinct, never the Answer, and printed like it. */
 export function expectGoodDistractors(p: Problem, choiceKey: (s: string) => string): void {
+  const values = [p.answer, ...p.distractorHints].map(choice =>
+    choiceKey(choice.replace(/\d+(?:\.\d+)?/g, n => String(Number(n)))),
+  );
+  expect(new Set(values).size).toBe(values.length);
   const keys = p.distractorHints.map(choiceKey);
   expect(new Set(keys).size).toBe(keys.length);
   expect(keys).not.toContain(choiceKey(p.answer));

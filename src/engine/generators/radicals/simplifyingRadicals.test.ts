@@ -46,11 +46,11 @@ describe("simplifying-radicals: Topic Options", () => {
 });
 
 describe("simplifying-radicals: distractors", () => {
-  it("are distinct wrong values, at least three", () => {
+  it("are distinct wrong values, at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expectValueDistractors(p.answer, p.distractorHints);
+        expectValueDistractors(p.answer, p.distractorHints, 4);
       }),
     );
   });
@@ -66,4 +66,9 @@ describe("simplifying-radicals: generate()", () => {
   it("is deterministic, renders, and has variety", () => {
     commonChecks(generator, anyParams, [{}, { cubeRoots: true }, { variables: true }], 60);
   });
+});
+
+it("offers the mistake of dividing 25 by the root index", () => {
+  const p = generator.generate({}, 1);
+  expect(p.distractorHints).toContain("\\frac{25}{2}");
 });

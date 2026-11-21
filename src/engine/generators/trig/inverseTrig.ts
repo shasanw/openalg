@@ -141,6 +141,8 @@ function valuesProblem(rng: Rng, fns: readonly TrigFn[], notation: Notation, uni
     // the reference angle placed in the wrong quadrant (π - θ, π + θ)
     A(signed(fn, coterminal(rat(a.d - a.n, a.d)))),
     A(coterminal(rat(a.d + a.n, a.d))),
+    // the wrong inverse: the other four functions' angle for the same number
+    ...TRIG_FNS.filter((f) => f !== fn && f !== cofunction(fn) && f !== reciprocalFn(fn)).map((f) => inverseHint(f, v, unit)),
   ];
   const where = unit === "degrees" ? ",\\quad \\text{in degrees}" : "";
   return { kind: "values", prompt: inverseOf(fn, surdLatex(v), notation) + where, answer: angleLatex(a, unit), hints };
@@ -188,6 +190,8 @@ function trianglesProblem(rng: Rng, fns: readonly TrigFn[], notation: Notation):
     R(neg(flip(ans))),
     R(x), // the inverse "cancelled" with the outer function
     R(ratioOf(outer, legO, legA)), // the triangle drawn in Quadrant I regardless
+    // the wrong outer function: another ratio of the same triangle
+    ...TRIG_FNS.filter((f) => f !== outer).map((f) => R(ratioOf(f, opp, adj))),
   ];
   const prompt = apply(outer, inverseOf(inner, R(x), notation));
   return { kind: "triangles", prompt, answer: R(ans), hints };

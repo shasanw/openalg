@@ -63,7 +63,7 @@ describe("factoring-special-cases: distractors", () => {
     fc.assert(
       fc.property(anySeed, params, (seed, ps) => {
         const p = generator.generate(ps, seed);
-        expectGoodHints(p, 3);
+        expectGoodHints(p, 4);
         expectHintsWrongInValue(p);
       }),
     );
@@ -75,6 +75,7 @@ describe("factoring-special-cases: distractors", () => {
     const k = { ...base, square: false, a: 3, b: 5 };
     expect(answerLatex(k)).toBe("(3x + 5)(3x - 5)");
     const out = distractors(k);
+    expect(out).toContain("3x - 5"); // omit the conjugate
     expect(out[0]).toBe("(3x - 5)^{2}");
     expect(out).toContain("(3x + 5)^{2}");
     expect(out).toContain("(3x + 25)(3x - 25)");

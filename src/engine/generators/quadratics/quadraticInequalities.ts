@@ -437,14 +437,24 @@ export function distractors(k: InequalityConstruction, notation: Notation): stri
   }
   const tex = sets.map((s) => solutionToLatex(s, notation));
   const s = k.solution;
+  const ray = (edge: ExactNum, right: boolean) => {
+    const h = numToLatex(edge);
+    const closed = !isStrict(k.op);
+    if (notation === "interval") {
+      return right ? `${closed ? "[" : "("}${h}, \\infty)` : `(-\\infty, ${h}${closed ? "]" : ")"}`;
+    }
+    return `x ${right ? (closed ? "\\ge" : ">") : (closed ? "\\le" : "<")} ${h}`;
+  };
   if (s.kind === "outside") {
-    // dropped the left ray
-    const gt = s.closed ? "\\ge" : ">";
-    tex.push(
-      notation === "interval"
-        ? `${s.closed ? "[" : "("}${numToLatex(s.hi)}, \\infty)`
-        : `x ${gt} ${numToLatex(s.hi)}`,
-    );
+    // Kept only one of the two rays.
+    tex.push(ray(s.hi, true), ray(s.lo, false));
+  } else if (s.kind === "between") {
+    // Solved only one side of the compound inequality.
+    tex.push(ray(s.lo, true), ray(s.hi, false));
+  } else {
+    // Treated the vertex as the boundary of a linear inequality.
+    const vertex = rational(-k.b, 2 * k.a);
+    tex.push(ray(vertex, true), ray(vertex, false));
   }
   const correct = solutionToLatex(s, notation);
   const seen = new Set<string>([correct]);

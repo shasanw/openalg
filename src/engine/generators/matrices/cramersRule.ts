@@ -13,7 +13,7 @@ import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
 import { renderPolynomial } from "../../format";
 import { add, distinctHints, mul, numLatex, rat, type Rat } from "../shared/equationKit";
-import { det, mapEntries, type Matrix } from "./matrixKit";
+import { det, mapEntries, minors, type Matrix } from "./matrixKit";
 import { systemLatex } from "../shared/systemsKit";
 
 export const CRAMERS_RULE_ID = "cramers-rule";
@@ -149,6 +149,21 @@ export function distractors(k: CramerConstruction): string[] {
   // A zero coordinate (or D = ±1) collapses several of the above: the
   // swapped coordinates with D's sign dropped keeps a third choice.
   candidates.push(tupleLatex([mul(rat(-1), s[1]), mul(rat(-1), s[0]), ...s.slice(2)]));
+  // a sign error on a single coordinate (the first was done above)
+  for (let i = 1; i < s.length; i++) candidates.push(tupleLatex(s.map((v, j) => (j === i ? mul(rat(-1), v) : v))));
+  // the determinant slip made everywhere: D and every D_i found with the signs of their products wrong
+  // (ad + bc for 2 by 2, the cofactor signs left off for 3 by 3), and only D found that way (3 by 3)
+  const m = asMatrix(k.a);
+  const wrongDet = (mm: Matrix): Rat => {
+    if (mm.length === 2) return add(mul(mm[0][0], mm[1][1]), mul(mm[0][1], mm[1][0]));
+    return minors(mm)[0].reduce((t, x, j) => add(t, mul(mm[0][j], x)), rat(0));
+  };
+  const wrongD = wrongDet(m);
+  const wrongDi = k.a.map((_, col) => wrongDet(mapEntries(m, (x, i, j) => (j === col ? rat(k.b[i]) : x))));
+  if (wrongD.n !== 0) {
+    candidates.push(tupleLatex(wrongDi.map((d) => mul(d, rat(wrongD.d, wrongD.n)))));
+    if (s.length === 3) candidates.push(tupleLatex(Di.map((d) => mul(d, rat(wrongD.d, wrongD.n)))));
+  }
   return distinctHints(answerLatex(k), candidates);
 }
 

@@ -54,19 +54,26 @@ describe("multiplying-radicals: Topic Options", () => {
 });
 
 describe("multiplying-radicals: distractors", () => {
-  it("are distinct wrong values, at least three", () => {
+  it("are distinct wrong values, at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expectValueDistractors(p.answer, p.distractorHints);
+        expectValueDistractors(p.answer, p.distractorHints, 4);
       }),
     );
   });
 
-  it("still supplies three wrong values for the product of two square roots of two", () => {
+  it("still supplies four wrong values for the product of two square roots of two", () => {
     const p = generator.generate({ form: "monomial", cubeRoots: false, variables: false }, 1960976362);
     expect(p.answer).toBe("2");
-    expectValueDistractors(p.answer, p.distractorHints);
+    expectValueDistractors(p.answer, p.distractorHints, 4);
+  });
+
+  it("still supplies four wrong values for the product of equal square roots with a variable and a 2 under the root", () => {
+    for (const seed of [1534026198, 1845774268, 1312890010]) {
+      const p = generator.generate({ form: "monomial", cubeRoots: false, variables: true }, seed);
+      expectValueDistractors(p.answer, p.distractorHints, 4);
+    }
   });
 
   it("include the binomial square missing its middle term", () => {
@@ -86,4 +93,9 @@ describe("multiplying-radicals: generate()", () => {
   it("is deterministic, renders, and has variety", () => {
     commonChecks(generator, anyParams, [{}, { form: "monomial" }, { form: "distribute" }, { form: "binomial" }], 120);
   });
+});
+
+it("offers the mistake of distributing only to the second term of \u221a3(\u221a3 \u2212 3)", () => {
+  const p = generator.generate({ form: "distribute" }, 22);
+  expect(p.distractorHints).toContain("-2\\sqrt{3}");
 });

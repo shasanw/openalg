@@ -10,7 +10,7 @@
 
 import { createRng, type Rng } from "../../rng";
 import { resolveParams, type Generator, type ParamSchema, type ParamValues, type Problem } from "../../types";
-import { distinctHints, div, isInt, mul, rat, sub, type Rat } from "../shared/equationKit";
+import { add, distinctHints, div, isInt, mul, rat, sub, type Rat } from "../shared/equationKit";
 import { amountLatex, drawPercent, percentLatex, plausibleAmount, terminates, type PercentRange } from "./percentKit";
 
 export const PERCENTS_ID = "percents";
@@ -163,6 +163,17 @@ export function distractors(k: PercentConstruction, decimals = true): string[] {
       // ... and the percent multiplied in without dividing by 100
       values = [mul(part, f), div(part, div(percent, rat(10))!), div(part, div(percent, rat(1000))!), mul(part, rat(2)), mul(part, percent)];
       break;
+  }
+  // Added the percent (or the part) onto the whole instead of finding a part of it.
+  if (k.find === "part") values.push(add(whole, part), add(whole, percent), sub(whole, percent));
+  // Over 100%: counted only the part above the whole (175% of 100 as 75, forgetting the 100%).
+  if (k.find === "part" && percent.n > 100 * percent.d) values.push(mul(whole, sub(f, rat(1))));
+  if (k.find === "whole") values.push(add(part, percent), add(whole, part), sub(whole, part), div(part, percent));
+  // Used the whole as a percentage, used the remaining part as the base,
+  // or reported the percent after an increase instead of the part's percent.
+  if (k.find === "percent") {
+    const ratio = div(part, sub(whole, part));
+    values.push(whole, ratio && mul(ratio, rat(100)), add(rat(100), percent), mul(percent, rat(10)));
   }
   const answer = answerOf(k);
   return distinctHints(

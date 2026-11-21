@@ -1,10 +1,11 @@
+import { choiceKey } from "../../mc";
 import { matrixOperations } from "./matrixOperations.answer.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
 import { construct, distractors, generator, UNDEFINED } from "./matrixOperations";
 import { fromInts } from "./matrixKit";
-import { expectKatex, expectTidy, readMatrix } from "../shared/matrices.testkit";
+import { expectKatex, expectTidy, readMatrices, readMatrix } from "../shared/matrices.testkit";
 
 const anySeed = fc.integer({ min: 0, max: 0xffffffff });
 const anyParams = fc.record({
@@ -69,13 +70,14 @@ describe("matrix-operations: Topic Options", () => {
 });
 
 describe("matrix-operations: distractors", () => {
-  it("are distinct matrices, never the Answer, and at least one", () => {
+  it("are distinct matrices, never the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(1);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        expect(p.distractorHints).not.toContain(p.answer);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        expect(new Set(choices.map((s) => s.startsWith("\\text") ? s : JSON.stringify(readMatrix(s)))).size).toBe(choices.length);
         for (const d of p.distractorHints) readMatrix(d);
       }),
     );
@@ -92,6 +94,10 @@ describe("matrix-operations: distractors", () => {
     ]);
     // AB = [2 1; 4 3]; BA = [3 4; 1 2]
     const product = distractors({ operation: "multiply", a, b, s1: 1, s2: 1 });
+    expect(product).toContain("\\begin{bmatrix} 1 & 3 \\\\ 4 & 4 \\end{bmatrix}"); // A + B
+    // [-2 -2][2; 2] = [-8]: the products listed without adding them up
+    const rowCol = distractors({ operation: "multiply", a: fromInts([[-2, -2]]), b: fromInts([[2], [2]]), s1: 1, s2: 1 });
+    expect(rowCol).toContain("\\begin{bmatrix} -4 & -4 \\end{bmatrix}");
     expect(product[0]).toBe("\\begin{bmatrix} 3 & 4 \\\\ 1 & 2 \\end{bmatrix}");
     // 2A - 3B = [2 1; 3 8]; 2A - B = [2 3; 5 8]
     const combo = distractors({ operation: "combination", a, b, s1: 2, s2: -3 });
@@ -111,5 +117,49 @@ describe("matrix-operations: generate()", () => {
   it("has enough variety for a 20-Problem Section without repeats", () => {
     const prompts = new Set(Array.from({ length: 200 }, (_, s) => generator.generate({}, s).prompt));
     expect(prompts.size).toBeGreaterThan(190);
+  });
+});
+
+describe("matrix-operations: soak regressions", () => {
+  const matrixIsZero = (m: number[][]) => m.every((row) => row.every((x) => x === 0));
+  const choicesOf = (p: { answer: string; distractorHints: string[] }) =>
+    [p.answer, ...p.distractorHints].map((s) => (s.startsWith("\\text") ? s : JSON.stringify(readMatrix(s))));
+
+  // Seeds the 100,000-pair soak scan found short of four Distractors
+  const seeds: [string, Record<string, string | number | boolean>, number][] = [
+    ["a scalar times a zero matrix", { operation: "scalar", maxDimension: 2, allowNegatives: false, includeUndefined: false }, 549317452],
+    ["a product with an all-zero factor", { operation: "multiply", maxDimension: 2, allowNegatives: false, includeUndefined: true }, 96429794],
+    ["a column of 2s times a row of 2s", { operation: "multiply", maxDimension: 2, allowNegatives: false, includeUndefined: false }, 2184810762],
+    ["a column of 2s times a row of 2s (mixed)", { operation: "mixed", maxDimension: 2, allowNegatives: false, includeUndefined: false }, 3337457826],
+    ["a zero column times a row", { operation: "multiply", maxDimension: 2, allowNegatives: true, includeUndefined: true }, 3277209993],
+  ];
+  for (const [name, params, seed] of seeds) {
+    it(`keeps four distinct Distractors for ${name} (seed ${seed})`, () => {
+      const p = generator.generate(params, seed);
+      expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+      const choices = choicesOf(p);
+      expect(new Set(choices).size).toBe(choices.length);
+    });
+  }
+
+  it("never makes a scalar multiple of, or a product with, an all-zero matrix", () => {
+    fc.assert(
+      fc.property(anySeed, anyParams, (seed, params) => {
+        const p = generator.generate(params, seed);
+        const shown = readMatrices(p.prompt);
+        const scalar = shown.length === 1;
+        const product = !scalar && /\\end\{bmatrix\}\\begin/.test(p.prompt);
+        if (scalar || product) for (const m of shown) expect(matrixIsZero(m), p.prompt).toBe(false);
+      }),
+    );
+  });
+
+  it("models subtracting the entry pairs and writing a product with its rows and columns swapped", () => {
+    // [2; 2][2 2] = all 4s: the differences are all 0s
+    const out = distractors({ operation: "multiply", a: fromInts([[2], [2]]), b: fromInts([[2, 2]]), s1: 1, s2: 1 });
+    expect(out).toContain("\\begin{bmatrix} 0 & 0 \\\\ 0 & 0 \\end{bmatrix}");
+    // [1; 2; 3][1 2] = [1 2; 2 4; 3 6] written as [1 2 3; 2 4 6]
+    const tall = distractors({ operation: "multiply", a: fromInts([[1], [2], [3]]), b: fromInts([[1, 2]]), s1: 1, s2: 1 });
+    expect(tall).toContain("\\begin{bmatrix} 1 & 2 & 3 \\\\ 2 & 4 & 6 \\end{bmatrix}");
   });
 });

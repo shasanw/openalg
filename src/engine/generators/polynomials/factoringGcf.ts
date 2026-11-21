@@ -16,6 +16,7 @@ import {
   factoredLatex,
   mono,
   mul,
+  mulMono,
   nonzero,
   norm,
   pickVars,
@@ -128,6 +129,10 @@ export function distractors(k: GcfConstruction): string[] {
   c.push(at(inner.map((t, i) => (i === inner.length - 1 ? mono(-t.c, ...t.e) : t))));
   c.push(at(inner.map((t, i) => (i === 0 ? t : mono(-t.c, ...t.e)))));
   if (inner.length > 2) c.push(at(inner.map((t, i) => (i === 1 ? mono(-t.c, ...t.e) : t))));
+  // Leave one dividend term untouched when dividing out the GCF.
+  inner.forEach((_, skipped) => {
+    c.push(at(inner.map((t, i) => i === skipped ? mulMono(t, g) : t)));
+  });
   const answer = answerLatex(k);
   return factoredHints(answer, expandFactored({ g, factors: [inner] }), c, vars);
 }

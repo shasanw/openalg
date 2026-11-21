@@ -1,7 +1,8 @@
+import { expectDistinctChoices, slopeValue } from "../shared/distractors.testkit";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
-import { assemble, choiceKey } from "../../mc";
+import { assemble } from "../../mc";
 import { lineSegment, plot, type CoordinatePlaneSpec } from "../../plot";
 import { buildSection, questionKey } from "../../worksheet";
 import { fractionToLatex } from "../../format";
@@ -115,14 +116,11 @@ describe("slope: from a graph", () => {
 });
 
 describe("slope: multiple choice", () => {
-  it("offers at least three mistake-based Distractors, distinct and never the Answer", () => {
+  it("offers at least four mistake-based Distractors, distinct and never the Answer", () => {
     fc.assert(
       fc.property(anySeed, anyOptions, (seed, opts) => {
         const p = generator.generate(opts, seed);
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(3);
-        const keys = p.distractorHints.map(choiceKey);
-        expect(new Set(keys).size).toBe(keys.length);
-        expect(keys).not.toContain(choiceKey(p.answer));
+        expectDistinctChoices(p, slopeValue);
         const { choices, correctIndex } = assemble(p, { choices: 5, seed });
         expect(choices[correctIndex]).toBe(p.answer);
       }),
@@ -132,6 +130,7 @@ describe("slope: multiple choice", () => {
   it("leads with rise and run swapped, then the sign error", () => {
     // (1, 2) to (3, 8): slope 3
     const k: SlopeConstruction = { source: "points", slope: { rise: 3, run: 1 }, p1: [1, 2], p2: [3, 8] };
+    expect(distractors(k)).toContain("6"); // used the rise alone
     expect(distractors(k).slice(0, 4)).toEqual(["\\frac{1}{3}", "-3", "-\\frac{1}{3}", "\\frac{5}{2}"]);
   });
 });

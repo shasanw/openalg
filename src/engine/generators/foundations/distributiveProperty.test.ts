@@ -1,3 +1,4 @@
+import { choiceKey } from "../../mc";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { createRng } from "../../rng";
@@ -97,14 +98,17 @@ describe("distributive-property: Topic Options", () => {
 });
 
 describe("distributive-property: Distractors", () => {
-  it("are distinct, never equal to the Answer, and at least two", () => {
+  it("are distinct, never equal to the Answer, and at least four", () => {
     fc.assert(
       fc.property(anySeed, anyParams, (seed, params) => {
         const p = generator.generate(params, seed);
         const k = construct(params, createRng(seed));
-        expect(p.distractorHints.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(p.distractorHints).size).toBe(p.distractorHints.length);
-        for (const d of p.distractorHints) expect(sameExpression(d, p.answer, k.v), d).toBe(false);
+        expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+        const choices = [p.answer, ...p.distractorHints];
+        for (const [i, d] of choices.entries()) {
+          for (const earlier of choices.slice(0, i)) expect(sameExpression(d, earlier, k.v), d).toBe(false);
+        }
       }),
     );
   });
@@ -128,6 +132,7 @@ describe("distributive-property: Distractors", () => {
       answer: [{ coef: rat(2), deg: 2 }, { coef: rat(3), deg: 1 }],
     };
     expect(distractors(v)).toContain("5x");
+    expect(distractors(v)).toContain("2x + 3"); // omitted the outside factor
   });
 });
 
@@ -143,5 +148,20 @@ describe("distributive-property: generate()", () => {
   it("has enough variety for a 20-Problem Section without repeats", () => {
     const prompts = new Set(Array.from({ length: 200 }, (_, s) => generator.generate({}, s).prompt));
     expect(prompts.size).toBeGreaterThan(150);
+  });
+});
+
+describe("distributive-property: soak regressions", () => {
+  it("keeps four Distractors for 2(t + 2) + 2(2 + t) (seed 989682511)", () => {
+    const params = { multiplier: "integer", terms: 2, combineLikeTerms: true, allowNegatives: false, maxCoefficient: 2, varyVariable: true };
+    const p = generator.generate(params, 989682511);
+    expect(p.prompt).toBe("2(t + 2) + 2(2 + t)");
+    expect(p.answer).toBe("4t + 8");
+    expect(p.distractorHints.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(p.distractorHints.map(choiceKey)).size).toBe(p.distractorHints.length);
+    // the slip in only one group: 2(t + 2) as 2t + 2, the other group worked correctly
+    expect(p.distractorHints).toContain("4t + 6");
+    // combined the unlike terms 4t + 8 as 12t
+    expect(p.distractorHints).toContain("12t");
   });
 });

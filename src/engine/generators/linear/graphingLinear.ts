@@ -158,6 +158,11 @@ export function answerGraph(k: GraphingLinearConstruction): CoordinatePlaneSpec 
   return lineGraph(lineOf(k), k.points);
 }
 
+/** The facts with the intercept point written out directly, for mistakes that swap its coordinates. */
+function factsAt(s: Slope, label: "x" | "y", px: string, py: string): string {
+  return slopeEquation(s) + ANSWER_PART_SEPARATOR + `\\text{$${label}$-intercept: } ${pointLatex(px, py)}`;
+}
+
 /** Mistake-based Distractors: the Answer with one classic error each, most common first. */
 export function distractors(k: GraphingLinearConstruction): string[] {
   const d = new Distractors(answerLatex(k));
@@ -167,12 +172,26 @@ export function distractors(k: GraphingLinearConstruction): string[] {
     // x = c read as a horizontal line, or its x-intercept as a y-intercept
     d.add(factsLatex(slope(0, 1), c), factsLatex(s, c, false), factsLatex(slope(0, 1), "0"));
     d.add(factsLatex(s, String(-k.c)));
+    d.add(
+      factsAt(s, "x", "0", c), // swapped the coordinates of the intercept
+      factsLatex(slope(k.c, 1), "0", false), // read x = c as a slope of c
+      factsAt(slope(k.c, 1), "x", c, "0"), // read x = c as a slope of c, keeping the x-intercept
+      factsAt(slope(0, 1), "x", c, "0"), // called it horizontal but kept the x-intercept
+      factsAt(slope(1, 1), "y", "0", c), // read x = c as y = x + c
+    );
     return d.list;
   }
   if (s.rise === 0) {
     // y = c read as a vertical line, or as a slope of c
     d.add(factsLatex(slope(1, 0), c), factsLatex(slope(k.c, 1), "0"), factsLatex(slope(0, 1), String(-k.c)));
     d.add(factsLatex(slope(1, 0), c, false));
+    d.add(
+      factsAt(slope(0, 1), "y", c, "0"), // swapped the coordinates of the intercept
+      factsLatex(slope(0, 1), "0"), // saw no x-term and gave no intercept
+      factsLatex(slope(k.c, 1), c), // read y = c as a slope of c and an intercept of c
+      factsAt(slope(1, 0), "x", "0", c), // called it vertical and swapped the intercept's coordinates
+      factsAt(slope(1, 1), "y", "0", c), // read y = c as y = x + c
+    );
     return d.list;
   }
   const [x1, y1] = k.points[1];
@@ -196,6 +215,23 @@ export function distractors(k: GraphingLinearConstruction): string[] {
   // the negative reciprocal, then the rise miscounted by one
   d.add(factsLatex(slope(-s.run, s.rise), c));
   d.add(factsLatex(slope(s.rise + (s.rise > 0 ? 1 : -1), s.run), c));
+  const dir = s.rise > 0 ? 1 : -1;
+  d.add(
+    factsLatex(slope(s.rise, s.run + 1), c), // miscounted the run by one
+    factsLatex(slope(s.rise - dir, s.run), c), // miscounted the rise by one, short
+    factsLatex(slope(s.rise, 1), c), // gave the rise alone as the slope
+    factsLatex(s, String(s.rise)), // read the slope's rise as the y-intercept
+    factsAt(s, "y", c, "0"), // swapped the coordinates of the y-intercept
+  );
+  if (k.form === "standard") {
+    const [A, B, C] = standardCoefficients(lineOf(k));
+    d.add(
+      factsLatex(slope(A, 1), c), // read the x-coefficient A as the slope
+      B !== 1 ? factsLatex(s, String(C)) : null, // read C as the y-intercept without dividing by B
+    );
+  } else if (k.form === "pointSlope") {
+    d.add(factsLatex(s, String(-y1))); // read the constant on the left, as printed, as the intercept
+  }
   return d.list;
 }
 

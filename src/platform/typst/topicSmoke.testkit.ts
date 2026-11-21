@@ -23,6 +23,17 @@ import { ANSWER_KEY_FORMATS, buildWorksheet, setResponseFormat } from "../../eng
 import { GENERATORS } from "../../engine/registry";
 import { topicVariants } from "../../engine/topicVariants.testkit";
 
+/**
+ * Let the worker's event loop run between compiles. Every compile resolves as
+ * a microtask, so without this a shard never returns to the event loop for
+ * its whole test, cannot answer vitest's progress calls, and the run fails at
+ * random with "Timeout calling onTaskUpdate" though every test passed.
+ */
+const breathe = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+/** Key formats compiled for every option variant (see everyTopicCompiles). */
+const SMOKE_KEY_FORMATS = ["in-context", "full"] as const;
+
 /** How many topicsN.smoke.test.ts files share the Topics. */
 export const TOPIC_SHARDS = 9;
 
@@ -62,17 +73,31 @@ export function everyTopicCompiles(shard: number): void {
           const fr = buildWorksheet({ generatorId: g.id, params, baseSeed: 1000 + i, count: 20 });
           const mc = setResponseFormat(fr, { mode: "multiple-choice", choices: 5 });
           for (const ws of [fr, mc]) {
-            const pages: Record<string, number> = {};
-            for (const keyFormat of ANSWER_KEY_FORMATS) {
-              pages[keyFormat] = (await engine.svgPages(buildTypstDocument(ws, { keyFormat }))).length;
-              expect(engine.warnings).toEqual([]);
+            if (i === 0) {
+              // The defaults: every key format, rendered, with its page count.
+              const pages: Record<string, number> = {};
+              for (const keyFormat of ANSWER_KEY_FORMATS) {
+                pages[keyFormat] = (await engine.svgPages(buildTypstDocument(ws, { keyFormat }))).length;
+                expect(engine.warnings).toEqual([]);
+                await breathe();
+              }
+              expect(pages.none).toBeGreaterThan(0);
+              // Every key starts on its own page; in context repeats the whole sheet.
+              expect(pages.full).toBeGreaterThan(pages.none);
+              expect(pages.odds).toBeGreaterThan(pages.none);
+              expect(pages.odds).toBeLessThanOrEqual(pages.full);
+              expect(pages["in-context"]).toBeGreaterThanOrEqual(2 * pages.none);
+              continue;
             }
-            expect(pages.none).toBeGreaterThan(0);
-            // Every key starts on its own page; in context repeats the whole sheet.
-            expect(pages.full).toBeGreaterThan(pages.none);
-            expect(pages.odds).toBeGreaterThan(pages.none);
-            expect(pages.odds).toBeLessThanOrEqual(pages.full);
-            expect(pages["in-context"]).toBeGreaterThanOrEqual(2 * pages.none);
+            // Every other option variant: compiled, not rendered, in the two key
+            // formats that hold all the markup (in context repeats the student
+            // sheet with its key marks; the full key lists every Answer, which
+            // the odd-numbered key only subsets).
+            for (const keyFormat of SMOKE_KEY_FORMATS) {
+              await engine.check(buildTypstDocument(ws, { keyFormat }));
+              expect(engine.warnings, `${g.id} ${JSON.stringify(params)} ${keyFormat}`).toEqual([]);
+              await breathe();
+            }
           }
         }
       }, 120_000);

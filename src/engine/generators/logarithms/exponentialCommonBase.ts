@@ -218,6 +218,12 @@ export function distractors(k: CommonBaseConstruction): string[] {
       div(sub(div(R(L.p), K)!, R(L.b)), R(L.a)),
       printed !== null && printed <= 32 ? div(sub(R(printed), R(L.b)), R(L.a)) : null,
       printed !== null && L.p > 0 ? div(sub(div(R(printed), R(intPow(k.c, L.p)!))!, R(L.b)), R(L.a)) : null,
+      // Treat the printed right side as the exponent, even for a reciprocal.
+      div(sub(k.k < 0 ? rat(1, intPow(k.c, -k.k)!) : R(printed!), R(L.b)), R(L.a)),
+      div(Kp, R(L.a)), // drop the constant in the exponent
+      div(sub(K, R(L.p + L.b)), R(L.a)), // add exponents in a power of a power
+      div(sub(K, R(L.b)), R(k.c ** Math.abs(L.p) * L.a)), // use the base as the x coefficient
+      Kp, // stop at ax + b
     ];
   } else {
     const Rt = k.right;
@@ -230,6 +236,13 @@ export function distractors(k: CommonBaseConstruction): string[] {
       neg(x),
       div(R(Math.abs(Rt.p) * Rt.b - Math.abs(L.p) * L.b), R(Math.abs(L.p) * L.a - Math.abs(Rt.p) * Rt.a)),
       div(R(Rt.p * Rt.b - L.p * L.b), R(L.p * L.a + Rt.p * Rt.a)),
+      R(Rt.p * Rt.b - L.p * L.b), // stop before dividing by the combined x coefficient
+      div(R(Rt.p * Rt.b - L.p * L.b), R(L.p * L.a)), // omit the right x term
+      div(R(Rt.p * Rt.b - L.p * L.b), R(-Rt.p * Rt.a)), // omit the left x term
+      div(R(Rt.p + Rt.b - L.p - L.b), R(L.a - Rt.a)), // add the outer and inner exponents
+      div(R(1), x), // invert the final division
+      sideExponent(L, x), // report the common exponent instead of x
+      R(0), // equate the variable parts and drop both constants
     ];
   }
   return distinctHints(
