@@ -22,6 +22,14 @@ function slopeOf(eq: string) {
 
 function curves(graph?: GraphSpec) {
   check(graph?.kind === "plane", "missing plane");
+  if (graph.axisLabels) check(graph.axisLabels.x === "x" && graph.axisLabels.y === "y", "incorrect coordinate axes");
+  for (const pt of graph.points ?? []) {
+    if (pt.label === undefined) continue;
+    const label = pt.label.replace(/−/g, "-").match(/^\((-?[\d.]+),\s*(-?[\d.]+)\)$/);
+    check(label, `unrecognized coordinate label ${pt.label}`);
+    equal(Number(label[1]), pt.x);
+    equal(Number(label[2]), pt.y);
+  }
   return graph.curves ?? [];
 }
 function onCurve(eq: string, c: LineCurve) {
