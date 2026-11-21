@@ -1,7 +1,12 @@
 // Multiple-choice assembler (issue #5). Turns any Problem into a set of
 // lettered choices: the Answer plus Distractors drawn from the Problem's
 // mistake-based `distractorHints`, topped up with deterministic fallback
-// Distractors when the hints run short.
+// Distractors when the hints run short. A Problem without enough hints (a
+// Custom Problem a teacher wrote has none) is topped up with plausible
+// mistakes of its Answer first (the sign flipped, a fraction's reciprocal, a
+// number doubled or halved, a leading coefficient's sign), then with numbers
+// nudged by one, and never with a well-formed equivalent of the Answer (no
+// \frac{2}{4} for \frac{1}{2}).
 //
 // The assembler is pure and its seed is an explicit input. The SET of choices
 // depends only on (problem, choice count); the seed only decides their ORDER
@@ -89,28 +94,112 @@ function splitTopLevel(s: string): string[] {
   return out;
 }
 
-/**
- * Fallback Distractors, in a fixed order, for when a Problem's hints run
- * short: each nudges one whole number in the Answer by a small amount (keeping
- * it a positive whole number, so no "\frac{1}{0}" or "-0"). An Answer with no
- * numbers at all falls back to "x = 1", "x = 2", ... using the Answer's own
- * left-hand side. The sequence never ends, so filling always terminates.
- */
+/** Preserve the variable in a printed answer such as "x = -3". */
+function answerParts(answer: Latex) {
+  const prefix = answer.match(/^\s*(?:[a-zA-Z]|\\theta)\s*=\s*/)?.[0] ?? "";
+  return { prefix, value: answer.slice(prefix.length).trim() };
+}
+
+/** Read a scalar exactly, including unreduced fractions and finite decimals. */
+function scalar(value: string): [bigint, bigint] | undefined {
+  const compact = value.replace(/\s+/g, "");
+  const frac = compact.match(/^([+-]?)\\frac\{([+-]?\d+)\}\{([+-]?\d+)\}$/);
+  if (frac && BigInt(frac[3]) !== 0n)
+    return [(frac[1] === "-" ? -1n : 1n) * BigInt(frac[2]), BigInt(frac[3])];
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(compact)) return;
+  const places = compact.split(".")[1]?.length ?? 0;
+  return [BigInt(compact.replace(".", "")), 10n ** BigInt(places)];
+}
+
+function gcd(a: bigint, b: bigint): bigint {
+  while (b !== 0n) [a, b] = [b, a % b];
+  return a;
+}
+
+function reduced(n: bigint, d: bigint): Latex {
+  let a = n < 0n ? -n : n;
+  let b = d < 0n ? -d : d;
+  const sign = n !== 0n && (n < 0n) !== (d < 0n) ? "-" : "";
+  const numerator = a;
+  const denominator = b;
+  while (b !== 0n) [a, b] = [b, a % b];
+  return denominator === a ? sign + String(numerator / a) : `${sign}\\frac{${numerator / a}}{${denominator / a}}`;
+}
+
+/** An exact value key lets fallback choices respect a differently spelled hint. */
+function fallbackKey(answer: Latex): string {
+  const { prefix, value } = answerParts(answer);
+  const pair = scalar(value);
+  return choiceKey(pair ? prefix + reduced(...pair) : answer);
+}
+
+function* mistakeFallbacks(answer: Latex): Generator<Latex> {
+  const { prefix, value } = answerParts(answer);
+  const pair = scalar(value);
+  if (pair) {
+    const [n, d] = pair;
+    if (n === 0n) return;
+    yield prefix + reduced(-n, d);
+    if (value.includes("\\frac")) yield prefix + reduced(d, n);
+    yield prefix + reduced(2n * n, d);
+    yield prefix + reduced(n, 2n * d);
+  } else if (/^-?(?:[1-9]\d*)?[a-z](?:\^(?:\d+|\{\d+\}))?(?:\s*[+-]|$)/.test(value)) {
+    // Flip only a nonzero leading monomial (e.g. -3x² + 1 becomes 3x² + 1).
+    yield prefix + (value.startsWith("-") ? value.slice(1) : "-" + value);
+  }
+}
+
+/** Last-resort numerical offsets, after the mistake-based choices. */
 export function* fallbackDistractors(answer: Latex): Generator<Latex> {
-  const numbers = [...answer.matchAll(/\d+/g)];
+  const { prefix, value } = answerParts(answer);
+  const pair = scalar(value);
+  if (pair && (/^-?\d+$/.test(value) || /^-?\\frac\{\d+\}\{\d+\}$/.test(value))) {
+    const numbers = [...value.matchAll(/\d+/g)];
+    for (let step = 1n; ; step++) {
+      for (const delta of [step, -step]) {
+        for (const [i, m] of numbers.entries()) {
+          // A zero fraction remains zero when only its denominator changes.
+          if (i === 1 && pair[0] === 0n) continue;
+          const changed = BigInt(m[0]) + delta;
+          if (changed < 1n) continue;
+          yield prefix + value.slice(0, m.index) + changed + value.slice(m.index! + m[0].length);
+        }
+      }
+    }
+  }
+  if (pair) {
+    for (let step = 1n; ; step++) {
+      for (const delta of [step, -step]) yield prefix + reduced(pair[0] + delta * pair[1], pair[1]);
+    }
+  }
+  // Any other Answer (several parts, text, expressions): nudge one whole number
+  // at a time, keeping it positive so no "\frac{1}{0}" or "-0" appears. Skip a
+  // digit whose change cannot change the value (the exponent of 0 or 1, the
+  // denominator of a zero fraction), since that would print the Answer again.
+  const numbers = [...answer.matchAll(/\d+/g)].filter(
+    (m) => !/(?:^|[^\d.])[01]\^\{?$|\\frac\{0\}\{$/.test(answer.slice(0, m.index)),
+  );
   if (numbers.length === 0) {
+    // Nothing to nudge: "x = 1", "x = 2", ... on the Answer's own left-hand side.
     const eq = answer.indexOf("=");
     const lhs = eq >= 0 ? answer.slice(0, eq + 1).trimEnd() + " " : "";
-    for (let n = 1; ; n++) yield `${lhs}${n}`;
+    for (let n = 1n; ; n++) yield `${lhs}${n}`;
   }
-  for (let step = 1; ; step++) {
+  for (let step = 1n; ; step++) {
     for (const delta of [step, -step]) {
       for (const m of numbers) {
         // BigInt so a long digit run still changes by exactly `delta`.
-        const value = BigInt(m[0]) + BigInt(delta);
-        if (value < 1n) continue;
-        const at = m.index!;
-        yield answer.slice(0, at) + String(value) + answer.slice(at + m[0].length);
+        const changed = BigInt(m[0]) + delta;
+        if (changed < 1n) continue;
+        const before = answer.slice(0, m.index);
+        const after = answer.slice(m.index! + m[0].length);
+        // Never print an unreduced fraction such as \frac{10}{2}: a tell, and
+        // not how a student would write an Answer.
+        const num = after.match(/^\}\{(\d+)\}/);
+        const den = before.match(/\\frac\{(\d+)\}\{$/);
+        if (before.endsWith("\\frac{") && num && gcd(changed, BigInt(num[1])) > 1n) continue;
+        if (den && gcd(BigInt(den[1]), changed) > 1n) continue;
+        yield before + changed + after;
       }
     }
   }
@@ -144,8 +233,16 @@ export function assemble(
     full = take(hint);
   }
   if (!full) {
-    for (const candidate of fallbackDistractors(problem.answer)) {
-      if (take(candidate)) break;
+    const values = new Set(picked.map(fallbackKey));
+    for (const source of [mistakeFallbacks, fallbackDistractors]) {
+      for (const candidate of source(problem.answer)) {
+        const key = fallbackKey(candidate);
+        if (values.has(key)) continue;
+        values.add(key);
+        full = take(candidate);
+        if (full) break;
+      }
+      if (full) break;
     }
   }
 
