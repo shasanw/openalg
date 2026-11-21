@@ -18,10 +18,18 @@ export function equation(p: Problem) {
   const v = names(p.prompt)[0];
   const f = (x: number) => gap(p.prompt, { [v]: x });
   if (p.generatorId === "solving-proportions") {
-    const xs = roots(p.answer, v);
-    equal(xs.length, 1);
-    equal(f(xs[0]), 0);
-    check(!close(f(xs[0] + 1), 0), "non-unique proportion");
+    const [lhs, rhs] = splitEquation(p.prompt);
+    const fraction = (side: string) => {
+      const m = side.match(/^\\frac\{([^{}]+)\}\{([^{}]+)\}$/)!;
+      return [m[1], m[2]];
+    };
+    const [a, b] = fraction(lhs),
+      [c, d] = fraction(rhs);
+    const candidates = realRoots((x) => evalLatex(`(${a})(${d}) - (${b})(${c})`, { [v]: x }));
+    sameNumbers(
+      roots(p.answer, v),
+      candidates.filter((x) => Number.isFinite(f(x)) && close(f(x), 0)),
+    );
   } else if (p.prompt.includes("\\lvert")) {
     const candidates = [1, -1].flatMap((sign) => {
       const eq = p.prompt.replace(/\\lvert(.+?)\\rvert/, `(${sign})($1)`);

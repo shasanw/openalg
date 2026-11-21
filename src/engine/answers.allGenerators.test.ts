@@ -7,6 +7,7 @@ import { evalArithmetic } from "./generators/foundations/arithmeticEval.testkit"
 import { close } from "./generators/shared/latexEval.testkit";
 import { checkers } from "./answerCheckers/index.testkit";
 import { GENERATORS } from "./registry";
+import { anyParams } from "./generators/polynomials/polynomials.testkit";
 import { topicVariants } from "./topicVariants.testkit";
 
 describe("printed Answer Key across every Topic", () => {
@@ -16,12 +17,14 @@ describe("printed Answer Key across every Topic", () => {
       () => {
         const verify = checkers[g.id];
         expect(
-          Object.prototype.hasOwnProperty.call(checkers,g.id) && verify,
+          Object.prototype.hasOwnProperty.call(checkers, g.id) && verify,
           `Add an independent printed Answer checker for ${g.id} in answerCheckers/index.testkit.ts`,
         ).toBeTypeOf("function");
-        for (const params of topicVariants(g.schema)) {
+        const options = topicVariants(g.schema).map((params) => fc.constant(params));
+        options.push(anyParams(g.schema));
+        for (const variant of options) {
           fc.assert(
-            fc.property(fc.integer({ min: 0, max: 0xffffffff }), (seed) => {
+            fc.property(fc.integer({ min: 0, max: 0xffffffff }), variant, (seed, params) => {
               const p = g.generate(params, seed);
               try {
                 verify(p);
