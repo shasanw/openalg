@@ -23,6 +23,14 @@ import { ANSWER_KEY_FORMATS, buildWorksheet, setResponseFormat } from "../../eng
 import { GENERATORS } from "../../engine/registry";
 import { topicVariants } from "../../engine/topicVariants.testkit";
 
+/**
+ * Let the worker's event loop run between compiles. Every compile resolves as
+ * a microtask, so without this a shard never returns to the event loop for
+ * its whole test, cannot answer vitest's progress calls, and the run fails at
+ * random with "Timeout calling onTaskUpdate" though every test passed.
+ */
+const breathe = () => new Promise<void>((resolve) => setImmediate(resolve));
+
 /** How many topicsN.smoke.test.ts files share the Topics. */
 export const TOPIC_SHARDS = 9;
 
@@ -66,6 +74,7 @@ export function everyTopicCompiles(shard: number): void {
             for (const keyFormat of ANSWER_KEY_FORMATS) {
               pages[keyFormat] = (await engine.svgPages(buildTypstDocument(ws, { keyFormat }))).length;
               expect(engine.warnings).toEqual([]);
+              await breathe();
             }
             expect(pages.none).toBeGreaterThan(0);
             // Every key starts on its own page; in context repeats the whole sheet.
