@@ -132,7 +132,7 @@ export function SectionOutline({
       {/* Right under the last Section, where the new one will appear. Sticky,
           so on a list long enough to scroll it pins to the bottom edge
           instead of scrolling out of view. */}
-      <div className="bg-panel before:from-panel sticky bottom-0 -mx-2 -mb-2 px-2 pb-2 before:pointer-events-none before:absolute before:inset-x-0 before:-top-4 before:h-4 before:bg-gradient-to-t before:to-transparent">
+      <div className="bg-panel sticky bottom-0 -mx-2 -mb-2 px-2 pb-2">
         <Button
           variant="quiet"
           className="w-full justify-start px-2.5"
