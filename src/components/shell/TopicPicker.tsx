@@ -16,7 +16,15 @@
 // list (up/down picks a Unit; Enter, right arrow or typing goes back to the
 // search), then Cancel and Add.
 
-import { Fragment, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Dialog } from "radix-ui";
 import { Search, X } from "lucide-react";
 import { coursesOf, LISTINGS, type Listing } from "@/engine/courses";
@@ -68,7 +76,7 @@ export function TopicPicker({
             e.preventDefault();
             searchRef.current?.focus();
           }}
-          className="bg-popover text-popover-foreground border-border-strong data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] fixed top-1/2 left-1/2 z-50 flex h-[min(560px,calc(100vh-32px))] w-[min(960px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border shadow-[var(--shadow-pop)] outline-none"
+          className="bg-popover text-popover-foreground border-border-strong data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] fixed top-1/2 left-1/2 z-50 flex h-[min(760px,calc(100vh-32px))] w-[min(1200px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border shadow-[var(--shadow-pop)] outline-none"
         >
           <PickerBody
             onPick={onPick}
@@ -96,7 +104,11 @@ function PickerBody({
   const courses = useMemo(() => coursesOf(listings), [listings]);
   // The body mounts each time the picker opens, so this runs per opening.
   const [course, setCourse] = useState(() =>
-    initialCourse({ sections, remembered: rememberedCourse(courses), listings }),
+    initialCourse({
+      sections,
+      remembered: rememberedCourse(courses),
+      listings,
+    }),
   );
   const [query, setQuery] = useState("");
   // The Unit chosen while browsing the Course, kept through a search.
@@ -111,7 +123,13 @@ function PickerBody({
 
   const searching = query.trim() !== "";
   const view = useMemo(
-    () => browseTopics({ listings, course, unit: searching ? searchUnit : unit, query }),
+    () =>
+      browseTopics({
+        listings,
+        course,
+        unit: searching ? searchUnit : unit,
+        query,
+      }),
     [listings, course, unit, searchUnit, searching, query],
   );
   const used = useMemo(() => sectionsByTopic(sections), [sections]);
@@ -131,10 +149,15 @@ function PickerBody({
   // that Course's Unit. That choice is separate from the browsing one and is
   // dropped when the search is cleared, which restores the chosen Course and
   // the Unit picked there.
-  const unitChoices: { unit: UnitRef | null; label: string; count: number }[] = [
-    { unit: null, label: "All Units", count: view.total },
-    ...view.units.map((u) => ({ unit: { course: u.course, name: u.name }, label: u.name, count: u.count })),
-  ];
+  const unitChoices: { unit: UnitRef | null; label: string; count: number }[] =
+    [
+      { unit: null, label: "All Units", count: view.total },
+      ...view.units.map((u) => ({
+        unit: { course: u.course, name: u.name },
+        label: u.name,
+        count: u.count,
+      })),
+    ];
   const unitIndex = unitChoices.findIndex((c) => sameUnit(c.unit, view.unit));
   const unitOptionId = (i: number) => `${unitsId}-unit-${i}`;
 
@@ -218,9 +241,16 @@ function PickerBody({
   return (
     <>
       <header className="flex h-12 shrink-0 items-center gap-3 border-b pr-2.5 pl-4">
-        <Dialog.Title className="text-[14px] font-semibold">Add Section</Dialog.Title>
+        <Dialog.Title className="text-[14px] font-semibold">
+          Add Section
+        </Dialog.Title>
         <Dialog.Close asChild>
-          <Button variant="quiet" size="icon-sm" className="ml-auto" aria-label="Close">
+          <Button
+            variant="quiet"
+            size="icon-sm"
+            className="ml-auto"
+            aria-label="Close"
+          >
             <X />
           </Button>
         </Dialog.Close>
@@ -244,13 +274,16 @@ function PickerBody({
             placeholder="Search Topics, Units and Courses…"
             className="placeholder:text-subtle-foreground min-w-0 flex-1 bg-transparent text-[13.5px] outline-none"
           />
-          <span className="text-muted-foreground shrink-0 text-[12px] tabular-nums" aria-live="polite">
+          <span
+            className="text-muted-foreground shrink-0 text-[12px] tabular-nums"
+            aria-live="polite"
+          >
             {view.total} Topic{view.total === 1 ? "" : "s"}
           </span>
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[156px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] min-[880px]:grid-cols-[176px_minmax(0,1fr)_minmax(260px,300px)] min-[880px]:grid-rows-1">
+      <div className="grid min-h-0 flex-1 grid-cols-[184px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] min-[880px]:grid-cols-[208px_minmax(0,1fr)_minmax(280px,400px)] min-[880px]:grid-rows-1">
         {/* Course, then its Units */}
         <div className="bg-panel-2 flex min-h-0 flex-col border-r">
           {courses.length > 1 && (
@@ -280,7 +313,9 @@ function PickerBody({
               const on = i === unitIndex;
               const prev = unitChoices[i - 1]?.unit;
               const courseHeading =
-                view.scope === "all" && c.unit && c.unit.course !== prev?.course ? c.unit.course : null;
+                view.scope === "all" && c.unit && c.unit.course !== prev?.course
+                  ? c.unit.course
+                  : null;
               return (
                 <Fragment key={c.unit ? `${c.unit.course}/${c.unit.name}` : ""}>
                   {courseHeading && (
@@ -296,7 +331,9 @@ function PickerBody({
                     role="option"
                     aria-selected={on}
                     aria-label={
-                      view.scope === "all" && c.unit ? `${c.unit.course}, ${c.label}, ${c.count}` : undefined
+                      view.scope === "all" && c.unit
+                        ? `${c.unit.course}, ${c.label}, ${c.count}`
+                        : undefined
                     }
                     data-unit-index={i}
                     onMouseDown={(e) => e.preventDefault()}
@@ -308,7 +345,9 @@ function PickerBody({
                         : "hover:bg-hover border-transparent",
                     )}
                   >
-                    <span className="truncate">{c.label}</span>
+                    <span className="line-clamp-2 leading-snug" title={c.label}>
+                      {c.label}
+                    </span>
                     <span
                       className={cn(
                         "shrink-0 text-[12px] tabular-nums",
@@ -339,7 +378,10 @@ function PickerBody({
           )}
           {view.groups.map((group, gi) => {
             const courseHeading =
-              view.scope === "all" && group.course !== view.groups[gi - 1]?.course ? group.course : null;
+              view.scope === "all" &&
+              group.course !== view.groups[gi - 1]?.course
+                ? group.course
+                : null;
             const labelId = `${listId}-group-${gi}`;
             const courseId = `${listId}-course-${courses.indexOf(group.course)}`;
             return (
@@ -358,7 +400,9 @@ function PickerBody({
                 )}
                 <div
                   role="group"
-                  aria-labelledby={view.scope === "all" ? `${courseId} ${labelId}` : labelId}
+                  aria-labelledby={
+                    view.scope === "all" ? `${courseId} ${labelId}` : labelId
+                  }
                   className="mb-2"
                 >
                   <GroupLabel className="px-2 pt-1.5 pb-1">
@@ -386,12 +430,16 @@ function PickerBody({
                             : "hover:bg-hover border-transparent",
                         )}
                       >
-                        <div className="truncate font-medium">{l.topic.title}</div>
+                        <div className="truncate font-medium">
+                          {l.topic.title}
+                        </div>
                         {letters && (
                           <div
                             className={cn(
                               "truncate text-[12px]",
-                              on ? "text-selected-muted" : "text-muted-foreground",
+                              on
+                                ? "text-selected-muted"
+                                : "text-muted-foreground",
                             )}
                           >
                             {usedLabel(letters)}
@@ -428,7 +476,11 @@ function PickerBody({
           <Dialog.Close asChild>
             <Button variant="secondary">Cancel</Button>
           </Dialog.Close>
-          <Button variant="primary" disabled={!activeTopic} onClick={() => pick(activeTopic)}>
+          <Button
+            variant="primary"
+            disabled={!activeTopic}
+            onClick={() => pick(activeTopic)}
+          >
             Add as Section {nextLetter}
           </Button>
         </div>
@@ -440,7 +492,9 @@ function PickerBody({
 function TopicPreview({ listing }: { listing: Listing | undefined }) {
   const topic = listing?.topic;
   // Cached per Topic and Topic Options, so moving the highlight never regenerates Problems.
-  const sample = listing ? topicSample(listing.topic, listing.options) : undefined;
+  const sample = listing
+    ? topicSample(listing.topic, listing.options)
+    : undefined;
   // Fade the bottom edge while more of the preview is below it: with macOS's
   // hidden scrollbars, a cut-off line otherwise looks like a layout bug.
   const pane = useRef<HTMLElement>(null);
@@ -466,15 +520,17 @@ function TopicPreview({ listing }: { listing: Listing | undefined }) {
       className="data-[more-below]:[mask-image:linear-gradient(to_bottom,black_calc(100%-40px),transparent)] col-span-2 max-h-[176px] min-h-0 overflow-y-auto border-t p-4 min-[880px]:col-span-1 min-[880px]:max-h-none min-[880px]:border-t-0 min-[880px]:border-l"
     >
       {!sample ? (
-        <p className="text-muted-foreground">Pick a Topic to see sample Problems.</p>
+        <p className="text-muted-foreground">
+          Pick a Topic to see sample Problems.
+        </p>
       ) : (
-        <div className="grid gap-x-6 gap-y-4 max-[879px]:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 max-[879px]:grid-cols-2">
           <div>
             <GroupLabel className="mb-2">Sample Problems</GroupLabel>
             {/* One paper card: the sample Problems, then the graph printed
                 with each Problem (if any) as a small thumbnail under them, so
                 the equations keep the card's full width. */}
-            <div className="rounded-md bg-white px-3 py-2.5 text-[#16181d] shadow-[var(--shadow-page)]">
+            <div className="overflow-x-auto rounded-md bg-white px-3 py-2.5 text-[#16181d] shadow-[var(--shadow-page)]">
               <ol className="font-paper space-y-1.5 text-[15px] whitespace-nowrap">
                 {sample.problems.map((tex, i) => (
                   <li key={i} className="flex gap-2">
@@ -494,7 +550,9 @@ function TopicPreview({ listing }: { listing: Listing | undefined }) {
           </div>
           <div className="space-y-4">
             <div>
-              <GroupLabel className="mb-1.5">Topic Options you can set</GroupLabel>
+              <GroupLabel className="mb-1.5">
+                Topic Options you can set
+              </GroupLabel>
               {sample.options.length === 0 ? (
                 <p className="text-muted-foreground">None</p>
               ) : (
@@ -507,7 +565,9 @@ function TopicPreview({ listing }: { listing: Listing | undefined }) {
             </div>
             <div>
               <GroupLabel className="mb-1.5">Directions</GroupLabel>
-              <p className="text-muted-foreground leading-snug">{sample.directions}</p>
+              <p className="text-muted-foreground leading-snug">
+                {sample.directions}
+              </p>
             </div>
           </div>
         </div>
